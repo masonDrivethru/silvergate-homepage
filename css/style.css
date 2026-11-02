@@ -17,6 +17,7 @@
   --silver-2: #8a92a3;
   --on-brand: #ffffff;
   --ok: #12b76a;
+  --hero-silver: #c9ced8;
 
   /* type */
   --font: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
@@ -47,7 +48,7 @@
   :root:not([data-theme="light"]) {
     --bg: #0b0d12; --bg-tint: #10131a; --surface: #12151d; --surface-2: #181c26;
     --line: #232836; --text: #eef0f4; --text-2: #9aa1b2;
-    --brand: #5b7cff; --brand-2: #9b85ff; --brand-soft: #161c33;
+    --brand: #5b7cff; --brand-2: #9b85ff; --brand-soft: #161c33; --hero-silver: #2a3142;
     --shadow-md: 0 8px 24px -8px rgb(0 0 0 / .5); --shadow-lg: 0 24px 48px -16px rgb(0 0 0 / .6);
     color-scheme: dark;
   }
@@ -55,7 +56,7 @@
 :root[data-theme="dark"] {
   --bg: #0b0d12; --bg-tint: #10131a; --surface: #12151d; --surface-2: #181c26;
   --line: #232836; --text: #eef0f4; --text-2: #9aa1b2;
-  --brand: #5b7cff; --brand-2: #9b85ff; --brand-soft: #161c33;
+  --brand: #5b7cff; --brand-2: #9b85ff; --brand-soft: #161c33; --hero-silver: #2a3142;
   --shadow-md: 0 8px 24px -8px rgb(0 0 0 / .5); --shadow-lg: 0 24px 48px -16px rgb(0 0 0 / .6);
   color-scheme: dark;
 }
@@ -64,6 +65,7 @@
    Base
    ========================================================= */
 *, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html { scroll-behavior: smooth; scroll-padding-top: calc(var(--nav-h) + 12px); -webkit-text-size-adjust: 100%; }
 body {
   margin: 0; background: var(--bg); color: var(--text);
@@ -149,7 +151,7 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: roun
   background:
     radial-gradient(40% 40% at 20% 30%, color-mix(in srgb, var(--brand) 22%, transparent), transparent 70%),
     radial-gradient(35% 35% at 80% 20%, color-mix(in srgb, var(--brand-2) 18%, transparent), transparent 70%),
-    radial-gradient(30% 30% at 60% 70%, color-mix(in srgb, var(--silver-1) 40%, transparent), transparent 70%);
+    radial-gradient(30% 30% at 60% 70%, color-mix(in srgb, var(--hero-silver) 40%, transparent), transparent 70%);
   filter: blur(40px);
   animation: float 18s ease-in-out infinite alternate;
 }
