@@ -1,16 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#2f5bff"/>
-      <stop offset="1" stop-color="#7a5cff"/>
-    </linearGradient>
-    <linearGradient id="s" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#ffffff"/>
-      <stop offset="1" stop-color="#d7dbe4"/>
-    </linearGradient>
-  </defs>
-  <rect width="64" height="64" rx="16" fill="url(#g)"/>
-  <!-- gate: arch -->
-  <path d="M18 48V30a14 14 0 0 1 28 0v18" fill="none" stroke="url(#s)" stroke-width="6" stroke-linecap="round"/>
-  <rect x="28" y="34" width="8" height="14" rx="2" fill="#ffffff"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -37 170 170">
+  <style>g{fill:#1c1c1c;stroke:#1c1c1c}@media (prefers-color-scheme:dark){g{fill:#e4e4e2;stroke:#e4e4e2}}</style>
+  <!-- SilverGate bridge mark (명함 CI) -->
+  <g><path stroke="none" d="M4 71 Q84 47 166 69 Q84 55 4 71 Z"/><path stroke="none" d="M58 6 C60.2 30 60.4 66 59.4 88 L57.8 88 C57 66 56.6 30 58 6 Z"/><path stroke="none" d="M112 3 C114.2 28 114.4 68 113.4 91 L111.8 91 C111 68 110.6 28 112 3 Z"/><path fill="none" stroke-width="2.2" stroke-linecap="round" d="M30 52 Q46 34 58 14 M58 14 Q85 66 112 10 M112 10 Q126 32 142 50"/></g>
 </svg>
