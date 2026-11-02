@@ -1,9 +1,10 @@
 // SilverGate service worker — offline support
-const CACHE = 'sg-v2';
+const CACHE = 'sg-v20';
 const ASSETS = [
   './',
   './index.html',
   './css/style.css',
+  './js/i18n.js',
   './js/main.js',
   './manifest.webmanifest',
   './assets/icons/logo.svg',
@@ -23,16 +24,20 @@ self.addEventListener('activate', (e) => {
   );
 });
 
-// HTML: network-first (always fresh), others: stale-while-revalidate
+// 사이트 파일(HTML·CSS·JS·이미지): network-first → 수정 사항이 바로 반영되고, 오프라인일 때만 캐시 사용
+// 외부 파일(폰트 CDN): stale-while-revalidate
 self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET') return;
 
-  if (req.mode === 'navigate') {
+  if (new URL(req.url).origin === self.location.origin) {
     e.respondWith(
       fetch(req)
-        .then((res) => { caches.open(CACHE).then((c) => c.put(req, res.clone())); return res; })
-        .catch(() => caches.match(req).then((r) => r || caches.match('./index.html')))
+        .then((res) => {
+          if (res.ok) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(req, copy)); }
+          return res;
+        })
+        .catch(() => caches.match(req).then((r) => r || (req.mode === 'navigate' ? caches.match('./index.html') : undefined)))
     );
     return;
   }
