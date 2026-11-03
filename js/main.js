@@ -419,7 +419,18 @@
 
   /* ---------- PWA ---------- */
   if ('serviceWorker' in navigator && location.protocol !== 'file:') {
-    addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+    addEventListener('load', () => navigator.serviceWorker.register('sw.js').then((reg) => {
+      // 앱을 다시 열거나 화면으로 돌아올 때마다 새 버전이 있는지 확인
+      document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') reg.update().catch(() => {}); });
+    }).catch(() => {}));
+    // 새 버전이 설치되면 한 번 새로고침해서 바로 적용 (처음 설치 때는 제외)
+    const hadController = !!navigator.serviceWorker.controller;
+    let reloaded = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!hadController || reloaded) return;
+      reloaded = true;
+      location.reload();
+    });
   }
   let deferred;
   const installBtn = $('#installBtn');

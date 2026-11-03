@@ -1,5 +1,5 @@
 // SilverGate service worker — offline support
-const CACHE = 'sg-v33';
+const CACHE = 'sg-v34';
 const ASSETS = [
   './',
   './index.html',
@@ -13,7 +13,7 @@ const ASSETS = [
 ];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS.map((u) => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', (e) => {
@@ -24,7 +24,7 @@ self.addEventListener('activate', (e) => {
   );
 });
 
-// 사이트 파일(HTML·CSS·JS·이미지): network-first → 수정 사항이 바로 반영되고, 오프라인일 때만 캐시 사용
+// 사이트 파일(HTML·CSS·JS·이미지): network-first (브라우저 HTTP 캐시도 건너뛰고 서버에 확인) → 수정 사항이 바로 반영되고, 오프라인일 때만 캐시 사용
 // 외부 파일(폰트 CDN): stale-while-revalidate
 self.addEventListener('fetch', (e) => {
   const req = e.request;
@@ -32,7 +32,7 @@ self.addEventListener('fetch', (e) => {
 
   if (new URL(req.url).origin === self.location.origin) {
     e.respondWith(
-      fetch(req)
+      fetch(req.url, { cache: 'no-cache', credentials: 'same-origin' })
         .then((res) => {
           if (res.ok) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(req, copy)); }
           return res;
