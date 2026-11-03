@@ -1,5 +1,5 @@
 // SilverGate service worker — offline support
-const CACHE = 'sg-v35';
+const CACHE = 'sg-v39';
 const ASSETS = [
   './',
   './index.html',

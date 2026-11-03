@@ -375,6 +375,21 @@
     $$('.diffx__log li[data-c], .row[data-c]', s.el).forEach((el) => onActivate(el, () => locate(el.dataset.c)));
   });
 
+  /* ---------- FAQ: 한 번에 하나씩 펼침 ---------- */
+  const faqItems = $$('.faq__item');
+  faqItems.forEach((item) => {
+    const btn = $('.faq__q', item);
+    btn.addEventListener('click', () => {
+      const open = !item.classList.contains('is-open');
+      faqItems.forEach((other) => {
+        other.classList.remove('is-open');
+        $('.faq__q', other).setAttribute('aria-expanded', 'false');
+      });
+      item.classList.toggle('is-open', open);
+      btn.setAttribute('aria-expanded', String(open));
+    });
+  });
+
   /* ---------- Toast ---------- */
   const toastEl = $('#toast');
   let toastTimer;

@@ -111,6 +111,7 @@
     <section class="intro" data-scroll="intro" aria-labelledby="intro-title">
       <canvas class="intro__dust" aria-hidden="true"></canvas>
       <div class="container intro__inner">
+        <div class="intro__focus">
         <svg class="intro__mark" viewBox="6 6 166 92" role="img" aria-label="SilverGate bridge logo" data-i18n-attr="aria-label:a.logo">
           <defs>
             <linearGradient id="mark-silver" x1="0" y1="0" x2="1" y2="1">
@@ -127,6 +128,7 @@
           </defs>
           <g fill="url(#mark-silver)"><path class="intro__deck" d="M8 72.5 C25 64 50 62 80 61.8 C110 61.6 140 66 170 72.5 C140 68.5 110 64.6 80 64.9 C50 65.2 25 66.5 8 72.5 Z"/><path class="intro__tower" d="M60.5 15.5 C61.2 25 62.6 33 64.2 38 C63.4 50 63.6 72 62.4 91.5 C61.4 72 61.2 50 60.6 40 C59.8 33 60 25 60.5 15.5 Z"/><path class="intro__tower" d="M118 8.5 C118.2 22 118.3 30 118.6 38 C118.3 52 118.2 74 116.9 95.5 C115.6 74 115.3 52 115.2 40 C114.4 36 113.6 34 112.2 33 C115.4 26 117.3 20 118 8.5 Z"/><path class="intro__cable" d="M35 53.3 Q50 48.5 61.5 29.5 L61.5 40.5 Q49 51 35 53.6 Z"/><path class="intro__cable" d="M61 30 C66 37 72 44.5 85 45.6 C97 45.8 105 38 116.5 24 L116.5 34 C107 42 97 49.4 85 49.6 C72 49.5 66 43 61.2 38 Z"/><path class="intro__cable" d="M117.5 32.5 C121 42 130 50 143 54.2 C129 52.5 121 48 117.5 40.5 Z"/></g><g class="intro__glint" fill="url(#mark-glint)"><path class="intro__deck" d="M8 72.5 C25 64 50 62 80 61.8 C110 61.6 140 66 170 72.5 C140 68.5 110 64.6 80 64.9 C50 65.2 25 66.5 8 72.5 Z"/><path class="intro__tower" d="M60.5 15.5 C61.2 25 62.6 33 64.2 38 C63.4 50 63.6 72 62.4 91.5 C61.4 72 61.2 50 60.6 40 C59.8 33 60 25 60.5 15.5 Z"/><path class="intro__tower" d="M118 8.5 C118.2 22 118.3 30 118.6 38 C118.3 52 118.2 74 116.9 95.5 C115.6 74 115.3 52 115.2 40 C114.4 36 113.6 34 112.2 33 C115.4 26 117.3 20 118 8.5 Z"/><path class="intro__cable" d="M35 53.3 Q50 48.5 61.5 29.5 L61.5 40.5 Q49 51 35 53.6 Z"/><path class="intro__cable" d="M61 30 C66 37 72 44.5 85 45.6 C97 45.8 105 38 116.5 24 L116.5 34 C107 42 97 49.4 85 49.6 C72 49.5 66 43 61.2 38 Z"/><path class="intro__cable" d="M117.5 32.5 C121 42 130 50 143 54.2 C129 52.5 121 48 117.5 40.5 Z"/></g>
         </svg>
+        </div>
         <h1 id="intro-title" class="sr-only">SilverGate</h1>
       </div>
       <a href="#product" class="intro__next">
@@ -471,38 +473,36 @@
         </ul>
       </div>
     </section>
-    <!-- ===== 4-1. Compliance table ===== -->
-    <section class="section" aria-labelledby="reg-title">
+    <!-- ===== 4-1. FAQ: 자주 묻는 질문 (누르면 부드럽게 펼쳐짐) ===== -->
+    <section class="section" id="faq" aria-labelledby="faq-title">
       <div class="container">
-        <h2 id="reg-title" class="section__title reveal" data-i18n="reg.title">Built for the rules you're audited on.</h2>
-        <div class="table-glass reveal">
-          <table class="regs">
-            <caption class="sr-only" data-i18n="reg.caption">Regulations and how SilverGate addresses them</caption>
-            <thead>
-              <tr><th scope="col" data-i18n="reg.h1">Standard</th><th scope="col" data-i18n="reg.h2">Requires</th><th scope="col" data-i18n="reg.h3">How we address it</th></tr>
-            </thead>
-            <tbody>
-              <tr><th scope="row">21 CFR Part 11</th><td data-i18n="reg.r1a">Electronic records &amp; signatures</td><td data-i18n="reg.r1b">Audit trail, e-signatures, access control</td></tr>
-              <tr><th scope="row">EU GMP Annex 11</th><td data-i18n="reg.r2a">Computerised systems</td><td data-i18n="reg.r2b">Validated system, backup, change control</td></tr>
-              <tr><th scope="row">GAMP 5</th><td data-i18n="reg.r3a">Risk-based validation</td><td data-i18n="reg.r3b">URS, FS and IQ/OQ/PQ deliverables</td></tr>
-              <tr><th scope="row">ALCOA+</th><td data-i18n="reg.r4a">Data integrity principles</td><td data-i18n="reg.r4b">Attributable, time-stamped, tamper-evident records</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </section>
-
-
-    <!-- ===== 4-2. Delivery process (실제 순서이므로 번호 사용) ===== -->
-    <section class="section" aria-labelledby="proc-title">
-      <div class="container">
-        <h2 id="proc-title" class="section__title reveal" data-i18n="proc.title">How a project runs.</h2>
-        <ol class="steps reveal">
-          <li><i class="steps__bar" aria-hidden="true"></i><span class="steps__no">01</span><h3 data-i18n="proc.s1">Assess</h3><p data-i18n="proc.d1">URS, gap analysis</p></li>
-          <li><i class="steps__bar" aria-hidden="true"></i><span class="steps__no">02</span><h3 data-i18n="proc.s2">Design</h3><p data-i18n="proc.d2">FS, risk assessment</p></li>
-          <li><i class="steps__bar" aria-hidden="true"></i><span class="steps__no">03</span><h3 data-i18n="proc.s3">Build &amp; validate</h3><p>IQ / OQ / PQ</p></li>
-          <li><i class="steps__bar" aria-hidden="true"></i><span class="steps__no">04</span><h3 data-i18n="proc.s4">Go live</h3><p data-i18n="proc.d4">Training, SOPs, hypercare</p></li>
-        </ol>
+        <h2 id="faq-title" class="section__title reveal" data-i18n="faq.title">Questions we hear most.</h2>
+        <ul class="faq reveal">
+          <li class="faq__item">
+            <h3><button type="button" class="faq__q" aria-expanded="false" aria-controls="faq-a1" id="faq-q1"><span data-i18n="faq.q1">Is SilverBio Author ready for 21 CFR Part 11?</span><i aria-hidden="true"></i></button></h3>
+            <div class="faq__a" id="faq-a1" role="region" aria-labelledby="faq-q1"><div><p data-i18n="faq.a1">Yes. It is designed for Part 11 from the start: every action is kept in an audit trail, records are signed electronically at author, review and approval, and access is controlled by role. The same design covers EU GMP Annex 11 and ALCOA+ data integrity.</p></div></div>
+          </li>
+          <li class="faq__item">
+            <h3><button type="button" class="faq__q" aria-expanded="false" aria-controls="faq-a2" id="faq-q2"><span data-i18n="faq.q2">What is the difference between MBR, EBR and MES?</span><i aria-hidden="true"></i></button></h3>
+            <div class="faq__a" id="faq-a2" role="region" aria-labelledby="faq-q2"><div><p data-i18n="faq.a2">MBR is the master batch record: authoring the recipe and getting it reviewed and approved. EBR runs that record on the floor, step by step, with review by exception. MES adds equipment and material tracking and connects to ERP and LIMS.</p></div></div>
+          </li>
+          <li class="faq__item">
+            <h3><button type="button" class="faq__q" aria-expanded="false" aria-controls="faq-a3" id="faq-q3"><span data-i18n="faq.q3">How does a project run?</span><i aria-hidden="true"></i></button></h3>
+            <div class="faq__a" id="faq-a3" role="region" aria-labelledby="faq-q3"><div><p data-i18n="faq.a3">Four steps. Assess: URS and gap analysis. Design: FS and risk assessment. Build and validate: IQ, OQ and PQ. Go live: training, SOPs and hypercare. Deliverables follow GAMP 5.</p></div></div>
+          </li>
+          <li class="faq__item">
+            <h3><button type="button" class="faq__q" aria-expanded="false" aria-controls="faq-a4" id="faq-q4"><span data-i18n="faq.q4">Can we see what changed between document versions?</span><i aria-hidden="true"></i></button></h3>
+            <div class="faq__a" id="faq-a4" role="region" aria-labelledby="faq-q4"><div><p data-i18n="faq.a4">SilverBio Compare puts two versions side by side and lists every value change, addition and deletion, for batch records, cleaning SOPs, QC specifications and other templates. Try the sample above.</p></div></div>
+          </li>
+          <li class="faq__item">
+            <h3><button type="button" class="faq__q" aria-expanded="false" aria-controls="faq-a5" id="faq-q5"><span data-i18n="faq.q5">Do you work outside pharma?</span><i aria-hidden="true"></i></button></h3>
+            <div class="faq__a" id="faq-a5" role="region" aria-labelledby="faq-q5"><div><p data-i18n="faq.a5">Yes. Since 2008 the team has delivered systems for insurance, banking and securities, and the public sector, including an integrated facility management system for Incheon International Airport.</p></div></div>
+          </li>
+          <li class="faq__item">
+            <h3><button type="button" class="faq__q" aria-expanded="false" aria-controls="faq-a6" id="faq-q6"><span data-i18n="faq.q6">How do we get started?</span><i aria-hidden="true"></i></button></h3>
+            <div class="faq__a" id="faq-a6" role="region" aria-labelledby="faq-q6"><div><p data-i18n="faq.a6">Send an inquiry with the form below or book a 30-minute meeting on Google Meet. We will start from your current process and documents.</p></div></div>
+          </li>
+        </ul>
       </div>
     </section>
 
@@ -582,7 +582,7 @@
             <li><svg class="icon" aria-hidden="true"><use href="#i-mail"/></svg><span><span class="sr-only" data-i18n="ct.email">Email </span><a href="mailto:masonlee@silvergate-solutions.com">masonlee@silvergate-solutions.com</a></span></li>
           </ul>
           <!-- 상담 예약: Google 캘린더 예약 페이지 주소를 href에 넣고 hidden을 지우면 표시됨 -->
-          <a class="btn btn--glass book-btn" id="bookBtn" href="" target="_blank" rel="noopener noreferrer" hidden data-i18n="ct.book">Book a meeting</a>
+          <a class="btn btn--glass book-btn" id="bookBtn" href="https://calendar.app.google/wLYapJcPyoxVQvN78" target="_blank" rel="noopener noreferrer" data-i18n="ct.book">Book a meeting</a>
         </div>
 
         <!-- 문의 전송: Google Apps Script(tools/contact-mailer.gs) → masonlee Gmail. 비우면 메일 앱으로 작성 -->
