@@ -585,8 +585,8 @@
           </ul>
         </div>
 
-        <!-- Formspree 연결 시 action에 엔드포인트 입력 (예: https://formspree.io/f/xxxx) -->
-        <form class="form reveal" id="contactForm" action="" method="POST" novalidate>
+        <!-- 문의 전송: Google Apps Script(tools/contact-mailer.gs) → masonlee Gmail. 비우면 메일 앱으로 작성 -->
+        <form class="form reveal" id="contactForm" action="https://script.google.com/macros/s/AKfycbzQc8NsvP7o6lRXvOTyZ5GKrL8MZaRfhF0fzz6Kc39EPLR4OvNgijxH2YiZkn5H9Ld4/exec" method="POST" novalidate>
           <div class="form__row">
             <div class="field"><label for="f-company" data-i18n="f.company">Company</label><input id="f-company" name="company" required autocomplete="organization" /></div>
             <div class="field"><label for="f-name" data-i18n="f.name">Name</label><input id="f-name" name="name" required autocomplete="name" /></div>
