@@ -206,11 +206,6 @@ window.SG_I18N = {
     'tbd': '[입력 필요]',
 
     'co.title': '회사 소개',
-    'st.years': '엔터프라이즈 시스템 구축 경력(년)',
-    'st.founded': '설립',
-    'st.clients': '고객사',
-    'st.ind': '규제 산업 분야',
-    'st.ready': '규정 준수를 처음부터 설계에 반영',
     'close.text': '다음 시스템, 함께 만듭니다.',
     'close.cta': '프로젝트 문의하기',
     'co.name': '회사명',

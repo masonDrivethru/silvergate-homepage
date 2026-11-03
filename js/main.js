@@ -209,26 +209,62 @@
     });
   }
 
-  /* ---------- FX: 숫자 카운트업 ---------- */
-  const statsEl = $('.stats');
-  let counted = false;
-  const countUp = () => {
-    if (counted || !statsEl || !statsEl.classList.contains('is-in')) return;
-    counted = true;
-    $$('.stats__num', statsEl).forEach((el) => {
-      const from = +el.dataset.from, to = +el.dataset.to, suf = el.dataset.suffix || '';
-      if (reduceMotion) { el.textContent = to + suf; return; }
-      const t0 = performance.now(), dur = 1600;
-      const tick = (now) => {
-        const k = clamp((now - t0) / dur);
-        const v = Math.round(from + (to - from) * (1 - Math.pow(1 - k, 4)));
-        el.textContent = v + (k === 1 ? suf : '');
-        if (k < 1) requestAnimationFrame(tick);
-      };
-      el.textContent = from;
-      requestAnimationFrame(tick);
-    });
-  };
+  /* ---------- FX 2: 커서 빛, 화면 기울기, 인트로 먼지 ---------- */
+  const fine = matchMedia('(hover: hover) and (pointer: fine)').matches;
+  if (!reduceMotion && fine) {
+    const light = $('.cursor-light');
+    let raf = 0, cx = 0, cy = 0;
+    addEventListener('pointermove', (ev) => {
+      cx = ev.clientX; cy = ev.clientY;
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        light?.style.setProperty('--cx', cx + 'px');
+        light?.style.setProperty('--cy', cy + 'px');
+        light?.classList.add('is-on');
+        root.style.setProperty('--tx', ((cx / innerWidth) * 2 - 1).toFixed(3));
+        root.style.setProperty('--ty', ((cy / innerHeight) * 2 - 1).toFixed(3));
+      });
+    }, { passive: true });
+    document.addEventListener('pointerleave', () => light?.classList.remove('is-on'));
+  }
+
+  // 인트로: 은빛 먼지가 천천히 떠오름 (인트로가 보일 때만 그림)
+  const dust = $('.intro__dust');
+  if (dust && !reduceMotion) {
+    const ctx = dust.getContext('2d');
+    let w = 0, h = 0, dpr = 1, parts = [];
+    const size = () => {
+      dpr = Math.min(devicePixelRatio || 1, 2);
+      w = dust.clientWidth; h = dust.clientHeight;
+      dust.width = w * dpr; dust.height = h * dpr;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const n = Math.round(Math.min(90, (w * h) / 16000));
+      parts = Array.from({ length: n }, () => ({
+        x: Math.random() * w, y: Math.random() * h,
+        r: Math.random() * 1.4 + 0.3, v: Math.random() * 0.25 + 0.06,
+        a: Math.random() * Math.PI * 2, s: Math.random() * 0.02 + 0.006,
+      }));
+    };
+    size();
+    addEventListener('resize', size);
+    const draw = () => {
+      requestAnimationFrame(draw);
+      if (scrollY > innerHeight) return;               // 인트로를 지나면 쉼
+      const lightMode = root.dataset.theme === 'light';
+      ctx.clearRect(0, 0, w, h);
+      parts.forEach((p) => {
+        p.y -= p.v; p.a += p.s; p.x += Math.sin(p.a) * 0.15;
+        if (p.y < -4) { p.y = h + 4; p.x = Math.random() * w; }
+        const tw = 0.35 + 0.65 * Math.abs(Math.sin(p.a));
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fillStyle = lightMode ? `rgba(60,64,72,${0.35 * tw})` : `rgba(235,238,242,${0.7 * tw})`;
+        ctx.fill();
+      });
+    };
+    requestAnimationFrame(draw);
+  }
 
   /* ---------- 스크롤 루프 (한 프레임에 한 번) ---------- */
   let ticking = false;
@@ -245,7 +281,6 @@
       if (closeSec) closing.style.setProperty('--c', (1 - Math.pow(1 - clamp(pinProgress(closeSec) / 0.8), 3)).toFixed(3));
     }
     reveal();
-    countUp();
     setFx();
     markActive();
   };
