@@ -54,42 +54,81 @@
   const seq = $$('.mock .seq');          // 단계 5개 + 서명 3개
   const steps = $$('.mock__steps li');
   const chip = $('#mockChip');
+  const hs = $('.hscroll');
+  const dots = $$('.hdots li');
+  const auditRows = $$('.audit__rows .aseq');
+  const signSeq = $$('.esign .sseq');
+  // 세로 스크롤을 3장의 가로 슬라이드로 나눔: [시작, 끝] 구간마다 해당 슬라이드의 진행도 0→1
+  const SLIDES = [[0, 0.36], [0.46, 0.66], [0.76, 1]];
+  const ease = (t) => t * t * (3 - 2 * t);
+  const setSlides = (p) => {
+    let x = 0;
+    SLIDES.forEach(([, e], i) => { if (i < SLIDES.length - 1) x += ease(clamp((p - e) / (SLIDES[i + 1][0] - e))); });
+    hs.style.setProperty('--x', x.toFixed(4));
+    const cur = Math.round(x);
+    dots.forEach((d, i) => d.classList.toggle('is-on', i === cur));
+    const local = (i) => clamp((p - SLIDES[i][0]) / (SLIDES[i][1] - SLIDES[i][0]));
+    setProduct(local(0));
+    const na = Math.round(clamp(local(1) / 0.85) * auditRows.length);
+    auditRows.forEach((el, i) => { el.classList.toggle('is-done', i < na); el.classList.toggle('is-now', i === na - 1); });
+    const ns = Math.round(clamp(local(2) / 0.8) * signSeq.length);
+    signSeq.forEach((el, i) => el.classList.toggle('is-done', i < ns));
+  };
   const diff = $('[data-scroll="diff"]');
-  const diffItems = $$('.diffx [data-c]');   // 변경점 행 + 변경 내역 (data-c = 순서)
-  const diffCount = Math.max(0, ...diffItems.map((el) => +el.dataset.c));
   const wordsSec = $('[data-scroll="words"]');
   const pills = $('.pills');
 
   const setProduct = (p) => {
-    const p1 = clamp(p / 0.3);                                   // 0~30%: 목업이 세워짐
+    const p1 = clamp(p / 0.35);                                  // 0~35%: 목업이 세워짐
     productInner.style.setProperty('--p1', p1.toFixed(3));
-    const n = Math.round(clamp((p - 0.32) / 0.6) * seq.length);  // 32~92%: 하나씩 승인
+    const n = Math.round(clamp((p - 0.38) / 0.55) * seq.length); // 38~93%: 하나씩 승인
     seq.forEach((el, i) => el.classList.toggle('is-done', i < n));
     steps.forEach((el, i) => el.classList.toggle('is-now', i === n && n < steps.length));
     chip.textContent = S(n >= seq.length ? 'approved' : n > steps.length ? 'inReview' : 'drafting');
     chip.classList.toggle('is-final', n >= seq.length);
   };
 
-  const diffInner = $('.diffx');
-  const diffLog = $$('.diffx__log li');       // 변경 종류: is-add / is-del / 그 외는 값 변경
-  const stats = { mod: $('.s-mod'), add: $('.s-add'), del: $('.s-del') };
-  const setDiff = (p) => {
-    const e = clamp(p / 0.12);                                  // 0~12%: 두 패널이 양옆에서 모임
-    const scan = clamp((p - 0.12) / 0.7);                       // 12~82%: 스캔 빔이 위→아래
-    diffInner.style.setProperty('--e', e.toFixed(3));
-    diffInner.style.setProperty('--scan', scan.toFixed(3));
-    diffInner.style.setProperty('--scan-o', p > 0.1 && p < 0.86 ? '1' : '0');
-    const n = Math.round(scan * diffCount);                     // 빔이 지나간 만큼 변경점 점등
-    diffItems.forEach((el) => el.classList.toggle('is-on', +el.dataset.c <= n));
+  // Compare: 템플릿 슬라이드마다 변경점 행 + 변경 내역(data-c = 강조 순서)을 따로 계산
+  const dtrack = $('.dtrack-wrap');
+  const dtabs = $$('.dtabs li');
+  const dslides = $$('.dslide').map((el) => {
+    const items = $$('[data-c]', el);
+    return {
+      el, items,
+      count: Math.max(0, ...items.map((x) => +x.dataset.c)),
+      log: $$('.diffx__log li', el),
+      stats: { mod: $('.s-mod', el), add: $('.s-add', el), del: $('.s-del', el) },
+    };
+  });
+  const setDiffSlide = (s, p, enter) => {
+    const e = enter ? clamp(p / 0.12) : 1;                      // 첫 장만: 두 패널이 양옆에서 모임
+    const scan = clamp((p - 0.12) / 0.7);                       // 스캔 빔이 위→아래
+    s.el.style.setProperty('--e', e.toFixed(3));
+    s.el.style.setProperty('--scan', scan.toFixed(3));
+    s.el.style.setProperty('--scan-o', p > 0.1 && p < 0.86 ? '1' : '0');
+    const n = Math.round(scan * s.count);
+    s.items.forEach((x) => x.classList.toggle('is-on', +x.dataset.c <= n));
     const count = { mod: 0, add: 0, del: 0 };
-    diffLog.forEach((li) => {
+    s.log.forEach((li) => {
       if (+li.dataset.c > n) return;
       count[li.classList.contains('is-add') ? 'add' : li.classList.contains('is-del') ? 'del' : 'mod'] += 1;
     });
-    if (stats.mod) {
-      stats.mod.textContent = `~${count.mod}`; stats.add.textContent = `+${count.add}`; stats.del.textContent = `−${count.del}`;
-      Object.keys(stats).forEach((k) => stats[k].classList.toggle('is-on', count[k] > 0));
+    if (s.stats.mod) {
+      s.stats.mod.textContent = `~${count.mod}`; s.stats.add.textContent = `+${count.add}`; s.stats.del.textContent = `−${count.del}`;
+      Object.keys(s.stats).forEach((k) => s.stats[k].classList.toggle('is-on', count[k] > 0));
     }
+  };
+  const DSLIDES = [[0, 0.27], [0.37, 0.63], [0.73, 1]];
+  const setDiff = (p) => {
+    let x = 0;
+    DSLIDES.forEach(([, e], i) => { if (i < DSLIDES.length - 1) x += ease(clamp((p - e) / (DSLIDES[i + 1][0] - e))); });
+    if (dtrack) dtrack.style.setProperty('--x', x.toFixed(4));
+    const cur = Math.round(x);
+    dtabs.forEach((t, i) => t.classList.toggle('is-on', i === cur));
+    dslides.forEach((s, i) => {
+      const [a, b] = DSLIDES[i] || [0, 1];
+      setDiffSlide(s, clamp((p - a) / (b - a)), i === 0);
+    });
   };
 
   const setWords = (p) => {
@@ -122,19 +161,67 @@
     links.forEach((a) => a.classList.toggle('is-active', a.getAttribute('href') === `#${id}`));
   };
 
+  /* ---------- FX: 진행 막대, 진행 단계, 기능 표 순서 ---------- */
+  const sprog = $('.sprog');
+  const stepsEl = $('.steps');
+  const stepItems = stepsEl ? $$('li', stepsEl) : [];
+  const setFx = () => {
+    const max = document.documentElement.scrollHeight - innerHeight;
+    if (sprog) sprog.style.setProperty('--sp', (max > 0 ? scrollY / max : 0).toFixed(4));
+    if (stepsEl) {
+      const r = stepsEl.getBoundingClientRect();
+      const prog = reduceMotion ? 1 : clamp((innerHeight * 0.92 - r.top) / (innerHeight * 0.55));
+      stepItems.forEach((li, i) => {
+        const f = clamp(prog * stepItems.length - i);
+        li.style.setProperty('--f', f.toFixed(3));
+        li.classList.toggle('is-lit', f >= 1);
+      });
+    }
+  };
+  // 기능 표: 체크 표시마다 열/행 번호를 넣어 열 순서대로 켜지게
+  $$('.matrix tbody tr').forEach((tr, row) => {
+    $$('td', tr).forEach((td, col) => {
+      const ok = $('.ok', td);
+      if (ok) { ok.style.setProperty('--col', col); ok.style.setProperty('--row', row); }
+    });
+  });
+
+  /* ---------- FX: 유리 카드 — 커서 빛 + 기울기 (마우스 환경만) ---------- */
+  if (!reduceMotion && matchMedia('(hover: hover) and (pointer: fine)').matches) {
+    const spots = $$('.industries li, .steps li, .project, .client, .facts, .form');
+    const tilts = new Set($$('.industries li, .steps li, .project, .client'));
+    spots.forEach((el) => {
+      el.classList.add('spot');
+      el.addEventListener('pointermove', (ev) => {
+        const r = el.getBoundingClientRect();
+        const x = (ev.clientX - r.left) / r.width;
+        const y = (ev.clientY - r.top) / r.height;
+        el.style.setProperty('--mx', `${(x * 100).toFixed(1)}%`);
+        el.style.setProperty('--my', `${(y * 100).toFixed(1)}%`);
+        if (tilts.has(el)) {
+          el.classList.add('is-tilt');
+          el.style.transform = `perspective(900px) rotateX(${((0.5 - y) * 8).toFixed(2)}deg) rotateY(${((x - 0.5) * 10).toFixed(2)}deg) translateY(-4px)`;
+        }
+      });
+      el.addEventListener('pointerleave', () => { el.style.transform = ''; });
+    });
+  }
+
   /* ---------- 스크롤 루프 (한 프레임에 한 번) ---------- */
   let ticking = false;
   const update = () => {
     ticking = false;
     if (reduceMotion) {
-      setProduct(1); setDiff(1); setWords(1);  // 모션 줄이기: 완성 상태로 고정
+      setProduct(1); setDiff(1); setWords(1);
+      auditRows.forEach((el) => el.classList.add('is-done')); signSeq.forEach((el) => el.classList.add('is-done'));  // 모션 줄이기: 완성 상태로 고정
     } else {
       if (intro) intro.style.setProperty('--p', clamp(scrollY / (innerHeight * 0.75)).toFixed(3));
-      if (product) setProduct(pinProgress(product));
+      if (product) setSlides(pinProgress(product));
       if (diff) setDiff(pinProgress(diff));
       if (wordsSec) setWords(pinProgress(wordsSec));
     }
     reveal();
+    setFx();
     markActive();
   };
   const onScroll = () => { if (!ticking) { ticking = true; requestAnimationFrame(update); } };
@@ -153,6 +240,7 @@
     if (desc) desc.content = lang === 'ko' ? ko['meta.desc'] : meta.desc;
     $$('.lang button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.lang === lang)));
     splitWords();
+    if (typeof syncThemeBtn === 'function') syncThemeBtn();
     update();
   };
 
@@ -161,9 +249,30 @@
     store.set('sg-lang', lang);
   }));
 
+  /* ---------- 테마: 다크(기본) ↔ 라이트 ---------- */
+  const themeBtn = $('#themeBtn');
+  const themeMeta = $('meta[name="theme-color"]');
+  const syncThemeBtn = () => {
+    const light = root.dataset.theme === 'light';
+    const key = light ? 'a.toDark' : 'a.toLight';
+    themeBtn?.setAttribute('aria-label', lang === 'ko' ? ko[key] : (light ? 'Switch to dark mode' : 'Switch to light mode'));
+    themeBtn?.setAttribute('aria-pressed', String(light));
+  };
+  const setTheme = (t) => {
+    if (t === 'light') root.dataset.theme = 'light'; else delete root.dataset.theme;
+    if (themeMeta) themeMeta.content = t === 'light' ? '#eceef1' : '#050506';
+    syncThemeBtn();
+  };
+  themeBtn?.addEventListener('click', () => {
+    const next = root.dataset.theme === 'light' ? 'dark' : 'light';
+    setTheme(next);
+    store.set('sg-theme', next);
+  });
+
   // 우선순위: 주소의 ?lang= → 저장된 선택 → 영어
   const qLang = new URLSearchParams(location.search).get('lang');
   setLang(qLang || store.get('sg-lang') || 'en');
+  syncThemeBtn();
 
   addEventListener('scroll', onScroll, { passive: true });
   addEventListener('resize', onScroll);

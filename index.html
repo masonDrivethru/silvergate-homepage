@@ -6,6 +6,16 @@
   <title>SilverGate | MES, EBR &amp; MBR for Pharma and Bio</title>
   <meta name="description" content="SilverGate builds MES, EBR and MBR solutions for pharma and biotech manufacturing, and enterprise systems for insurance, finance and the public sector. Author and approve master batch records with SilverBio Author." />
   <meta name="theme-color" content="#050506" />
+  <script>
+    (function () {
+      var t = new URLSearchParams(location.search).get('theme');
+      try { t = t || localStorage.getItem('sg-theme'); } catch (e) {}
+      if (t === 'light') {
+        document.documentElement.setAttribute('data-theme', 'light');
+        document.querySelector('meta[name="theme-color"]').setAttribute('content', '#eceef1');
+      }
+    })();
+  </script>
   <link rel="canonical" href="https://www.silvergate-solutions.com/" />
 
   <!-- Favicon / PWA -->
@@ -38,6 +48,7 @@
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
+  <div class="sprog" aria-hidden="true"></div>
   <a class="skip" href="#main" data-i18n="skip">Skip to content</a>
 
   <!-- 아이콘: 브랜드 마크 + Lucide (ISC License) -->
@@ -82,6 +93,10 @@
       </nav>
       <div class="nav__actions">
         <button class="btn btn--glass btn--sm install-btn" id="installBtn" type="button" hidden data-i18n="nav.install">Install app</button>
+        <button class="theme" id="themeBtn" type="button" aria-label="Switch to light mode" data-i18n-attr="aria-label:a.toLight">
+          <svg class="t-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+          <svg class="t-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+        </button>
         <div class="lang" role="group" aria-label="Language" data-i18n-attr="aria-label:a.lang">
           <button type="button" data-lang="en" aria-pressed="true" lang="en">EN</button>
           <button type="button" data-lang="ko" aria-pressed="false" lang="ko">KO</button>
@@ -116,36 +131,109 @@
     <!-- ===== 2. Product: 목업이 세워지고, 단계가 하나씩 승인됨 ===== -->
     <section class="pin pin--product" id="product" data-scroll="product" aria-labelledby="product-title">
       <div class="pin__stage">
+        <div class="hscroll">
+          <div class="hscroll__track">
+            <div class="hslide">
         <div class="container product">
           <p class="product__name">SilverBio Author</p>
           <h2 id="product-title" class="product__title" data-i18n="product.title">From record to approval.</h2>
-          <figure class="mock" aria-label="SilverBio Author screen placeholder" data-i18n-attr="aria-label:a.mock">
+          <figure class="mock" aria-label="SilverBio Author sample screen" data-i18n-attr="aria-label:a.mock">
             <div class="mock__bar" aria-hidden="true">
               <span class="mock__dots"><i></i><i></i><i></i></span>
               <span class="mock__url">SilverBio Author</span>
             </div>
             <div class="mock__body" aria-hidden="true">
               <div class="mock__side">
-                <span class="is-on"></span><span></span><span></span><span></span><span></span>
+                <span class="is-on" data-i18n="mock.s1">Batch records</span>
+                <span data-i18n="mock.s2">Templates</span>
+                <span data-i18n="mock.s3">Reviews</span>
+                <span data-i18n="mock.s4">Audit trail</span>
+                <span data-i18n="mock.s5">Settings</span>
               </div>
               <div class="mock__main">
-                <div class="mock__head"><span class="w40"></span><span class="mock__chip" id="mockChip">Drafting</span></div>
+                <div class="mock__head">
+                  <div class="mock__doc"><strong data-i18n="mock.doc">Tablet compression</strong><small>MBR-0142 &nbsp;v1.3</small></div>
+                  <span class="mock__chip" id="mockChip">Drafting</span>
+                </div>
                 <ol class="mock__steps">
-                  <li class="seq"><b><svg><use href="#i-check"/></svg></b><span class="w70"></span><em></em></li>
-                  <li class="seq"><b><svg><use href="#i-check"/></svg></b><span class="w55"></span><em></em></li>
-                  <li class="seq"><b><svg><use href="#i-check"/></svg></b><span class="w80"></span><em></em></li>
-                  <li class="seq"><b><svg><use href="#i-check"/></svg></b><span class="w60"></span><em></em></li>
-                  <li class="seq"><b><svg><use href="#i-check"/></svg></b><span class="w45"></span><em></em></li>
+                  <li class="seq"><b><svg><use href="#i-check"/></svg></b><span data-i18n="mock.t1">Line clearance</span><em>09:02</em></li>
+                  <li class="seq"><b><svg><use href="#i-check"/></svg></b><span data-i18n="mock.t2">Weigh API, 250.0 mg ±2%</span><em>09:18</em></li>
+                  <li class="seq"><b><svg><use href="#i-check"/></svg></b><span data-i18n="mock.t3">Blend for 15 min</span><em>09:41</em></li>
+                  <li class="seq"><b><svg><use href="#i-check"/></svg></b><span data-i18n="mock.t4">Compress tablets</span><em>10:26</em></li>
+                  <li class="seq"><b><svg><use href="#i-check"/></svg></b><span data-i18n="mock.t5">In-process check, hardness 8–12 kp</span><em>10:47</em></li>
                 </ol>
                 <div class="mock__sign">
-                  <div><small data-i18n="mock.author">Author</small><span class="seq"><svg><use href="#i-check"/></svg></span></div>
-                  <div><small data-i18n="mock.review">Review</small><span class="seq"><svg><use href="#i-check"/></svg></span></div>
-                  <div><small data-i18n="mock.approve">Approve</small><span class="seq"><svg><use href="#i-check"/></svg></span></div>
+                  <div><p><small data-i18n="mock.author">Author</small><i>J. Kim</i></p><span class="seq"><svg><use href="#i-check"/></svg></span></div>
+                  <div><p><small data-i18n="mock.review">Review</small><i>S. Park</i></p><span class="seq"><svg><use href="#i-check"/></svg></span></div>
+                  <div><p><small data-i18n="mock.approve">Approve</small><i>QA Lead</i></p><span class="seq"><svg><use href="#i-check"/></svg></span></div>
                 </div>
               </div>
             </div>
-            <figcaption class="mock__note" data-i18n="mock.note">Product screenshot [TBD]</figcaption>
+            <figcaption class="mock__note" data-i18n="mock.note">Sample screen</figcaption>
           </figure>
+        </div>
+            </div>
+            <div class="hslide">
+        <div class="container product product--flat">
+          <p class="product__name" data-i18n="mock.audit">Audit trail</p>
+          <h2 class="product__title" data-i18n="mock.auditTitle">Every action, on the record.</h2>
+          <figure class="mock" aria-label="SilverBio Author audit trail sample" data-i18n-attr="aria-label:a.audit">
+            <div class="mock__bar" aria-hidden="true">
+              <span class="mock__dots"><i></i><i></i><i></i></span>
+              <span class="mock__url">SilverBio Author</span>
+            </div>
+            <div class="audit" aria-hidden="true">
+              <div class="audit__head"><span data-i18n="mock.hTime">Time</span><span data-i18n="mock.hUser">User</span><span data-i18n="mock.hAction">Action</span><span data-i18n="mock.hDetail">Detail</span></div>
+              <ol class="audit__rows">
+                <li class="aseq"><time>09:18:04</time><span class="audit__user">J. Kim</span><b class="tag tag--edit" data-i18n="mock.aEdit">Edited</b><span class="audit__detail" data-i18n="mock.a1">NaCl 8.77 → 8.80 g</span></li>
+                <li class="aseq"><time>09:42:10</time><span class="audit__user">S. Park</span><b class="tag tag--note" data-i18n="mock.aNote">Commented</b><span class="audit__detail" data-i18n="mock.a2">Step 4: confirm the pH meter ID</span></li>
+                <li class="aseq"><time>09:55:47</time><span class="audit__user">J. Kim</span><b class="tag tag--edit" data-i18n="mock.aEdit">Edited</b><span class="audit__detail" data-i18n="mock.a3">pH meter PH-03 added</span></li>
+                <li class="aseq"><time>10:26:12</time><span class="audit__user">J. Kim</span><b class="tag tag--sign" data-i18n="mock.aSign">Signed</b><span class="audit__detail" data-i18n="mock.a4">Author signature</span></li>
+                <li class="aseq"><time>10:31:05</time><span class="audit__user">S. Park</span><b class="tag tag--sign" data-i18n="mock.aSign">Signed</b><span class="audit__detail" data-i18n="mock.a5">Review signature</span></li>
+                <li class="aseq"><time>10:47:12</time><span class="audit__user">QA Lead</span><b class="tag tag--ok" data-i18n="mock.aOk">Approved</b><span class="audit__detail" data-i18n="mock.a6">Released for production</span></li>
+              </ol>
+              <p class="audit__foot" data-i18n="mock.auditFoot">Entries cannot be edited or deleted.</p>
+            </div>
+            <figcaption class="mock__note" data-i18n="mock.note">Sample screen</figcaption>
+          </figure>
+        </div>
+            </div>
+            <div class="hslide">
+        <div class="container product product--flat">
+          <p class="product__name" data-i18n="mock.esign">E-signature</p>
+          <h2 class="product__title" data-i18n="mock.esignTitle">Signed to Part 11.</h2>
+          <figure class="mock" aria-label="SilverBio Author e-signature sample" data-i18n-attr="aria-label:a.esign">
+            <div class="mock__bar" aria-hidden="true">
+              <span class="mock__dots"><i></i><i></i><i></i></span>
+              <span class="mock__url">SilverBio Author</span>
+            </div>
+            <div class="esign" aria-hidden="true">
+              <div class="esign__info">
+                <div class="mock__doc"><strong data-i18n="mock.doc">Tablet compression</strong><small>MBR-0142 &nbsp;v1.3</small></div>
+                <dl class="esign__meta">
+                  <div><dt data-i18n="mock.mSigner">Signer</dt><dd>QA Lead</dd></div>
+                  <div><dt data-i18n="mock.mMeaning">Meaning</dt><dd data-i18n="mock.approve">Approve</dd></div>
+                  <div><dt data-i18n="mock.mTime">Time</dt><dd>2026-11-03 10:47:12 KST</dd></div>
+                </dl>
+                <ul class="esign__checks">
+                  <li class="sseq"><b><svg><use href="#i-check"/></svg></b><span data-i18n="mock.c1">Identity verified with ID and password</span></li>
+                  <li class="sseq"><b><svg><use href="#i-check"/></svg></b><span data-i18n="mock.c2">Meaning of the signature recorded</span></li>
+                  <li class="sseq"><b><svg><use href="#i-check"/></svg></b><span data-i18n="mock.c3">Server time stamp applied</span></li>
+                  <li class="sseq"><b><svg><use href="#i-check"/></svg></b><span data-i18n="mock.c4">Bound to the record, cannot be copied</span></li>
+                </ul>
+              </div>
+              <div class="esign__seal sseq">
+                <svg class="esign__mark"><use href="#sg-mark"/></svg>
+                <strong data-i18n="mock.signed">Signed</strong>
+                <small>10:47:12</small>
+              </div>
+            </div>
+            <figcaption class="mock__note" data-i18n="mock.note">Sample screen</figcaption>
+          </figure>
+        </div>
+            </div>
+          </div>
+          <ol class="hdots" aria-hidden="true"><li class="is-on"></li><li></li><li></li></ol>
         </div>
       </div>
     </section>
@@ -157,49 +245,151 @@
           <p class="product__name">SilverBio Compare</p>
           <h2 id="sol-title" class="diffx__title" data-i18n="diff.title">Every change, side by side.</h2>
 
-          <div class="diffx__panes">
-            <!-- 이전 버전 -->
-            <section class="pane pane--old" aria-label="Version 1.2" data-i18n-attr="aria-label:diff.a.old">
-              <header class="pane__head">
-                <span class="pane__doc" data-i18n="diff.doc">Buffer Preparation · MBR</span>
-                <span class="pane__ver">v1.2</span>
-                <span class="pane__status" data-i18n="diff.approved">Approved</span>
-              </header>
-              <ol class="rows">
-                <li class="row"><span class="row__no">1</span><span class="row__step" data-i18n="diff.s1">Weigh Tris base</span><span class="row__val">12.10 g</span></li>
-                <li class="row row--old" data-c="1"><span class="row__no">2</span><span class="row__step" data-i18n="diff.s2">Dissolve in WFI</span><span class="row__val">800 mL</span></li>
-                <li class="row row--old" data-c="2"><span class="row__no">3</span><span class="row__step" data-i18n="diff.s3">Adjust pH</span><span class="row__val">7.4 ± 0.2</span></li>
-                <li class="row"><span class="row__no">4</span><span class="row__step" data-i18n="diff.s4">Mix</span><span class="row__val">15 min</span></li>
-                <li class="row row--gap" data-c="3" aria-hidden="true"></li>
-                <li class="row row--del" data-c="4"><span class="row__no">5</span><span class="row__step" data-i18n="diff.s6">Hold at room temperature</span><span class="row__val">30 min</span></li>
-              </ol>
-            </section>
-
-            <!-- 새 버전 -->
-            <section class="pane pane--new" aria-label="Version 1.3" data-i18n-attr="aria-label:diff.a.new">
-              <header class="pane__head">
-                <span class="pane__doc" data-i18n="diff.doc">Buffer Preparation · MBR</span>
-                <span class="pane__ver">v1.3</span>
-                <span class="pane__stats" aria-hidden="true"><b class="s-mod">~0</b><b class="s-add">+0</b><b class="s-del">−0</b></span>
-                <span class="pane__status is-draft" data-i18n="diff.review">In review</span>
-              </header>
-              <ol class="rows">
-                <li class="row"><span class="row__no">1</span><span class="row__step" data-i18n="diff.s1">Weigh Tris base</span><span class="row__val">12.10 g</span></li>
-                <li class="row row--new" data-c="1"><span class="row__no">2</span><span class="row__step" data-i18n="diff.s2">Dissolve in WFI</span><span class="row__val"><s class="row__was">800 mL</s>850 mL</span></li>
-                <li class="row row--new" data-c="2"><span class="row__no">3</span><span class="row__step" data-i18n="diff.s3">Adjust pH</span><span class="row__val"><s class="row__was">7.4 ± 0.2</s>7.4 ± 0.1</span></li>
-                <li class="row"><span class="row__no">4</span><span class="row__step" data-i18n="diff.s4">Mix</span><span class="row__val">15 min</span></li>
-                <li class="row row--add" data-c="3"><span class="row__no">5</span><span class="row__step" data-i18n="diff.s5">Filter</span><span class="row__val">0.22 µm</span></li>
-                <li class="row row--gap" data-c="4"><span class="row__ghost" data-i18n="diff.s6">Hold at room temperature</span></li>
-              </ol>
-            </section>
-          </div>
-
-          <ol class="diffx__log">
-            <li data-c="1"><b aria-hidden="true">~</b><span data-i18n="diff.l1">WFI volume 800 → 850 mL</span></li>
-            <li data-c="2"><b aria-hidden="true">~</b><span data-i18n="diff.l2">pH tolerance ±0.2 → ±0.1</span></li>
-            <li data-c="3" class="is-add"><b aria-hidden="true">+</b><span data-i18n="diff.l3">Filtration step added</span></li>
-            <li data-c="4" class="is-del"><b aria-hidden="true">−</b><span data-i18n="diff.l4">Hold step removed</span></li>
+          <ol class="dtabs" aria-hidden="true">
+            <li class="is-on" data-i18n="dtab.1">Batch record</li>
+            <li data-i18n="dtab.2">Cleaning SOP</li>
+            <li data-i18n="dtab.3">QC specification</li>
           </ol>
+          <div class="dtrack-wrap">
+          <div class="dtrack">
+            <div class="dslide">
+              <div class="diffx__panes">
+                <section class="pane pane--old" aria-label="v1.2">
+                  <header class="pane__head">
+                    <span class="pane__doc" data-i18n="diff.doc">Buffer Preparation · MBR</span>
+                    <span class="pane__ver">v1.2</span>
+                    <span class="pane__status" data-i18n="diff.approved">Approved</span>
+                  </header>
+                  <ol class="rows">
+                    <li class="row"><span class="row__no">1</span><span class="row__step" data-i18n="diff.s1">Weigh Tris base</span><span class="row__val">12.10 g</span></li>
+                    <li class="row row--old" data-c="1"><span class="row__no">2</span><span class="row__step" data-i18n="diff.s7">Weigh NaCl</span><span class="row__val">8.77 g</span></li>
+                    <li class="row row--old" data-c="2"><span class="row__no">3</span><span class="row__step" data-i18n="diff.s2">Dissolve in WFI</span><span class="row__val">800 mL</span></li>
+                    <li class="row row--old" data-c="3"><span class="row__no">4</span><span class="row__step" data-i18n="diff.s3">Adjust pH</span><span class="row__val">7.4 ± 0.2</span></li>
+                    <li class="row row--old" data-c="4"><span class="row__no">5</span><span class="row__step" data-i18n="diff.s4">Mix</span><span class="row__val">15 min</span></li>
+                    <li class="row row--gap" data-c="5" aria-hidden="true"></li>
+                    <li class="row row--gap" data-c="6" aria-hidden="true"></li>
+                    <li class="row row--del" data-c="7"><span class="row__no">6</span><span class="row__step" data-i18n="diff.s6">Hold at room temperature</span><span class="row__val">30 min</span></li>
+                  </ol>
+                </section>
+                <section class="pane pane--new" aria-label="v1.3">
+                  <header class="pane__head">
+                    <span class="pane__doc" data-i18n="diff.doc">Buffer Preparation · MBR</span>
+                    <span class="pane__ver">v1.3</span>
+                    <span class="pane__stats" aria-hidden="true"><b class="s-mod">~0</b><b class="s-add">+0</b><b class="s-del">−0</b></span>
+                    <span class="pane__status is-draft" data-i18n="diff.review">In review</span>
+                  </header>
+                  <ol class="rows">
+                    <li class="row"><span class="row__no">1</span><span class="row__step" data-i18n="diff.s1">Weigh Tris base</span><span class="row__val">12.10 g</span></li>
+                    <li class="row row--new" data-c="1"><span class="row__no">2</span><span class="row__step" data-i18n="diff.s7">Weigh NaCl</span><span class="row__val"><s class="row__was">8.77 g</s>8.80 g</span></li>
+                    <li class="row row--new" data-c="2"><span class="row__no">3</span><span class="row__step" data-i18n="diff.s2">Dissolve in WFI</span><span class="row__val"><s class="row__was">800 mL</s>850 mL</span></li>
+                    <li class="row row--new" data-c="3"><span class="row__no">4</span><span class="row__step" data-i18n="diff.s3">Adjust pH</span><span class="row__val"><s class="row__was">7.4 ± 0.2</s>7.4 ± 0.1</span></li>
+                    <li class="row row--new" data-c="4"><span class="row__no">5</span><span class="row__step" data-i18n="diff.s4">Mix</span><span class="row__val"><s class="row__was">15 min</s>20 min</span></li>
+                    <li class="row row--add" data-c="5"><span class="row__no">6</span><span class="row__step" data-i18n="diff.s8">Check conductivity</span><span class="row__val">14–16 mS/cm</span></li>
+                    <li class="row row--add" data-c="6"><span class="row__no">7</span><span class="row__step" data-i18n="diff.s5">Filter</span><span class="row__val">0.22 µm</span></li>
+                    <li class="row row--gap" data-c="7"><span class="row__ghost" data-i18n="diff.s6">Hold at room temperature</span></li>
+                  </ol>
+                </section>
+              </div>
+              <ol class="diffx__log">
+                <li data-c="1"><b aria-hidden="true">~</b><span data-i18n="diff.l1">NaCl 8.77 → 8.80 g</span></li>
+                <li data-c="2"><b aria-hidden="true">~</b><span data-i18n="diff.l2">WFI volume 800 → 850 mL</span></li>
+                <li data-c="3"><b aria-hidden="true">~</b><span data-i18n="diff.l3">pH tolerance ±0.2 → ±0.1</span></li>
+                <li data-c="4"><b aria-hidden="true">~</b><span data-i18n="diff.l4">Mixing time 15 → 20 min</span></li>
+                <li data-c="5" class="is-add"><b aria-hidden="true">+</b><span data-i18n="diff.l5">Conductivity check added</span></li>
+                <li data-c="6" class="is-add"><b aria-hidden="true">+</b><span data-i18n="diff.l6">Filtration step added</span></li>
+                <li data-c="7" class="is-del"><b aria-hidden="true">−</b><span data-i18n="diff.l7">Hold step removed</span></li>
+              </ol>
+            </div>
+            <div class="dslide">
+              <div class="diffx__panes">
+                <section class="pane pane--old" aria-label="v4.0">
+                  <header class="pane__head">
+                    <span class="pane__doc" data-i18n="d2.doc">Equipment Cleaning · SOP</span>
+                    <span class="pane__ver">v4.0</span>
+                    <span class="pane__status" data-i18n="diff.approved">Approved</span>
+                  </header>
+                  <ol class="rows">
+                    <li class="row"><span class="row__no">1</span><span class="row__step" data-i18n="d2.s1">Pre-rinse with purified water</span><span class="row__val">5 min</span></li>
+                    <li class="row row--old" data-c="1"><span class="row__no">2</span><span class="row__step" data-i18n="d2.s2">Detergent concentration</span><span class="row__val">1%</span></li>
+                    <li class="row row--old" data-c="2"><span class="row__no">3</span><span class="row__step" data-i18n="d2.s3">Wash temperature</span><span class="row__val">60 °C</span></li>
+                    <li class="row"><span class="row__no">4</span><span class="row__step" data-i18n="d2.s4">Final rinse</span><span class="row__val">3 cycles</span></li>
+                    <li class="row row--gap" data-c="3" aria-hidden="true"></li>
+                    <li class="row row--gap" data-c="4" aria-hidden="true"></li>
+                    <li class="row row--del" data-c="5"><span class="row__no">5</span><span class="row__step" data-i18n="d2.s7">Air dry overnight</span><span class="row__val">12 h</span></li>
+                  </ol>
+                </section>
+                <section class="pane pane--new" aria-label="v4.1">
+                  <header class="pane__head">
+                    <span class="pane__doc" data-i18n="d2.doc">Equipment Cleaning · SOP</span>
+                    <span class="pane__ver">v4.1</span>
+                    <span class="pane__stats" aria-hidden="true"><b class="s-mod">~0</b><b class="s-add">+0</b><b class="s-del">−0</b></span>
+                    <span class="pane__status is-draft" data-i18n="diff.review">In review</span>
+                  </header>
+                  <ol class="rows">
+                    <li class="row"><span class="row__no">1</span><span class="row__step" data-i18n="d2.s1">Pre-rinse with purified water</span><span class="row__val">5 min</span></li>
+                    <li class="row row--new" data-c="1"><span class="row__no">2</span><span class="row__step" data-i18n="d2.s2">Detergent concentration</span><span class="row__val"><s class="row__was">1%</s>2%</span></li>
+                    <li class="row row--new" data-c="2"><span class="row__no">3</span><span class="row__step" data-i18n="d2.s3">Wash temperature</span><span class="row__val"><s class="row__was">60 °C</s>70 °C</span></li>
+                    <li class="row"><span class="row__no">4</span><span class="row__step" data-i18n="d2.s4">Final rinse</span><span class="row__val">3 cycles</span></li>
+                    <li class="row row--add" data-c="3"><span class="row__no">5</span><span class="row__step" data-i18n="d2.s5">TOC swab test</span><span class="row__val">≤ 500 ppb</span></li>
+                    <li class="row row--add" data-c="4"><span class="row__no">6</span><span class="row__step" data-i18n="d2.s6">Visual inspection sign-off</span><span class="row__val">QA</span></li>
+                    <li class="row row--gap" data-c="5"><span class="row__ghost" data-i18n="d2.s7">Air dry overnight</span></li>
+                  </ol>
+                </section>
+              </div>
+              <ol class="diffx__log">
+                <li data-c="1"><b aria-hidden="true">~</b><span data-i18n="d2.l1">Detergent 1% → 2%</span></li>
+                <li data-c="2"><b aria-hidden="true">~</b><span data-i18n="d2.l2">Wash temperature 60 → 70 °C</span></li>
+                <li data-c="3" class="is-add"><b aria-hidden="true">+</b><span data-i18n="d2.l3">TOC swab test added</span></li>
+                <li data-c="4" class="is-add"><b aria-hidden="true">+</b><span data-i18n="d2.l4">QA visual check added</span></li>
+                <li data-c="5" class="is-del"><b aria-hidden="true">−</b><span data-i18n="d2.l5">Overnight drying removed</span></li>
+              </ol>
+            </div>
+            <div class="dslide">
+              <div class="diffx__panes">
+                <section class="pane pane--old" aria-label="v2.0">
+                  <header class="pane__head">
+                    <span class="pane__doc" data-i18n="d3.doc">Tablet Release · Specification</span>
+                    <span class="pane__ver">v2.0</span>
+                    <span class="pane__status" data-i18n="diff.approved">Approved</span>
+                  </header>
+                  <ol class="rows">
+                    <li class="row"><span class="row__no">1</span><span class="row__step" data-i18n="d3.s1">Appearance</span><span class="row__val">White, round</span></li>
+                    <li class="row row--del" data-c="1"><span class="row__no">2</span><span class="row__step" data-i18n="d3.s2">Identification (TLC)</span><span class="row__val">Conforms</span></li>
+                    <li class="row row--gap" data-c="2" aria-hidden="true"></li>
+                    <li class="row row--old" data-c="3"><span class="row__no">3</span><span class="row__step" data-i18n="d3.s4">Assay</span><span class="row__val">95.0–105.0%</span></li>
+                    <li class="row row--old" data-c="4"><span class="row__no">4</span><span class="row__step" data-i18n="d3.s5">Dissolution, 30 min</span><span class="row__val">Q = 75%</span></li>
+                    <li class="row"><span class="row__no">5</span><span class="row__step" data-i18n="d3.s6">Hardness</span><span class="row__val">8–12 kp</span></li>
+                    <li class="row row--gap" data-c="5" aria-hidden="true"></li>
+                  </ol>
+                </section>
+                <section class="pane pane--new" aria-label="v2.1">
+                  <header class="pane__head">
+                    <span class="pane__doc" data-i18n="d3.doc">Tablet Release · Specification</span>
+                    <span class="pane__ver">v2.1</span>
+                    <span class="pane__stats" aria-hidden="true"><b class="s-mod">~0</b><b class="s-add">+0</b><b class="s-del">−0</b></span>
+                    <span class="pane__status is-draft" data-i18n="diff.review">In review</span>
+                  </header>
+                  <ol class="rows">
+                    <li class="row"><span class="row__no">1</span><span class="row__step" data-i18n="d3.s1">Appearance</span><span class="row__val">White, round</span></li>
+                    <li class="row row--gap" data-c="1"><span class="row__ghost" data-i18n="d3.s2">Identification (TLC)</span></li>
+                    <li class="row row--add" data-c="2"><span class="row__no">2</span><span class="row__step" data-i18n="d3.s3">Identification (HPLC)</span><span class="row__val">Conforms</span></li>
+                    <li class="row row--new" data-c="3"><span class="row__no">3</span><span class="row__step" data-i18n="d3.s4">Assay</span><span class="row__val"><s class="row__was">95.0–105.0%</s>97.0–103.0%</span></li>
+                    <li class="row row--new" data-c="4"><span class="row__no">4</span><span class="row__step" data-i18n="d3.s5">Dissolution, 30 min</span><span class="row__val"><s class="row__was">Q = 75%</s>Q = 80%</span></li>
+                    <li class="row"><span class="row__no">5</span><span class="row__step" data-i18n="d3.s6">Hardness</span><span class="row__val">8–12 kp</span></li>
+                    <li class="row row--add" data-c="5"><span class="row__no">6</span><span class="row__step" data-i18n="d3.s7">NDMA impurity</span><span class="row__val">≤ 0.03 ppm</span></li>
+                  </ol>
+                </section>
+              </div>
+              <ol class="diffx__log">
+                <li data-c="1" class="is-del"><b aria-hidden="true">−</b><span data-i18n="d3.l1">TLC identification removed</span></li>
+                <li data-c="2" class="is-add"><b aria-hidden="true">+</b><span data-i18n="d3.l2">HPLC identification added</span></li>
+                <li data-c="3"><b aria-hidden="true">~</b><span data-i18n="d3.l3">Assay range tightened</span></li>
+                <li data-c="4"><b aria-hidden="true">~</b><span data-i18n="d3.l4">Dissolution Q 75 → 80%</span></li>
+                <li data-c="5" class="is-add"><b aria-hidden="true">+</b><span data-i18n="d3.l5">Nitrosamine limit added</span></li>
+              </ol>
+            </div>
+          </div>
+          </div>
           <p class="diffx__sample" data-i18n="diff.sample">Sample screen</p>
         </div>
       </div>
@@ -301,10 +491,10 @@
       <div class="container">
         <h2 id="proc-title" class="section__title reveal" data-i18n="proc.title">How a project runs.</h2>
         <ol class="steps reveal">
-          <li><span class="steps__no">01</span><h3 data-i18n="proc.s1">Assess</h3><p data-i18n="proc.d1">URS, gap analysis</p></li>
-          <li><span class="steps__no">02</span><h3 data-i18n="proc.s2">Design</h3><p data-i18n="proc.d2">FS, risk assessment</p></li>
-          <li><span class="steps__no">03</span><h3 data-i18n="proc.s3">Build &amp; validate</h3><p>IQ / OQ / PQ</p></li>
-          <li><span class="steps__no">04</span><h3 data-i18n="proc.s4">Go live</h3><p data-i18n="proc.d4">Training, SOPs, hypercare</p></li>
+          <li><i class="steps__bar" aria-hidden="true"></i><span class="steps__no">01</span><h3 data-i18n="proc.s1">Assess</h3><p data-i18n="proc.d1">URS, gap analysis</p></li>
+          <li><i class="steps__bar" aria-hidden="true"></i><span class="steps__no">02</span><h3 data-i18n="proc.s2">Design</h3><p data-i18n="proc.d2">FS, risk assessment</p></li>
+          <li><i class="steps__bar" aria-hidden="true"></i><span class="steps__no">03</span><h3 data-i18n="proc.s3">Build &amp; validate</h3><p>IQ / OQ / PQ</p></li>
+          <li><i class="steps__bar" aria-hidden="true"></i><span class="steps__no">04</span><h3 data-i18n="proc.s4">Go live</h3><p data-i18n="proc.d4">Training, SOPs, hypercare</p></li>
         </ol>
       </div>
     </section>
@@ -341,12 +531,12 @@
              <img class="client__logo" src="assets/clients/파일명.svg" alt="회사명" />으로 바꾸면 은색 단색으로 표시됨 -->
         <h3 class="clients__title reveal" data-i18n="cl.title">Clients</h3>
         <ul class="clients reveal">
-          <li class="client"><span class="client__name" data-i18n="cl.c1">Samsung Biologics</span><span class="client__field" data-i18n="ind.bio">Pharma &amp; Bio</span></li>
-          <li class="client"><span class="client__name" data-i18n="cl.c2">Incheon International Airport</span><span class="client__field" data-i18n="ind.pub">Public sector</span></li>
-          <li class="client"><span class="client__name" data-i18n="cl.c3">National Pension Service</span><span class="client__field" data-i18n="ind.pub">Public sector</span></li>
-          <li class="client"><span class="client__name" data-i18n="cl.c4">Hanwha General Insurance</span><span class="client__field" data-i18n="ind.ins">Insurance</span></li>
-          <li class="client"><span class="client__name" data-i18n="cl.c5">KB Life Insurance</span><span class="client__field" data-i18n="ind.ins">Insurance</span></li>
-          <li class="client"><span class="client__name" data-i18n="cl.c6">Lina Life</span><span class="client__field" data-i18n="ind.ins">Insurance</span></li>
+          <li class="client"><a class="client__link" href="https://www.samsungbiologics.com/" target="_blank" rel="noopener noreferrer"><span class="client__name" data-i18n="cl.c1">Samsung Biologics</span><span class="sr-only" data-i18n="a.newtab"> (opens in a new tab)</span></a><span class="client__field" data-i18n="ind.bio">Pharma &amp; Bio</span></li>
+          <li class="client"><a class="client__link" href="https://www.airport.kr/" target="_blank" rel="noopener noreferrer"><span class="client__name" data-i18n="cl.c2">Incheon International Airport</span><span class="sr-only" data-i18n="a.newtab"> (opens in a new tab)</span></a><span class="client__field" data-i18n="ind.pub">Public sector</span></li>
+          <li class="client"><a class="client__link" href="https://www.nps.or.kr/" target="_blank" rel="noopener noreferrer"><span class="client__name" data-i18n="cl.c3">National Pension Service</span><span class="sr-only" data-i18n="a.newtab"> (opens in a new tab)</span></a><span class="client__field" data-i18n="ind.pub">Public sector</span></li>
+          <li class="client"><a class="client__link" href="https://www.hwgeneralins.com/" target="_blank" rel="noopener noreferrer"><span class="client__name" data-i18n="cl.c4">Hanwha General Insurance</span><span class="sr-only" data-i18n="a.newtab"> (opens in a new tab)</span></a><span class="client__field" data-i18n="ind.ins">Insurance</span></li>
+          <li class="client"><a class="client__link" href="https://www.kblife.co.kr/" target="_blank" rel="noopener noreferrer"><span class="client__name" data-i18n="cl.c5">KB Life Insurance</span><span class="sr-only" data-i18n="a.newtab"> (opens in a new tab)</span></a><span class="client__field" data-i18n="ind.ins">Insurance</span></li>
+          <li class="client"><a class="client__link" href="https://www.lina.co.kr/" target="_blank" rel="noopener noreferrer"><span class="client__name" data-i18n="cl.c6">Lina Life</span><span class="sr-only" data-i18n="a.newtab"> (opens in a new tab)</span></a><span class="client__field" data-i18n="ind.ins">Insurance</span></li>
         </ul>
         <p class="partners reveal"><span data-i18n="cl.partners">Partners</span><span class="chip" data-i18n="ref.p2.partner">Hiddenwork</span></p>
       </div>
