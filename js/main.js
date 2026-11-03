@@ -345,6 +345,36 @@
     history.replaceState(null, "", location.pathname + location.search);
   }));
 
+  /* ---------- 인터랙티브 데모 ----------
+     탭/점을 누르면 해당 장면이 완성된 위치로 스크롤, 변경점을 누르면 양쪽 패널의 같은 행을 강조 */
+  const goToSlide = (pin, ranges, i) => {
+    if (!pin || !ranges[i]) return;
+    const [a0, b0] = ranges[i];
+    const p = a0 + (b0 - a0) * 0.97;
+    const top = pin.getBoundingClientRect().top + scrollY + (pin.offsetHeight - innerHeight) * p;
+    scrollTo({ top, behavior: reduceMotion ? 'auto' : 'smooth' });
+  };
+  const onActivate = (el, fn) => {
+    el.addEventListener('click', fn);
+    el.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); fn(ev); } });
+  };
+  dots.forEach((d, i) => onActivate(d, () => goToSlide(product, SLIDES, i)));
+  dtabs.forEach((t, i) => onActivate(t, () => goToSlide(diff, DSLIDES, i)));
+
+  dslides.forEach((s) => {
+    let timer;
+    const locate = (c) => {
+      const hits = $$(`.row[data-c="${c}"], .diffx__log li[data-c="${c}"]`, s.el);
+      $$('.is-focus', s.el).forEach((x) => x.classList.remove('is-focus'));
+      void s.el.offsetWidth;                    // 같은 항목을 다시 눌러도 애니메이션이 다시 돌게
+      hits.forEach((x) => x.classList.add('is-focus'));
+      s.el.classList.add('is-locating');
+      clearTimeout(timer);
+      timer = setTimeout(() => { s.el.classList.remove('is-locating'); hits.forEach((x) => x.classList.remove('is-focus')); }, 1800);
+    };
+    $$('.diffx__log li[data-c], .row[data-c]', s.el).forEach((el) => onActivate(el, () => locate(el.dataset.c)));
+  });
+
   /* ---------- Toast ---------- */
   const toastEl = $('#toast');
   let toastTimer;

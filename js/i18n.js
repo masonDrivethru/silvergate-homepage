@@ -17,6 +17,9 @@ window.SG_I18N = {
     'a.logo': '실버게이트 다리 로고',
     'a.mock': 'SilverBio Author 샘플 화면',
     'a.yes': '지원',
+    'a.slides': '슬라이드',
+    'a.templates': '템플릿',
+    'diff.hint': '샘플 화면입니다. 템플릿이나 변경점을 눌러 보세요.',
     'a.toLight': '라이트 모드로 전환',
     'a.toDark': '다크 모드로 전환',
     'a.newtab': ' (새 탭에서 열림)',
@@ -217,6 +220,7 @@ window.SG_I18N = {
     'co.locV': '인천 송도 포스코타워 26층',
 
     'ct.title': '도입 상담',
+    'ct.book': '미팅 예약하기',
     'ct.phone': '전화 ',
     'ct.email': '이메일 ',
     'f.company': '회사명',
