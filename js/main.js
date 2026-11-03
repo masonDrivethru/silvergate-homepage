@@ -337,6 +337,14 @@
   addEventListener('scroll', onScroll, { passive: true });
   addEventListener('resize', onScroll);
 
+  /* ---------- 홈 버튼: 맨 위로 ----------
+     #top이 고정된 메뉴바라서 브라우저가 스크롤하지 않음 → 직접 맨 위로 이동 */
+  $$('a[href="#top"]').forEach((a) => a.addEventListener("click", (ev) => {
+    ev.preventDefault();
+    scrollTo({ top: 0, behavior: reduceMotion ? "auto" : "smooth" });
+    history.replaceState(null, "", location.pathname + location.search);
+  }));
+
   /* ---------- Toast ---------- */
   const toastEl = $('#toast');
   let toastTimer;
