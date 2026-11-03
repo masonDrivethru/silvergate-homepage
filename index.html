@@ -553,6 +553,25 @@
           <div><dt data-i18n="co.loc">Location</dt><dd data-i18n="co.locV">POSCO Tower-Songdo 26F, Incheon, Korea</dd></div>
         </dl>
       </div>
+      <div class="container">
+        <ul class="stats reveal">
+          <li class="stats__big"><b class="stats__num" data-from="0" data-to="18" data-suffix="+">18+</b><span data-i18n="st.years">Years building enterprise systems</span></li>
+          <li><b class="stats__num" data-from="2008" data-to="2021">2021</b><span data-i18n="st.founded">Founded</span></li>
+          <li><b class="stats__num" data-from="0" data-to="6">6</b><span data-i18n="st.clients">Clients</span></li>
+          <li><b class="stats__num" data-from="0" data-to="4">4</b><span data-i18n="st.ind">Regulated industries</span></li>
+          <li class="stats__wide"><b class="stats__word">Part 11</b><span data-i18n="st.ready">Compliance designed in, not bolted on</span></li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ===== 6-1. Closing: 큰 문장이 줄어들며 자리 잡고, 버튼이 나타남 ===== -->
+    <section class="pin pin--close" data-scroll="close" aria-labelledby="close-title">
+      <div class="pin__stage">
+        <div class="container closing">
+          <h2 id="close-title" class="closing__text" data-i18n="close.text">Let's build what's next.</h2>
+          <a href="#contact" class="btn btn--silver btn--lg closing__cta" data-i18n="close.cta">Start a project</a>
+        </div>
+      </div>
     </section>
 
     <!-- ===== 7. Contact ===== -->
@@ -575,6 +594,7 @@
           <div class="field"><label for="f-email" data-i18n="f.email">Email</label><input id="f-email" name="email" type="email" required autocomplete="email" /></div>
           <div class="field"><label for="f-msg" data-i18n="f.msg">Message</label><textarea id="f-msg" name="message" rows="4" required></textarea></div>
           <label class="agree"><input type="checkbox" name="agree" required /><span data-i18n="f.agree">I agree to the collection and use of my personal information for this inquiry.</span></label>
+          <input class="hp" type="text" name="_gotcha" tabindex="-1" autocomplete="off" aria-hidden="true" />
           <p class="form__error" id="formError" role="alert" hidden></p>
           <button class="btn btn--silver btn--lg btn--block" type="submit" data-i18n="f.send">Send inquiry</button>
         </form>

@@ -76,6 +76,8 @@
   };
   const diff = $('[data-scroll="diff"]');
   const wordsSec = $('[data-scroll="words"]');
+  const closeSec = $('[data-scroll="close"]');
+  const closing = $('.closing');
   const pills = $('.pills');
 
   const setProduct = (p) => {
@@ -207,6 +209,27 @@
     });
   }
 
+  /* ---------- FX: 숫자 카운트업 ---------- */
+  const statsEl = $('.stats');
+  let counted = false;
+  const countUp = () => {
+    if (counted || !statsEl || !statsEl.classList.contains('is-in')) return;
+    counted = true;
+    $$('.stats__num', statsEl).forEach((el) => {
+      const from = +el.dataset.from, to = +el.dataset.to, suf = el.dataset.suffix || '';
+      if (reduceMotion) { el.textContent = to + suf; return; }
+      const t0 = performance.now(), dur = 1600;
+      const tick = (now) => {
+        const k = clamp((now - t0) / dur);
+        const v = Math.round(from + (to - from) * (1 - Math.pow(1 - k, 4)));
+        el.textContent = v + (k === 1 ? suf : '');
+        if (k < 1) requestAnimationFrame(tick);
+      };
+      el.textContent = from;
+      requestAnimationFrame(tick);
+    });
+  };
+
   /* ---------- 스크롤 루프 (한 프레임에 한 번) ---------- */
   let ticking = false;
   const update = () => {
@@ -219,8 +242,10 @@
       if (product) setSlides(pinProgress(product));
       if (diff) setDiff(pinProgress(diff));
       if (wordsSec) setWords(pinProgress(wordsSec));
+      if (closeSec) closing.style.setProperty('--c', (1 - Math.pow(1 - clamp(pinProgress(closeSec) / 0.8), 3)).toFixed(3));
     }
     reveal();
+    countUp();
     setFx();
     markActive();
   };
@@ -327,8 +352,15 @@
     const btn = $('button[type="submit"]', form);
     btn.disabled = true;
     try {
-      const res = await fetch(endpoint, { method: 'POST', body: data, headers: { Accept: 'application/json' } });
-      if (!res.ok) throw new Error(res.status);
+      if (data.get('_gotcha')) { form.reset(); toast(S('sent')); return; }   // 스팸 봇
+      if (endpoint.includes('script.google.com')) {
+        // Gmail 연결(Apps Script): 응답을 읽을 수 없는 방식이라 전송 오류만 잡는다
+        data.set('lang', lang);
+        await fetch(endpoint, { method: 'POST', mode: 'no-cors', body: new URLSearchParams(data) });
+      } else {
+        const res = await fetch(endpoint, { method: 'POST', body: data, headers: { Accept: 'application/json' } });
+        if (!res.ok) throw new Error(res.status);
+      }
       form.reset();
       toast(S('sent'));
     } catch {

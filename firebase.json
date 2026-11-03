@@ -9,6 +9,7 @@
       ".gitignore",
       ".nojekyll",
       ".github/**",
+      "tools/**",
       "**/.*",
       "**/.*/**",
       ".git/**",
