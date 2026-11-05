@@ -851,7 +851,8 @@ button, input, textarea { font: inherit; color: inherit; }
   will-change: transform;
 }
 .closing__cta { opacity: clamp(0, calc(var(--c) * 3 - 2), 1); transform: translateY(calc((1 - var(--c)) * 30px)); }
-.hp { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
+.hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; }
+.turnstile:empty { display: none; }
 
 
 /* =========================================================

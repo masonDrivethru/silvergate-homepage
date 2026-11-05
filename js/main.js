@@ -404,6 +404,34 @@
      action이 비어 있으면 메일 앱으로 작성, Formspree 주소를 넣으면 그쪽으로 전송 */
   const form = $('#contactForm');
   const errorEl = $('#formError');
+  const MIN_FILL_MS = 3000;            // 페이지를 연 뒤 3초 안의 제출은 봇으로 본다 (서버도 같은 기준으로 확인)
+  const showError = (msg) => { errorEl.textContent = msg; errorEl.hidden = false; };
+
+  // Cloudflare Turnstile: 사이트 키가 있을 때만, 폼이 화면에 가까워지면 불러온다
+  const siteKey = form?.dataset.turnstileSitekey;
+  let tsWidget = null;
+  if (form && siteKey) {
+    const loadTurnstile = () => {
+      window.onTurnstileLoad = () => {
+        tsWidget = window.turnstile.render('#turnstile', {
+          sitekey: siteKey,
+          theme: 'auto',
+          language: lang,
+          appearance: 'interaction-only',   // 대부분은 보이지 않고, 확인이 필요할 때만 체크 상자가 뜬다
+        });
+      };
+      const s = document.createElement('script');
+      s.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=onTurnstileLoad';
+      s.async = true;
+      document.head.appendChild(s);
+    };
+    const io = new IntersectionObserver((entries) => {
+      if (entries.some((en) => en.isIntersecting)) { io.disconnect(); loadTurnstile(); }
+    }, { rootMargin: '600px 0px' });
+    io.observe(form);
+  }
+  const resetTurnstile = () => { if (tsWidget !== null) window.turnstile?.reset(tsWidget); };
+
   form?.addEventListener('submit', async (ev) => {
     ev.preventDefault();
     let firstInvalid = null;
@@ -437,23 +465,39 @@
       return;
     }
 
+    // 1. 허니팟이 채워졌으면 보내지 않고 성공한 척
+    if (data.get('website')) { form.reset(); toast(S('sent')); return; }
+    // 2. 페이지를 연 뒤 너무 빨리 보낸 경우
+    const elapsed = Math.round(performance.now());
+    if (elapsed < MIN_FILL_MS) { showError(S('errTooFast')); return; }
+    // 3. Turnstile 토큰이 아직 없으면 (확인 중이거나 체크가 필요한 상태)
+    if (siteKey && !data.get('cf-turnstile-response')) { showError(S('errCaptcha')); return; }
+
     const btn = $('button[type="submit"]', form);
     btn.disabled = true;
     try {
-      if (data.get('_gotcha')) { form.reset(); toast(S('sent')); return; }   // 스팸 봇
       if (endpoint.includes('script.google.com')) {
-        // Gmail 연결(Apps Script): 응답을 읽을 수 없는 방식이라 전송 오류만 잡는다
+        // Gmail 연결(Apps Script): 서버 응답 {ok, error}을 읽어 결과를 보여준다
         data.set('lang', lang);
-        await fetch(endpoint, { method: 'POST', mode: 'no-cors', body: new URLSearchParams(data) });
+        data.set('_t', String(elapsed));
+        const res = await fetch(endpoint, { method: 'POST', body: new URLSearchParams(data) });
+        const out = await res.json();
+        if (!out.ok) {
+          resetTurnstile();
+          const key = { invalid: 'errFields', captcha: 'errCaptcha', rate: 'errRate' }[out.error];
+          if (key) { showError(S(key)); return; }
+          throw new Error(out.error);
+        }
       } else {
         const res = await fetch(endpoint, { method: 'POST', body: data, headers: { Accept: 'application/json' } });
         if (!res.ok) throw new Error(res.status);
       }
       form.reset();
+      resetTurnstile();                 // 토큰은 1회용이라 다음 문의를 위해 새로 받는다
       toast(S('sent'));
     } catch {
-      errorEl.textContent = S('sendFail')(CONTACT_EMAIL);
-      errorEl.hidden = false;
+      resetTurnstile();
+      showError(S('sendFail')(CONTACT_EMAIL));
     } finally {
       btn.disabled = false;
     }

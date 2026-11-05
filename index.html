@@ -585,8 +585,9 @@
           <a class="btn btn--glass book-btn" id="bookBtn" href="https://calendar.app.google/wLYapJcPyoxVQvN78" target="_blank" rel="noopener noreferrer" data-i18n="ct.book">Book a meeting</a>
         </div>
 
-        <!-- 문의 전송: Google Apps Script(tools/contact-mailer.gs) → masonlee Gmail. 비우면 메일 앱으로 작성 -->
-        <form class="form reveal" id="contactForm" action="https://script.google.com/macros/s/AKfycbzQc8NsvP7o6lRXvOTyZ5GKrL8MZaRfhF0fzz6Kc39EPLR4OvNgijxH2YiZkn5H9Ld4/exec" method="POST" novalidate>
+        <!-- 문의 전송: Google Apps Script(tools/contact-mailer.gs) → masonlee Gmail. 비우면 메일 앱으로 작성
+             data-turnstile-sitekey: Cloudflare Turnstile 사이트 키 (비우면 Turnstile 없이 동작) -->
+        <form class="form reveal" id="contactForm" action="https://script.google.com/macros/s/AKfycbzQc8NsvP7o6lRXvOTyZ5GKrL8MZaRfhF0fzz6Kc39EPLR4OvNgijxH2YiZkn5H9Ld4/exec" method="POST" novalidate data-turnstile-sitekey="">
           <div class="form__row">
             <div class="field"><label for="f-company" data-i18n="f.company">Company</label><input id="f-company" name="company" required autocomplete="organization" /></div>
             <div class="field"><label for="f-name" data-i18n="f.name">Name</label><input id="f-name" name="name" required autocomplete="name" /></div>
@@ -594,7 +595,9 @@
           <div class="field"><label for="f-email" data-i18n="f.email">Email</label><input id="f-email" name="email" type="email" required autocomplete="email" /></div>
           <div class="field"><label for="f-msg" data-i18n="f.msg">Message</label><textarea id="f-msg" name="message" rows="4" required></textarea></div>
           <label class="agree"><input type="checkbox" name="agree" required /><span data-i18n="f.agree">I agree to the collection and use of my personal information for this inquiry.</span></label>
-          <input class="hp" type="text" name="_gotcha" tabindex="-1" autocomplete="off" aria-hidden="true" />
+          <!-- 허니팟: 사람에게는 안 보이고, 봇만 채우는 칸 -->
+          <div class="hp" aria-hidden="true"><label for="f-website">Website</label><input id="f-website" type="text" name="website" tabindex="-1" autocomplete="off" /></div>
+          <div class="turnstile" id="turnstile"></div>
           <p class="form__error" id="formError" role="alert" hidden></p>
           <button class="btn btn--silver btn--lg btn--block" type="submit" data-i18n="f.send">Send inquiry</button>
         </form>

@@ -1,5 +1,5 @@
 // SilverGate service worker — offline support
-const CACHE = 'sg-v39';
+const CACHE = 'sg-v40';
 const ASSETS = [
   './',
   './index.html',
@@ -29,6 +29,7 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET') return;
+  if (new URL(req.url).hostname === 'challenges.cloudflare.com') return;   // Turnstile은 캐시하면 안 됨
 
   if (new URL(req.url).origin === self.location.origin) {
     e.respondWith(

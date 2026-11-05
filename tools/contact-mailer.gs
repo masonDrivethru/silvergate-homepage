@@ -7,11 +7,16 @@
  * 1. script.google.com 의 "SilverGate Contact Mailer" 프로젝트에 이 파일 내용을 붙여넣고 저장
  * 2. 프로젝트 설정(톱니바퀴) → 스크립트 속성 → ANTHROPIC_API_KEY 추가 (값: Anthropic Console에서 만든 API 키)
  *    ※ 키는 여기에만 넣고, 코드·채팅·메일에는 절대 붙여넣지 않는다
+ *    같은 곳에 TURNSTILE_SECRET 추가 (값: Cloudflare 대시보드 → Turnstile → 위젯의 Secret Key)
+ *    ※ TURNSTILE_SECRET이 없으면 Turnstile 검증만 건너뛴다 (나머지 방어는 그대로 동작)
  * 3. 배포 → 배포 관리 → 연필(수정) → 버전: 새 버전 → 배포 (URL은 그대로 유지됨)
  *    처음 한 번 "외부 서비스 연결" 권한 승인이 필요하다
  */
 const TO = 'masonlee@silvergate-solutions.com';
-const MAX_MAIL_PER_HOUR = 20;     // 문의 메일 폭주 방지
+const MAX_MAIL_PER_HOUR = 20;     // 문의 메일 폭주 방지 (사이트 전체 기준)
+const MAX_MAIL_PER_SENDER = 2;    // 같은 이메일 주소로는 10분에 2건까지
+const SENDER_WINDOW_SEC = 600;
+const MIN_FILL_MS = 3000;         // 페이지를 연 뒤 3초 안에 보낸 제출은 봇으로 본다
 const MAX_CHAT_PER_HOUR = 120;    // 챗봇 요청 상한 (사이트 전체 기준, 비용 보호)
 const MAX_CHAT_PER_6H = 400;     // CacheService 보관 한도가 6시간이라 6시간 단위로 제한
 
@@ -52,7 +57,11 @@ function doPost(e) {
 
 /* ---------------- 문의 폼 → Gmail ---------------- */
 function mail(p) {
-  if (p._gotcha) return json({ ok: true });                    // 봇이 채우는 숨김 칸
+  // 1. 허니팟: 사람 눈에 안 보이는 칸이 채워져 있으면 메일 없이 성공한 척
+  if (p.website || p._gotcha) return json({ ok: true });
+  // 2. 제출 시간: 화면이 보낸 경과 시간(_t, ms)이 없거나 3초 미만이면 봇 → 조용히 성공 처리
+  const elapsed = Number(p._t);
+  if (!isFinite(elapsed) || elapsed < MIN_FILL_MS) return json({ ok: true });
 
   const clean = (v, n) => String(v || '').trim().slice(0, n);
   const company = clean(p.company, 100);
@@ -61,6 +70,12 @@ function mail(p) {
   const message = clean(p.message, 5000);
   if (!company || !name || !message || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ ok: false, error: 'invalid' });
 
+  // 3. Cloudflare Turnstile 토큰을 서버에서 검증 (토큰은 1회용)
+  if (!verifyTurnstile(p['cf-turnstile-response'])) return json({ ok: false, error: 'captcha' });
+
+  // 4. 반복 제출 제한: 같은 이메일 주소 10분 2건 + 사이트 전체 1시간 20건
+  //    ※ Apps Script는 요청자 IP를 알려주지 않아 IP 대신 이메일 주소 기준으로 제한한다
+  if (!underLimit('mail_s_' + digest(email.toLowerCase()), MAX_MAIL_PER_SENDER, SENDER_WINDOW_SEC)) return json({ ok: false, error: 'rate' });
   if (!underLimit('mail', MAX_MAIL_PER_HOUR, 3600)) return json({ ok: false, error: 'rate' });
 
   MailApp.sendEmail({
@@ -140,6 +155,31 @@ function chat(p) {
 }
 
 /* ---------------- 공통 ---------------- */
+function verifyTurnstile(token) {
+  const secret = PropertiesService.getScriptProperties().getProperty('TURNSTILE_SECRET');
+  if (!secret) return true;                                   // 아직 설정 전이면 검증 생략
+  if (!token) return false;
+  try {
+    const res = UrlFetchApp.fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+      method: 'post',
+      muteHttpExceptions: true,
+      payload: { secret: secret, response: String(token).slice(0, 2048) },
+    });
+    const body = JSON.parse(res.getContentText());
+    if (!body.success) console.warn('Turnstile 실패: ' + JSON.stringify(body['error-codes'] || []));
+    return body.success === true;
+  } catch (err) {
+    console.error('Turnstile 검증 오류: ' + err);
+    return false;
+  }
+}
+
+function digest(text) {
+  return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, text)
+    .map(function (b) { return ('0' + (b & 0xff).toString(16)).slice(-2); })
+    .join('');
+}
+
 function underLimit(name, max, seconds) {
   const cache = CacheService.getScriptCache();
   const count = Number(cache.get(name) || 0);
