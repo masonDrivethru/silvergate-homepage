@@ -2,6 +2,7 @@
  * SilverGate 홈페이지 백엔드 (Google Apps Script 웹 앱)
  *  - action 없음 : 문의 폼 → Gmail 전송
  *  - action=chat : AI 상담 챗봇 (Claude API)
+ *  - action=visit: 방문 기록 → 구글 시트 "SilverGate 방문 기록" (본인 드라이브, 비공개)
  *
  * 설정 (masonlee@silvergate-solutions.com 계정)
  * 1. script.google.com 의 "SilverGate Contact Mailer" 프로젝트에 이 파일 내용을 붙여넣고 저장
@@ -18,6 +19,7 @@ const MAX_MAIL_PER_SENDER = 2;    // 같은 이메일 주소로는 10분에 2건
 const SENDER_WINDOW_SEC = 600;
 const MIN_FILL_MS = 3000;         // 페이지를 연 뒤 3초 안에 보낸 제출은 봇으로 본다
 const VALID_LANGS = ['ko', 'en']; // 화면이 자동으로 보내는 언어 값. 이 외의 값(빈 값 포함)은 봇으로 본다
+const MAX_VISIT_PER_HOUR = 1000;  // 방문 기록 상한 (봇이 시트를 채우는 것 방지)
 const MAX_CHAT_PER_HOUR = 120;    // 챗봇 요청 상한 (사이트 전체 기준, 비용 보호)
 const MAX_CHAT_PER_6H = 400;     // CacheService 보관 한도가 6시간이라 6시간 단위로 제한
 
@@ -53,6 +55,7 @@ const SYSTEM_PROMPT = [
 function doPost(e) {
   const p = (e && e.parameter) || {};
   if (p.action === 'chat') return chat(p);
+  if (p.action === 'visit') return visit(p);
   return mail(p);
 }
 
@@ -166,6 +169,67 @@ function chat(p) {
     .trim();
   if (!text) return json({ ok: false, error: 'empty' });
   return json({ ok: true, reply: text });
+}
+
+/* ---------------- 방문 기록 → 구글 시트 (본인만 열람) ----------------
+   쿠키·IP·이름 등 개인을 알아볼 수 있는 정보는 받지도 저장하지도 않는다.
+   시트는 처음 방문이 기록될 때 이 계정의 구글 드라이브에 비공개로 자동 생성된다
+   (파일 이름: "SilverGate 방문 기록", 주소는 스크립트 속성 VISIT_SHEET_ID 에 저장). */
+function visit(p) {
+  if (!underLimit('visit_h', MAX_VISIT_PER_HOUR, 3600)) return json({ ok: true });   // 폭주 시 기록만 건너뜀
+  const clean = (v, n) => String(v || '').replace(/[\r\n\t]/g, ' ').trim().slice(0, n);
+  const pick = (v, list) => (list.indexOf(v) >= 0 ? v : '');
+  // 수식으로 해석되지 않게 =,+,-,@ 로 시작하는 값 앞에 ' 를 붙인다
+  const safe = (v) => (/^[=+\-@]/.test(v) ? "'" + v : v);
+  const row = [
+    new Date(),
+    safe(clean(p.page, 200)) || '/',
+    safe(clean(p.ref, 100)) || '(직접 방문)',
+    pick(p.lang, VALID_LANGS),
+    safe(clean(p.blang, 20)),
+    safe(clean(p.tz, 50)),
+    pick(p.device, ['PC', '모바일', '태블릿']),
+    p.app === '1' ? '앱' : '웹',
+  ];
+  const lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(5000);
+    visitSheet().appendRow(row);
+  } catch (err) {
+    console.error('방문 기록 실패: ' + err);
+  } finally {
+    lock.releaseLock();
+  }
+  return json({ ok: true });
+}
+
+function visitSheet() {
+  const props = PropertiesService.getScriptProperties();
+  const id = props.getProperty('VISIT_SHEET_ID');
+  if (id) return SpreadsheetApp.openById(id).getSheetByName('방문');
+
+  const ss = SpreadsheetApp.create('SilverGate 방문 기록');
+  ss.setSpreadsheetTimeZone('Asia/Seoul');
+  const log = ss.getSheets()[0].setName('방문');
+  log.appendRow(['시각', '페이지', '유입 경로', '화면 언어', '브라우저 언어', '시간대(지역)', '기기', '웹/앱']);
+  log.setFrozenRows(1);
+  log.getRange('A:A').setNumberFormat('yyyy-mm-dd hh:mm:ss');
+
+  const sum = ss.insertSheet('요약', 0);
+  sum.getRange('A1').setFormula(
+    "=QUERY({ARRAYFORMULA(TO_DATE(INT('방문'!A2:A))),'방문'!A2:A}," +
+    "\"select Col1, count(Col2) where Col2 is not null group by Col1 order by Col1 desc label Col1 '날짜', count(Col2) '방문 수'\",0)");
+  sum.getRange('A:A').setNumberFormat('yyyy-mm-dd');
+  sum.getRange('D1').setFormula(
+    "=QUERY('방문'!C2:C,\"select C, count(C) where C is not null group by C order by count(C) desc label C '유입 경로', count(C) '방문 수'\",0)");
+  sum.getRange('G1').setFormula(
+    "=QUERY('방문'!F2:F,\"select F, count(F) where F is not null group by F order by count(F) desc label F '시간대(지역)', count(F) '방문 수'\",0)");
+  sum.getRange('J1').setFormula(
+    "=QUERY('방문'!G2:G,\"select G, count(G) where G is not null group by G order by count(G) desc label G '기기', count(G) '방문 수'\",0)");
+
+  props.setProperty('VISIT_SHEET_ID', ss.getId());
+  console.log('방문 기록 시트 생성: ' + ss.getUrl());
+  return log;
 }
 
 /* ---------------- 공통 ---------------- */
