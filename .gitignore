@@ -7,3 +7,11 @@ node_modules/
 # Firebase
 firebase-debug.log
 .firebase/
+
+# Nuxt
+.nuxt/
+.output/
+.data/
+.nitro/
+.cache/
+dist/

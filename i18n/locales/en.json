@@ -1,0 +1,267 @@
+{
+  "skip": "Skip to content",
+  "nav": {
+    "product": "Product",
+    "solutions": "Solutions",
+    "references": "References",
+    "company": "Company",
+    "install": "Install app"
+  },
+  "intro": {
+    "scroll": "Scroll"
+  },
+  "product": {
+    "title": "From record to approval."
+  },
+  "mock": {
+    "s1": "Batch records",
+    "s2": "Templates",
+    "s3": "Reviews",
+    "s4": "Audit trail",
+    "s5": "Settings",
+    "doc": "Tablet compression",
+    "t1": "Line clearance",
+    "t2": "Weigh API, 250.0 mg ±2%",
+    "t3": "Blend for 15 min",
+    "t4": "Compress tablets",
+    "t5": "In-process check, hardness 8–12 kp",
+    "author": "Author",
+    "review": "Review",
+    "approve": "Approve",
+    "note": "Sample screen",
+    "audit": "Audit trail",
+    "auditTitle": "Every action, on the record.",
+    "hTime": "Time",
+    "hUser": "User",
+    "hAction": "Action",
+    "hDetail": "Detail",
+    "aEdit": "Edited",
+    "a1": "NaCl 8.77 → 8.80 g",
+    "aNote": "Commented",
+    "a2": "Step 4: confirm the pH meter ID",
+    "a3": "pH meter PH-03 added",
+    "aSign": "Signed",
+    "a4": "Author signature",
+    "a5": "Review signature",
+    "aOk": "Approved",
+    "a6": "Released for production",
+    "auditFoot": "Entries cannot be edited or deleted.",
+    "esign": "E-signature",
+    "esignTitle": "Signed to Part 11.",
+    "mSigner": "Signer",
+    "mMeaning": "Meaning",
+    "mTime": "Time",
+    "c1": "Identity verified with ID and password",
+    "c2": "Meaning of the signature recorded",
+    "c3": "Server time stamp applied",
+    "c4": "Bound to the record, cannot be copied",
+    "signed": "Signed"
+  },
+  "diff": {
+    "title": "Every change, side by side.",
+    "doc": "Buffer Preparation · MBR",
+    "approved": "Approved",
+    "s1": "Weigh Tris base",
+    "s7": "Weigh NaCl",
+    "s2": "Dissolve in WFI",
+    "s3": "Adjust pH",
+    "s4": "Mix",
+    "s6": "Hold at room temperature",
+    "review": "In review",
+    "s8": "Check conductivity",
+    "s5": "Filter",
+    "l1": "NaCl 8.77 → 8.80 g",
+    "l2": "WFI volume 800 → 850 mL",
+    "l3": "pH tolerance ±0.2 → ±0.1",
+    "l4": "Mixing time 15 → 20 min",
+    "l5": "Conductivity check added",
+    "l6": "Filtration step added",
+    "l7": "Hold step removed",
+    "hint": "Sample screen. Tap a template or a change to explore."
+  },
+  "dtab": {
+    "1": "Batch record",
+    "2": "Cleaning SOP",
+    "3": "QC specification"
+  },
+  "d2": {
+    "doc": "Equipment Cleaning · SOP",
+    "s1": "Pre-rinse with purified water",
+    "s2": "Detergent concentration",
+    "s3": "Wash temperature",
+    "s4": "Final rinse",
+    "s7": "Air dry overnight",
+    "s5": "TOC swab test",
+    "s6": "Visual inspection sign-off",
+    "l1": "Detergent 1% → 2%",
+    "l2": "Wash temperature 60 → 70 °C",
+    "l3": "TOC swab test added",
+    "l4": "QA visual check added",
+    "l5": "Overnight drying removed"
+  },
+  "d3": {
+    "doc": "Tablet Release · Specification",
+    "s1": "Appearance",
+    "s2": "Identification (TLC)",
+    "s4": "Assay",
+    "s5": "Dissolution, 30 min",
+    "s6": "Hardness",
+    "s3": "Identification (HPLC)",
+    "s7": "NDMA impurity",
+    "l1": "TLC identification removed",
+    "l2": "HPLC identification added",
+    "l3": "Assay range tightened",
+    "l4": "Dissolution Q 75 → 80%",
+    "l5": "Nitrosamine limit added"
+  },
+  "cap": {
+    "title": "Three stages. One platform.",
+    "caption": "Features covered by MBR, EBR and MES",
+    "feature": "Feature",
+    "r1": "Master recipe authoring",
+    "r2": "Review & approval workflow",
+    "r3": "Electronic signatures",
+    "r4": "Audit trail",
+    "r5": "Step-by-step execution",
+    "r6": "Review by exception",
+    "r7": "Equipment & material tracking",
+    "r8": "ERP & LIMS integration"
+  },
+  "words": {
+    "text": "Enterprise systems since 2008. Compliance, designed in from day one.",
+    "di": "Data integrity"
+  },
+  "ind": {
+    "title": "Built for regulated industries.",
+    "note": "Fields our team has delivered in since 2008.",
+    "bio": "Pharma & Bio",
+    "bioD": "MES, MBR and EBR authoring, bioprocess systems",
+    "ins": "Insurance",
+    "insD": "New business, products, GA sales, call center, digital channels",
+    "fin": "Banking & Securities",
+    "finD": "Bancassurance, retirement pensions, channel websites",
+    "pub": "Public sector",
+    "pubD": "Next-generation core systems, EDI, facility management"
+  },
+  "faq": {
+    "title": "Questions we hear most.",
+    "q1": "Is SilverBio Author ready for 21 CFR Part 11?",
+    "a1": "Yes. It is designed for Part 11 from the start: every action is kept in an audit trail, records are signed electronically at author, review and approval, and access is controlled by role. The same design covers EU GMP Annex 11 and ALCOA+ data integrity.",
+    "q2": "What is the difference between MBR, EBR and MES?",
+    "a2": "MBR is the master batch record: authoring the recipe and getting it reviewed and approved. EBR runs that record on the floor, step by step, with review by exception. MES adds equipment and material tracking and connects to ERP and LIMS.",
+    "q3": "How does a project run?",
+    "a3": "Four steps. Assess: URS and gap analysis. Design: FS and risk assessment. Build and validate: IQ, OQ and PQ. Go live: training, SOPs and hypercare. Deliverables follow GAMP 5.",
+    "q4": "Can we see what changed between document versions?",
+    "a4": "SilverBio Compare puts two versions side by side and lists every value change, addition and deletion, for batch records, cleaning SOPs, QC specifications and other templates. Try the sample above.",
+    "q5": "Do you work outside pharma?",
+    "a5": "Yes. Since 2008 the team has delivered systems for insurance, banking and securities, and the public sector, including an integrated facility management system for Incheon International Airport.",
+    "q6": "How do we get started?",
+    "a6": "Send an inquiry with the form below or book a 30-minute meeting on Google Meet. We will start from your current process and documents."
+  },
+  "ref": {
+    "title": "References",
+    "live": "In progress",
+    "p1": {
+      "client": "Samsung Biologics",
+      "scope": "Analysis, design, development",
+      "since": "Feb 2025"
+    },
+    "field": "Field",
+    "scope": "Scope",
+    "since": "Since",
+    "p2": {
+      "client": "Incheon International Airport Corporation",
+      "title": "IFMS Integrated Facility Management System",
+      "field": "Public · Airport facilities",
+      "partner": "Hiddenwork"
+    },
+    "partner": "Partner"
+  },
+  "cl": {
+    "title": "Clients",
+    "c1": "Samsung Biologics",
+    "c2": "Incheon International Airport",
+    "c3": "National Pension Service",
+    "c4": "Hanwha General Insurance",
+    "c5": "KB Life Insurance",
+    "c6": "Lina Life",
+    "partners": "Partners"
+  },
+  "a": {
+    "newtab": " (opens in a new tab)",
+    "home": "SilverGate home",
+    "menu": "Main menu",
+    "toLight": "Switch to light mode",
+    "lang": "Language",
+    "logo": "SilverGate bridge logo",
+    "mock": "SilverBio Author sample screen",
+    "audit": "SilverBio Author audit trail sample",
+    "esign": "SilverBio Author e-signature sample",
+    "slides": "Slides",
+    "templates": "Templates",
+    "yes": "Supported",
+    "mmenu": "Mobile menu",
+    "toDark": "Switch to dark mode"
+  },
+  "co": {
+    "title": "Company",
+    "name": "Name",
+    "nameV": "SilverGate Co., Ltd.",
+    "ceo": "CEO",
+    "founded": "Founded",
+    "foundedV": "2021",
+    "loc": "Location",
+    "locV": "POSCO Tower-Songdo 26F, Incheon, Korea"
+  },
+  "close": {
+    "text": "Let's build what's next.",
+    "cta": "Start a project"
+  },
+  "ct": {
+    "title": "Contact us",
+    "phone": "Phone ",
+    "email": "Email ",
+    "book": "Book a meeting"
+  },
+  "f": {
+    "company": "Company",
+    "name": "Name",
+    "email": "Email",
+    "msg": "Message",
+    "agree": "I agree to the collection and use of my personal information for this inquiry.",
+    "send": "Send inquiry"
+  },
+  "ft": {
+    "co": "SilverGate Co., Ltd.",
+    "ceo": "CEO Changkeun Lee",
+    "biz": "Business reg. no.",
+    "addr": "V584, 26F, Posco Tower-Songdo, 165, Convensia-daero, Yeonsu-gu, Incheon, Republic of Korea"
+  },
+  "tab": {
+    "home": "Home",
+    "ref": "Work",
+    "contact": "Contact"
+  },
+  "meta": {
+    "title": "SilverGate {'|'} MES, EBR & MBR for Pharma and Bio",
+    "desc": "SilverGate builds MES, EBR and MBR solutions for pharma and biotech manufacturing, and enterprise systems for insurance, finance and the public sector. Author and approve master batch records with SilverBio Author."
+  },
+  "s": {
+    "drafting": "Drafting",
+    "inReview": "In review",
+    "approved": "Approved",
+    "errAgree": "Please agree to the privacy terms to send your inquiry.",
+    "errFields": "Please fill in the highlighted fields. Email should look like name{'@'}company.com.",
+    "mailSubject": "[Inquiry]",
+    "lCompany": "Company",
+    "lName": "Name",
+    "lEmail": "Email",
+    "mailToast": "Your mail app is open. Review and send the message.",
+    "sent": "Inquiry sent. We will get back to you shortly.",
+    "sendFail": "Could not send. Please email {mail} directly.",
+    "errTooFast": "That was very fast. Please wait a moment and send again.",
+    "errCaptcha": "Security check is not finished yet. Please wait a moment and send again.",
+    "errRate": "Too many inquiries in a short time. Please try again in a few minutes.",
+    "installed": "SilverGate app installed."
+  }
+}

@@ -1,11 +1,9 @@
 // SilverGate service worker — offline support
-const CACHE = 'sg-v41';
+// Nuxt 빌드 파일(/_nuxt/*)은 이름에 해시가 붙으므로 미리 저장하지 않고, 처음 받을 때 아래 fetch 처리에서 저장된다
+const CACHE = 'sg-v42';
 const ASSETS = [
   './',
   './index.html',
-  './css/style.css',
-  './js/i18n.js',
-  './js/main.js',
   './manifest.webmanifest',
   './assets/icons/logo.svg',
   './assets/icons/icon-192.png',
