@@ -23,7 +23,7 @@ build() {
 if [ "${1:-}" = "--preview" ]; then
   build
   echo "미리보기 채널에 배포하는 중..."
-  $FIREBASE hosting:channel:deploy preview --expires 7d --project "$PROJECT" --non-interactive 2>&1 | grep -E "Channel URL|expires|Error" || true
+  $FIREBASE hosting:channel:deploy preview --expires 7d --project "$PROJECT" --non-interactive 2>&1 | grep -aE "Channel URL|expires|Error" || true
   rm -f firebase-debug.log
   exit 0
 fi
@@ -45,7 +45,7 @@ echo "2/3 빌드..."
 build
 
 echo "3/3 구글 클라우드(Firebase)에 배포하는 중..."
-$FIREBASE deploy --only hosting --project "$PROJECT" --non-interactive 2>&1 | grep -E "Deploy complete|Hosting URL|Error" || true
+$FIREBASE deploy --only hosting --project "$PROJECT" --non-interactive 2>&1 | grep -aE "Deploy complete|Hosting URL|Error" || true
 rm -f firebase-debug.log
 
 echo "완료: https://www.silvergate-solutions.com  /  https://silvergate-web.web.app"
