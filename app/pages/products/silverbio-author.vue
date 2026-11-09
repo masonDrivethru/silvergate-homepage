@@ -1,18 +1,16 @@
 <script setup lang="ts">
 // 제품 상세: SilverBio Author (샘플 페이지). 내용은 홈·챗봇 설정에 있는 사실만 사용
-const { t } = useI18n();
-const SITE = 'https://www.silvergate-solutions.com';
+const { t, locale } = useI18n();
+const { homePath } = useSiteNav();
 const BOOK_URL = 'https://calendar.app.google/wLYapJcPyoxVQvN78';
 
-useHead({
+usePageSeo({
+  path: PRODUCT_AUTHOR_PATH,
   title: () => t('pd.metaTitle'),
-  meta: [
-    { name: 'description', content: () => t('pd.metaDesc') },
-    { property: 'og:title', content: () => t('pd.metaTitle') },
-    { property: 'og:description', content: () => t('pd.metaDesc') },
-    { property: 'og:url', content: SITE + PRODUCT_AUTHOR_PATH },
-  ],
-  link: [{ rel: 'canonical', href: SITE + PRODUCT_AUTHOR_PATH }],
+  description: () => t('pd.metaDesc'),
+  ogTitle: () => t('pd.ogTitle'),
+  ogDescription: () => t('pd.ogDesc'),
+  ogImage: () => `/assets/og/silverbio-author-${locale.value}.png`,
 });
 useReveal();
 
@@ -39,7 +37,7 @@ const steps = [
       <h1 id="pd-title" class="pd-hero__title reveal">{{ $t('pd.title') }}</h1>
       <p class="pd-hero__lead reveal">{{ $t('pd.lead') }}</p>
       <div class="pd-actions reveal">
-        <a class="btn btn--silver btn--lg" href="/#contact">{{ $t('pd.contact') }}</a>
+        <a class="btn btn--silver btn--lg" :href="homePath + '#contact'">{{ $t('pd.contact') }}</a>
         <a class="btn btn--glass btn--lg" :href="BOOK_URL" target="_blank" rel="noopener noreferrer">{{ $t('pd.book') }}<span class="sr-only">{{ $t('a.newtab') }}</span></a>
       </div>
     </div>
@@ -91,8 +89,8 @@ const steps = [
     <div class="container">
       <h2 id="pd-close" class="section__title reveal">{{ $t('close.text') }}</h2>
       <div class="pd-actions reveal">
-        <a class="btn btn--silver btn--lg" href="/#contact">{{ $t('close.cta') }}</a>
-        <a class="btn btn--glass btn--lg" href="/">{{ $t('pd.backHome') }}</a>
+        <a class="btn btn--silver btn--lg" :href="homePath + '#contact'">{{ $t('close.cta') }}</a>
+        <a class="btn btn--glass btn--lg" :href="homePath">{{ $t('pd.backHome') }}</a>
       </div>
     </div>
   </section>

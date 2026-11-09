@@ -1,10 +1,8 @@
 // SilverGate 홈페이지 — Nuxt 4 (Vue 3)
 // 빌드: npm run build → .output/public (정적 HTML) → Firebase Hosting
 const SITE = 'https://www.silvergate-solutions.com';
-const META_EN = {
-  title: 'SilverGate | MES, EBR & MBR for Pharma and Bio',
-  ogDesc: 'From master batch record to shop-floor execution. GMP, CSV and data integrity, designed in from day one.',
-};
+// 미리 HTML로 만들 페이지 (영어: 주소 그대로, 한국어: /ko 아래). public/sitemap.xml 도 같이 고친다
+const PAGES = ['/', '/products/silverbio-author'];
 
 export default defineNuxtConfig({
   compatibilityDate: '2026-11-01',
@@ -25,8 +23,11 @@ export default defineNuxtConfig({
   },
 
   i18n: {
-    // 주소는 그대로 두고(/), 화면 언어만 바꾼다. 우선순위: ?lang= → 저장된 선택 → 영어 (app/composables/useSiteLang.ts)
-    strategy: 'no_prefix',
+    // 영어는 주소 그대로(/products/...), 한국어는 /ko 아래(/ko/products/...)에 따로 HTML을 만든다
+    // → 링크 미리보기(카카오톡·슬랙 등)와 검색엔진이 한국어 페이지를 한국어로 읽는다
+    // ?lang= 과 저장된 언어 선택은 app/plugins/lang.client.ts 에서 해당 언어 주소로 옮겨 준다
+    strategy: 'prefix_except_default',
+    baseUrl: SITE,
     defaultLocale: 'en',
     detectBrowserLanguage: false,     // 쿠키를 쓰지 않는다
     locales: [
@@ -40,7 +41,6 @@ export default defineNuxtConfig({
       htmlAttrs: { lang: 'en' },
       charset: 'utf-8',
       viewport: 'width=device-width, initial-scale=1, viewport-fit=cover',
-      title: META_EN.title,
       meta: [
         { name: 'theme-color', content: '#050506' },
         { name: 'apple-mobile-web-app-capable', content: 'yes' },
@@ -48,19 +48,12 @@ export default defineNuxtConfig({
         { name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' },
         { name: 'apple-mobile-web-app-title', content: 'SilverGate' },
         { property: 'og:type', content: 'website' },
-        { property: 'og:locale', content: 'en_US' },
-        { property: 'og:locale:alternate', content: 'ko_KR' },
         { property: 'og:site_name', content: 'SilverGate' },
-        { property: 'og:title', content: META_EN.title },
-        { property: 'og:description', content: META_EN.ogDesc },
-        { property: 'og:url', content: SITE + '/' },
-        { property: 'og:image', content: SITE + '/assets/og-image.png' },
         { property: 'og:image:width', content: '1200' },
         { property: 'og:image:height', content: '630' },
         { name: 'twitter:card', content: 'summary_large_image' },
       ],
       link: [
-        { rel: 'canonical', href: SITE + '/' },
         { rel: 'icon', href: '/assets/icons/logo.svg', type: 'image/svg+xml' },
         { rel: 'apple-touch-icon', href: '/assets/icons/icon-180.png' },
         { rel: 'manifest', href: '/manifest.webmanifest' },
@@ -81,6 +74,6 @@ export default defineNuxtConfig({
   },
 
   nitro: {
-    prerender: { routes: ['/', '/products/silverbio-author'], crawlLinks: false },
+    prerender: { routes: [...PAGES, ...PAGES.map((p) => (p === '/' ? '/ko' : '/ko' + p))], crawlLinks: false },
   },
 });

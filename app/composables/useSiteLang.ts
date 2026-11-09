@@ -1,30 +1,31 @@
-// 화면 언어: 영어 기본, 한국어 전환. 주소는 그대로(/)이고 선택은 localStorage(sg-lang)에 저장
-// 처음 적용은 app/plugins/lang.client.ts 에서 (i18n 모듈이 초기 언어를 정한 뒤에 해야 덮어쓰이지 않음)
+// 화면 언어: 영어는 주소 그대로(/...), 한국어는 /ko 아래(/ko/...). 버튼으로 고른 언어는 localStorage(sg-lang)에 저장
+// 처음 들어올 때의 ?lang= 과 저장된 선택은 app/plugins/lang.client.ts 에서 해당 언어 주소로 옮겨 준다
+
 // 시작할 때 저장해 둔 주소 쿼리 (?lang=, ?notrack=, ?utm_source=)
 export const useInitialQuery = () => new URLSearchParams(useState('initial-search', () => '').value);
 export type Lang = 'en' | 'ko';
 export const normLang = (v: string | null | undefined): Lang => (v === 'ko' ? 'ko' : 'en');
 
-type Composer = {
-  locale: Ref<string>;
-  setLocale: (code: Lang) => Promise<void>;
-  loadLocaleMessages: (code: Lang) => Promise<void>;
-};
-
-// 번역 파일을 먼저 받은 뒤 언어를 바꾼다
-export async function applyLang(i18n: Composer, code: Lang) {
-  await i18n.loadLocaleMessages(code);
-  await i18n.setLocale(code);
-}
-
-// 우선순위: 주소의 ?lang= → 저장된 선택 → 영어
-export const initialLang = (qs: URLSearchParams): Lang => normLang(qs.get('lang') || store.get('sg-lang') || 'en');
-
 export function useSiteLang() {
-  const i18n = useNuxtApp().$i18n as unknown as Composer;
+  const { locale } = useI18n();
+  const switchLocalePath = useSwitchLocalePath();
+  const router = useRouter();
+
+  // 같은 페이지의 다른 언어 주소로 이동 (뒤로 가기 기록을 늘리지 않게 replace, #위치는 유지)
   const switchLang = async (code: string) => {
-    await applyLang(i18n, normLang(code));
-    store.set('sg-lang', i18n.locale.value);
+    const target = normLang(code);
+    store.set('sg-lang', target);
+    if (target === locale.value) return;
+    const raw = switchLocalePath(target);
+    if (!raw) {
+      // 없는 주소(404 화면) 등 다른 언어 페이지가 정해지지 않은 경우: 주소 앞의 /ko 만 바꿔서 다시 연다
+      const p = location.pathname.replace(/^\/ko(?=\/|$)/, '') || '/';
+      location.href = (target === 'ko' ? '/ko' + (p === '/' ? '' : p) : p) + location.search + location.hash;
+      return;
+    }
+    const to = router.resolve(raw);
+    await router.replace({ path: to.path, query: to.query, hash: location.hash });
   };
-  return { locale: i18n.locale, switchLang };
+
+  return { locale, switchLang };
 }

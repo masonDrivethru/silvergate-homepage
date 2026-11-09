@@ -3,7 +3,7 @@ const { locale, switchLang } = useSiteLang();
 const { isLight, toggle } = useTheme();
 const canInstall = useState('pwa-can-install', () => false);
 const { $installApp } = useNuxtApp();
-const { href, homeHref, isCurrent } = useSiteNav();
+const { href, homeHref, pathTo, isCurrent } = useSiteNav();
 </script>
 
 <template>
@@ -16,7 +16,7 @@ const { href, homeHref, isCurrent } = useSiteNav();
       </a>
       <nav class="nav__links" :aria-label="$t('a.menu')">
         <a :href="href('product')">{{ $t('nav.product') }}</a>
-        <a :href="PRODUCT_AUTHOR_PATH" :class="{ 'is-active': isCurrent(PRODUCT_AUTHOR_PATH) }">{{ $t('nav.author') }}</a>
+        <a :href="pathTo(PRODUCT_AUTHOR_PATH)" :class="{ 'is-active': isCurrent(PRODUCT_AUTHOR_PATH) }">{{ $t('nav.author') }}</a>
         <a :href="href('solutions')">{{ $t('nav.solutions') }}</a>
         <a :href="href('references')">{{ $t('nav.references') }}</a>
         <a :href="href('company')">{{ $t('nav.company') }}</a>

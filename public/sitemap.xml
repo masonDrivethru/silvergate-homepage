@@ -1,12 +1,33 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- 검색엔진용 페이지 목록. 페이지를 추가하면 여기에도 넣는다 (nuxt.config.ts의 nitro.prerender.routes와 같게) -->
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<!-- 검색엔진용 페이지 목록. 페이지를 추가하면 여기에도 넣는다 (nuxt.config.ts의 PAGES와 같게)
+     영어 주소와 한국어(/ko) 주소를 서로 알려 준다 (xhtml:link) -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
     <loc>https://www.silvergate-solutions.com/</loc>
-    <lastmod>2026-11-09</lastmod>
+    <lastmod>2026-11-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.silvergate-solutions.com/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://www.silvergate-solutions.com/ko"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.silvergate-solutions.com/"/>
+  </url>
+  <url>
+    <loc>https://www.silvergate-solutions.com/ko</loc>
+    <lastmod>2026-11-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.silvergate-solutions.com/"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://www.silvergate-solutions.com/ko"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.silvergate-solutions.com/"/>
   </url>
   <url>
     <loc>https://www.silvergate-solutions.com/products/silverbio-author</loc>
-    <lastmod>2026-11-09</lastmod>
+    <lastmod>2026-11-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.silvergate-solutions.com/products/silverbio-author"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://www.silvergate-solutions.com/ko/products/silverbio-author"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.silvergate-solutions.com/products/silverbio-author"/>
+  </url>
+  <url>
+    <loc>https://www.silvergate-solutions.com/ko/products/silverbio-author</loc>
+    <lastmod>2026-11-10</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.silvergate-solutions.com/products/silverbio-author"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://www.silvergate-solutions.com/ko/products/silverbio-author"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.silvergate-solutions.com/products/silverbio-author"/>
   </url>
 </urlset>

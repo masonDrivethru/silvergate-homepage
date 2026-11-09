@@ -3,9 +3,12 @@
 const { t, locale } = useI18n();
 const { $langReady } = useNuxtApp();
 
-useHead({
+usePageSeo({
+  path: '/',
   title: () => t('meta.title'),
-  meta: [{ name: 'description', content: () => t('meta.desc') }],
+  description: () => t('meta.desc'),
+  ogDescription: () => t('meta.ogDesc'),
+  ogImage: () => '/assets/og-image.png',
 });
 
 let scenes: ReturnType<typeof initScrollScenes> | null = null;
