@@ -3,21 +3,23 @@ const { locale, switchLang } = useSiteLang();
 const { isLight, toggle } = useTheme();
 const canInstall = useState('pwa-can-install', () => false);
 const { $installApp } = useNuxtApp();
+const { href, homeHref, isCurrent } = useSiteNav();
 </script>
 
 <template>
   <!-- ===== Header ===== -->
   <header class="nav" id="top">
     <div class="container nav__inner">
-      <a href="#top" class="brand" :aria-label="$t('a.home')">
+      <a :href="homeHref" class="brand" :aria-label="$t('a.home')">
         <svg class="brand__mark" aria-hidden="true"><use href="#sg-mark"/></svg>
         <span>SilverGate</span>
       </a>
       <nav class="nav__links" :aria-label="$t('a.menu')">
-        <a href="#product">{{ $t('nav.product') }}</a>
-        <a href="#solutions">{{ $t('nav.solutions') }}</a>
-        <a href="#references">{{ $t('nav.references') }}</a>
-        <a href="#company">{{ $t('nav.company') }}</a>
+        <a :href="href('product')">{{ $t('nav.product') }}</a>
+        <a :href="PRODUCT_AUTHOR_PATH" :class="{ 'is-active': isCurrent(PRODUCT_AUTHOR_PATH) }">{{ $t('nav.author') }}</a>
+        <a :href="href('solutions')">{{ $t('nav.solutions') }}</a>
+        <a :href="href('references')">{{ $t('nav.references') }}</a>
+        <a :href="href('company')">{{ $t('nav.company') }}</a>
       </nav>
       <div class="nav__actions">
         <button class="btn btn--glass btn--sm install-btn" id="installBtn" type="button" :hidden="!canInstall" @click="$installApp()">{{ $t('nav.install') }}</button>

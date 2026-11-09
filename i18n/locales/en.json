@@ -5,7 +5,9 @@
     "solutions": "Solutions",
     "references": "References",
     "company": "Company",
-    "install": "Install app"
+    "install": "Install app",
+    "author": "SilverBio Author",
+    "authorTab": "SilverBio"
   },
   "intro": {
     "scroll": "Scroll"
@@ -263,5 +265,43 @@
     "errCaptcha": "Security check is not finished yet. Please wait a moment and send again.",
     "errRate": "Too many inquiries in a short time. Please try again in a few minutes.",
     "installed": "SilverGate app installed."
+  },
+  "pd": {
+    "metaTitle": "SilverBio Author: Master Batch Record Authoring and Approval · SilverGate",
+    "metaDesc": "SilverBio Author handles authoring, review and approval of master batch records, with step-by-step records, electronic signatures and an audit trail of every action. Designed for 21 CFR Part 11, EU GMP Annex 11, GAMP 5 and ALCOA+.",
+    "eyebrow": "SilverBio Author",
+    "title": "Master batch records, from authoring to approval.",
+    "lead": "Author, review and approve master batch records in one place. Every step is recorded, every signature is bound to the record, and every action stays in the audit trail.",
+    "book": "Book a meeting",
+    "contact": "Send an inquiry",
+    "featTitle": "What it does",
+    "f1": "Step-by-step records",
+    "f1d": "Write each step of the master batch record with its parameters and limits, such as weights, times and in-process checks.",
+    "f2": "Review & approval",
+    "f2d": "Records move from author to reviewer to approver, with comments on the steps that need attention.",
+    "f3": "Electronic signatures",
+    "f3d": "Identity verified with ID and password, the meaning of the signature and a server time stamp recorded, bound to the record.",
+    "f4": "Audit trail",
+    "f4d": "Every edit, comment, signature and approval is recorded. Entries cannot be edited or deleted.",
+    "compTitle": "Designed for compliance",
+    "compNote": "Built to the regulations pharma and bio manufacturers work under.",
+    "c1": "21 CFR Part 11",
+    "c1d": "Audit trail, electronic signatures, access control",
+    "c2": "EU GMP Annex 11",
+    "c2d": "Validated system, backup, change control",
+    "c3": "GAMP 5",
+    "c3d": "URS, FS and IQ/OQ/PQ deliverables",
+    "c4": "ALCOA+",
+    "c4d": "Attributable, time-stamped, tamper-evident records",
+    "runTitle": "How a project runs",
+    "r1": "Assess",
+    "r1d": "URS, gap analysis",
+    "r2": "Design",
+    "r2d": "FS, risk assessment",
+    "r3": "Build & validate",
+    "r3d": "IQ, OQ, PQ",
+    "r4": "Go live",
+    "r4d": "Training, SOPs, hypercare",
+    "backHome": "Back to home"
   }
 }

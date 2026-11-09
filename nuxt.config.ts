@@ -81,6 +81,6 @@ export default defineNuxtConfig({
   },
 
   nitro: {
-    prerender: { routes: ['/'], crawlLinks: false },
+    prerender: { routes: ['/', '/products/silverbio-author'], crawlLinks: false },
   },
 });

@@ -640,6 +640,7 @@ button, input, textarea { font: inherit; color: inherit; }
   }
   .tabbar svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
   .tabbar a.is-active { color: var(--hi); background: rgb(var(--ink) / .12); }
+  .tabbar.tabbar--5 { grid-template-columns: repeat(5, 1fr); }
 }
 
 @media (max-width: 420px) {
