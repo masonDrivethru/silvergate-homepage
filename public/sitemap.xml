@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- 검색엔진용 페이지 목록. 페이지를 추가하면 여기에도 넣는다 (nuxt.config.ts의 nitro.prerender.routes와 같게) -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://www.silvergate-solutions.com/</loc>
+    <lastmod>2026-11-09</lastmod>
+  </url>
+  <url>
+    <loc>https://www.silvergate-solutions.com/products/silverbio-author</loc>
+    <lastmod>2026-11-09</lastmod>
+  </url>
+</urlset>
