@@ -4,9 +4,11 @@ const { locale } = useI18n();
 const { isLight, syncFromDom } = useTheme();
 const config = useRuntimeConfig().public;
 const initialQuery = useInitialQuery();
+// 화려한 연출(스크롤 애니메이션, 마우스 빛, 빛나는 효과)은 홈에서만. 세부 페이지는 차분하게 (style.css 의 data-motion="calm")
+const { isHome } = useSiteNav();
 
 useHead({
-  htmlAttrs: { lang: () => locale.value },
+  htmlAttrs: { lang: () => locale.value, 'data-motion': () => (isHome.value ? 'full' : 'calm') },
   meta: [{ name: 'theme-color', content: () => (isLight.value ? '#eceef1' : '#050506') }],
 });
 

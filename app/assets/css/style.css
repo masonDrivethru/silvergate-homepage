@@ -1049,3 +1049,17 @@ body::before { inset: -12%; animation: drift 26s ease-in-out infinite alternate;
   .diffx__panes::after { display: none; }
   .words__text .w { color: var(--silver-hi); }
 }
+
+/* =========================================================
+   세부 페이지(홈이 아닌 페이지): 차분하게
+   스크롤하며 나타나기·빛나기·반짝임·마우스 빛을 끄고 처음부터 완성된 모습으로 보여 준다.
+   머리글 메뉴(펼침 메뉴 등)의 움직임은 그대로 둔다
+   ========================================================= */
+html[data-motion="calm"] body::before { animation: none; }
+html[data-motion="calm"] .cursor-light, html[data-motion="calm"] .sprog,
+html[data-motion="calm"] .table-glass::before, html[data-motion="calm"] .form::after, html[data-motion="calm"] .btn--silver::after { display: none; }
+html[data-motion="calm"] main *, html[data-motion="calm"] main *::before, html[data-motion="calm"] main *::after { animation: none !important; transition-property: color, background-color, border-color !important; transition-duration: .2s !important; transition-delay: 0s !important; }
+html[data-motion="calm"] main :is(.reveal, .project, .industries li, .steps li, .table-glass tbody tr, .table-glass .ok, .facts div, .client, .faq__item, .audit__rows li) { opacity: 1; transform: none; }
+html[data-motion="calm"] main .facts div + div { background-size: 100% 1px; }
+html[data-motion="calm"] main .industries .icon { stroke-dashoffset: 0; filter: none; }
+html[data-motion="calm"] main .section__title { background-position: 0 0; }
