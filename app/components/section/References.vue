@@ -12,6 +12,7 @@
             <div><dt>{{ $t('ref.field') }}</dt><dd>{{ $t('ind.bio') }}</dd></div>
             <div><dt>{{ $t('ref.scope') }}</dt><dd>{{ $t('ref.p1.scope') }}</dd></div>
             <div><dt>{{ $t('ref.since') }}</dt><dd>{{ $t('ref.p1.since') }}</dd></div>
+            <div><dt>{{ $t('ref.partner') }}</dt><dd>{{ $t('ref.p1.partner') }}</dd></div>
           </dl>
           <p class="project__tags"><span class="chip">Vue 3</span><span class="chip">Java</span><span class="chip">Oracle</span><span class="chip">WebLogic</span></p>
         </li>
@@ -38,7 +39,7 @@
         <li class="client"><a class="client__link" href="https://www.kblife.co.kr/" target="_blank" rel="noopener noreferrer"><span class="client__name">{{ $t('cl.c5') }}</span><span class="sr-only">{{ $t('a.newtab') }}</span></a><span class="client__field">{{ $t('ind.ins') }}</span></li>
         <li class="client"><a class="client__link" href="https://www.lina.co.kr/" target="_blank" rel="noopener noreferrer"><span class="client__name">{{ $t('cl.c6') }}</span><span class="sr-only">{{ $t('a.newtab') }}</span></a><span class="client__field">{{ $t('ind.ins') }}</span></li>
       </ul>
-      <p class="partners reveal"><span>{{ $t('cl.partners') }}</span><span class="chip">{{ $t('ref.p2.partner') }}</span></p>
+      <p class="partners reveal"><span>{{ $t('cl.partners') }}</span><span class="chip">{{ $t('ref.p2.partner') }}</span><span class="chip">{{ $t('cl.pt2') }}</span></p>
     </div>
   </section>
 </template>

@@ -166,7 +166,8 @@
     "p1": {
       "client": "Samsung Biologics",
       "scope": "Analysis, design, development",
-      "since": "Feb 2025"
+      "since": "Feb 2025",
+      "partner": "Hiddenwork · Ssangmujigae"
     },
     "field": "Field",
     "scope": "Scope",
@@ -187,7 +188,8 @@
     "c4": "Hanwha General Insurance",
     "c5": "KB Life Insurance",
     "c6": "Lina Life",
-    "partners": "Partners"
+    "partners": "Partners",
+    "pt2": "Ssangmujigae"
   },
   "a": {
     "newtab": " (opens in a new tab)",
