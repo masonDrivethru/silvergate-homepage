@@ -32,10 +32,10 @@ onBeforeUnmount(() => scenes?.destroy());
   <SectionCompare />
   <SectionCapability />
   <SectionStrengths />
-  <SectionIndustries />
+  <SectionIndustries more />
   <SectionFaq />
-  <SectionReferences />
-  <SectionCompany />
+  <SectionReferences more />
+  <SectionCompany more />
   <SectionClosing />
   <SectionContact />
 </template>

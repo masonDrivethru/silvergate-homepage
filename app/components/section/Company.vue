@@ -1,3 +1,8 @@
+<script setup lang="ts">
+defineProps<{ more?: boolean }>();
+const { pathTo } = useSiteNav();
+</script>
+
 <template>
   <!-- ===== 6. Company ===== -->
   <section class="section" id="company" aria-labelledby="co-title">
@@ -9,6 +14,7 @@
         <div><dt>{{ $t('co.founded') }}</dt><dd>{{ $t('co.foundedV') }}</dd></div>
         <div><dt>{{ $t('co.loc') }}</dt><dd>{{ $t('co.locV') }}</dd></div>
       </dl>
+      <p v-if="more" class="more-link reveal"><a :href="pathTo('/company')">{{ $t('mn.learnMore') }} <span aria-hidden="true">→</span><span class="sr-only">: {{ $t('co.title') }}</span></a></p>
     </div>
   </section>
 </template>

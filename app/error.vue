@@ -23,7 +23,7 @@ useHead({
         <div class="err__actions">
           <a class="btn btn--silver btn--lg" :href="homePath">{{ $t('err.home') }}</a>
           <a class="btn btn--glass btn--lg" :href="pathTo(PRODUCT_AUTHOR_PATH)">{{ $t('nav.author') }}</a>
-          <a class="btn btn--glass btn--lg" :href="homePath + '#contact'">{{ $t('err.contact') }}</a>
+          <a class="btn btn--glass btn--lg" :href="pathTo(CONTACT_PATH)">{{ $t('err.contact') }}</a>
         </div>
       </div>
     </section>

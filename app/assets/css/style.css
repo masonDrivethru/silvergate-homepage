@@ -205,6 +205,52 @@ button, input, textarea { font: inherit; color: inherit; }
 .nav__links a:hover, .nav__links a.is-active { color: var(--hi); background: rgb(var(--ink) / .08); }
 .nav__actions { display: flex; align-items: center; gap: var(--s1); }
 
+/* 펼침 메뉴 (PC): 메뉴에 마우스를 올리면 머리글 아래로 큰 판이 열린다 */
+.nav__links a.is-hover { color: var(--hi); }
+.mega { position: absolute; left: 0; right: 0; top: 100%; }
+.mega__panel {
+  position: absolute; left: 0; right: 0; top: 0;
+  background: var(--glass-solid); border-bottom: 1px solid var(--glass-line);
+  box-shadow: 0 30px 60px -30px rgb(0 0 0 / .45);
+  opacity: 0; visibility: hidden; transform: translateY(-8px);
+  transition: opacity .25s var(--ease), transform .3s var(--ease), visibility 0s linear .3s;
+}
+.mega__panel.is-on { opacity: 1; visibility: visible; transform: none; transition: opacity .25s var(--ease), transform .3s var(--ease), visibility 0s; }
+.mega__inner { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: var(--s6); padding-block: var(--s5) var(--s6); }
+.mega__head { font-size: .75rem; font-weight: 600; letter-spacing: .04em; color: var(--text-3); }
+.mega__main, .mega__more { list-style: none; margin: var(--s2) 0 0; padding: 0; display: grid; gap: 10px; }
+.mega__main a { font-size: 1.5rem; font-weight: 600; letter-spacing: -.01em; color: var(--heading); text-decoration: none; }
+.mega__more a { font-size: .9375rem; color: var(--text-2); text-decoration: none; }
+.mega__main a:hover, .mega__more a:hover { color: var(--hi); text-decoration: underline; text-underline-offset: 4px; }
+.mega-scrim {
+  position: fixed; inset: 0; z-index: 49; pointer-events: none; opacity: 0;
+  background: rgb(0 0 0 / .32); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  transition: opacity .3s var(--ease);
+}
+.mega-scrim.is-on { opacity: 1; pointer-events: auto; }
+:root[data-theme="light"] .mega-scrim { background: rgb(20 22 28 / .14); }
+
+/* 휴대폰 메뉴 버튼(☰)과 전체 화면 메뉴. 메뉴는 머리글 바로 아래부터 화면 끝까지 */
+.burger { display: none; width: 40px; height: 40px; border: 0; border-radius: var(--r-pill); background: rgb(var(--ink) / .07); color: var(--text); cursor: pointer; position: relative; }
+.burger i { position: absolute; left: 12px; right: 12px; height: 1.5px; background: currentColor; border-radius: 2px; transition: transform .3s var(--ease), top .3s var(--ease); }
+.burger i:first-child { top: 16px; }
+.burger i:last-child { top: 23px; }
+.burger[aria-expanded="true"] i:first-child { top: 19.5px; transform: rotate(45deg); }
+.burger[aria-expanded="true"] i:last-child { top: 19.5px; transform: rotate(-45deg); }
+.mmenu {
+  position: absolute; left: 0; right: 0; top: 100%; height: calc(100dvh - var(--nav-h) - env(safe-area-inset-top));
+  overflow-y: auto; overscroll-behavior: contain; background: var(--bg);
+  opacity: 0; visibility: hidden; transition: opacity .25s var(--ease), visibility 0s linear .25s;
+}
+.nav.is-mopen .mmenu { opacity: 1; visibility: visible; transition: opacity .25s var(--ease), visibility 0s; }
+.mmenu .container { padding-block: var(--s3) calc(var(--s8) + env(safe-area-inset-bottom)); }
+.mmenu__group { padding-block: var(--s2); border-bottom: 1px solid var(--glass-line-soft); }
+.mmenu__top { display: block; padding-block: 6px; font-size: 1.75rem; font-weight: 600; letter-spacing: -.01em; color: var(--heading); text-decoration: none; }
+.mmenu ul { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 2px; }
+.mmenu ul a { display: block; padding-block: 6px; color: var(--text-2); text-decoration: none; }
+html.menu-open, html.menu-open body { overflow: hidden; }
+html.menu-open .tabbar { display: none; }
+
 /* =========================================================
    1. Intro — 첫 화면. 스크롤하면 작아지며 사라진다 (--p)
    ========================================================= */
@@ -524,6 +570,10 @@ button, input, textarea { font: inherit; color: inherit; }
    Industries + Stack
    ========================================================= */
 .section__note { margin-top: var(--s2); color: var(--text-3); }
+/* 홈 섹션 끝의 '자세히 보기 →' (해당 페이지로) */
+.more-link { margin-top: var(--s4); }
+.more-link a { color: var(--silver-hi); font-weight: 500; text-decoration: none; }
+.more-link a:hover { text-decoration: underline; text-underline-offset: 4px; }
 .industries { list-style: none; margin: var(--s6) 0 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--s2); }
 .industries li { padding: var(--s4); border-radius: var(--r-md); opacity: 0; transform: translateY(14px); transition: opacity .6s var(--ease), transform .6s var(--ease); }
 .industries.is-in li { opacity: 1; transform: none; }
@@ -581,6 +631,8 @@ button, input, textarea { font: inherit; color: inherit; }
 
 @media (max-width: 767px) {
   .nav__links { display: none; }
+  .burger { display: inline-block; }
+  .mega, .mega-scrim { display: none; }
   .nav__actions { margin-left: auto; }
   .intro { min-height: calc(100svh - var(--nav-h) - var(--tabbar-h)); }
   .intro__next { bottom: var(--s2); }

@@ -1,14 +1,18 @@
 <script setup lang="ts">
-const { href, homeHref, isHome, pathTo, isCurrent } = useSiteNav();
+// 휴대폰 아래 탭: 홈 · 제품 · 실적 · 회사 · 문의 (각 페이지로 이동)
+const { homeHref, isHome, pathTo, isUnder } = useSiteNav();
+const tabs = [
+  { to: '/products', icon: 'i-layout-grid', label: 'nav.product' },
+  { to: '/references', icon: 'i-award', label: 'tab.ref' },
+  { to: '/company', icon: 'i-building', label: 'nav.company' },
+  { to: CONTACT_PATH, icon: 'i-message-square', label: 'tab.contact' },
+];
 </script>
 
 <template>
   <!-- ===== Mobile app tab bar ===== -->
   <nav class="tabbar tabbar--5" :aria-label="$t('a.mmenu')">
     <a :href="homeHref" :class="{ 'is-active': isHome }"><svg aria-hidden="true"><use href="#i-house"/></svg><span>{{ $t('tab.home') }}</span></a>
-    <a :href="href('product')"><svg aria-hidden="true"><use href="#i-layout-grid"/></svg><span>{{ $t('nav.product') }}</span></a>
-    <a :href="pathTo(PRODUCT_AUTHOR_PATH)" :class="{ 'is-active': isCurrent(PRODUCT_AUTHOR_PATH) }"><svg aria-hidden="true"><use href="#i-clipboard-list"/></svg><span>{{ $t('nav.authorTab') }}</span></a>
-    <a :href="href('references')"><svg aria-hidden="true"><use href="#i-award"/></svg><span>{{ $t('tab.ref') }}</span></a>
-    <a :href="href('contact')"><svg aria-hidden="true"><use href="#i-message-square"/></svg><span>{{ $t('tab.contact') }}</span></a>
+    <a v-for="tb in tabs" :key="tb.to" :href="pathTo(tb.to)" :class="{ 'is-active': isUnder(tb.to) }"><svg aria-hidden="true"><use :href="'#' + tb.icon"/></svg><span>{{ $t(tb.label) }}</span></a>
   </nav>
 </template>

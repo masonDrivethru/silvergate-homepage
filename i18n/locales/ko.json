@@ -19,7 +19,10 @@
     "toDark": "다크 모드로 전환",
     "newtab": " (새 탭에서 열림)",
     "audit": "SilverBio Author 감사 추적 샘플 화면",
-    "esign": "SilverBio Author 전자서명 샘플 화면"
+    "esign": "SilverBio Author 전자서명 샘플 화면",
+    "openMenu": "메뉴 열기",
+    "closeMenu": "메뉴 닫기",
+    "pageMenu": "이 페이지 메뉴"
   },
   "diff": {
     "hint": "샘플 화면입니다. 템플릿이나 변경점을 눌러 보세요.",
@@ -50,7 +53,9 @@
     "company": "회사",
     "install": "앱 설치",
     "author": "SilverBio Author",
-    "authorTab": "SilverBio"
+    "authorTab": "SilverBio",
+    "industries": "산업",
+    "contact": "문의"
   },
   "tab": {
     "home": "홈",
@@ -318,5 +323,51 @@
     "body": "잠시 후 다시 시도해 주세요.",
     "home": "홈으로",
     "contact": "문의하기"
+  },
+  "mn": {
+    "explore": "둘러보기",
+    "more": "더 알아보기",
+    "allProducts": "전체 제품 보기",
+    "learnMore": "자세히 보기",
+    "overview": "개요",
+    "features": "주요 기능",
+    "compliance": "규정 준수",
+    "process": "도입 절차",
+    "demo": "미팅 예약",
+    "contactUs": "문의하기",
+    "about": "회사 소개"
+  },
+  "pg": {
+    "products": {
+      "eyebrow": "제품",
+      "title": "제약·바이오 제조를 위한 소프트웨어.",
+      "lead": "마스터 배치 기록 작성부터 현장 실행까지, 실버게이트의 제품을 한곳에서 보세요.",
+      "cardLabel": "MBR 작성 · 승인",
+      "metaTitle": "제품 {'|'} SilverGate"
+    },
+    "industries": {
+      "eyebrow": "산업",
+      "title": "바이오에서 금융, 공공까지.",
+      "lead": "제약·바이오, 보험, 금융, 공공 분야의 시스템을 만들어 온 경험으로 일합니다.",
+      "metaTitle": "산업 {'|'} SilverGate"
+    },
+    "references": {
+      "eyebrow": "실적",
+      "title": "함께 만들고 있는 시스템.",
+      "lead": "진행 중인 프로젝트와 고객사, 협력사를 소개합니다.",
+      "metaTitle": "실적 {'|'} SilverGate"
+    },
+    "company": {
+      "eyebrow": "회사",
+      "title": "주식회사 실버게이트",
+      "lead": "2021년부터 제약·바이오와 기업 시스템을 만들어 온 소프트웨어 회사입니다.",
+      "metaTitle": "회사 소개 {'|'} SilverGate"
+    },
+    "contact": {
+      "eyebrow": "문의",
+      "title": "프로젝트 이야기를 들려주세요.",
+      "lead": "문의 양식을 보내시거나, 미팅을 바로 예약하실 수 있습니다.",
+      "metaTitle": "문의 {'|'} SilverGate"
+    }
   }
 }

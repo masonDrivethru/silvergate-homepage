@@ -7,7 +7,9 @@
     "company": "Company",
     "install": "Install app",
     "author": "SilverBio Author",
-    "authorTab": "SilverBio"
+    "authorTab": "SilverBio",
+    "industries": "Industries",
+    "contact": "Contact"
   },
   "intro": {
     "scroll": "Scroll"
@@ -205,7 +207,10 @@
     "templates": "Templates",
     "yes": "Supported",
     "mmenu": "Mobile menu",
-    "toDark": "Switch to dark mode"
+    "toDark": "Switch to dark mode",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu",
+    "pageMenu": "On this page"
   },
   "co": {
     "title": "Company",
@@ -318,5 +323,51 @@
     "body": "Please try again in a moment.",
     "home": "Back to home",
     "contact": "Contact us"
+  },
+  "mn": {
+    "explore": "Explore",
+    "more": "More",
+    "allProducts": "All products",
+    "learnMore": "Learn more",
+    "overview": "Overview",
+    "features": "Features",
+    "compliance": "Compliance",
+    "process": "How we work",
+    "demo": "Book a meeting",
+    "contactUs": "Contact us",
+    "about": "About SilverGate"
+  },
+  "pg": {
+    "products": {
+      "eyebrow": "Products",
+      "title": "Software for pharma and bio manufacturing.",
+      "lead": "From master batch record authoring to shop-floor execution. See SilverGate products in one place.",
+      "cardLabel": "MBR authoring and approval",
+      "metaTitle": "Products {'|'} SilverGate"
+    },
+    "industries": {
+      "eyebrow": "Industries",
+      "title": "From bio to finance and the public sector.",
+      "lead": "We bring experience building systems for pharma and bio, insurance, finance and the public sector.",
+      "metaTitle": "Industries {'|'} SilverGate"
+    },
+    "references": {
+      "eyebrow": "References",
+      "title": "Systems we are building together.",
+      "lead": "Current projects, clients and partners.",
+      "metaTitle": "References {'|'} SilverGate"
+    },
+    "company": {
+      "eyebrow": "Company",
+      "title": "SilverGate Co., Ltd.",
+      "lead": "A software company building pharma, bio and enterprise systems since 2021.",
+      "metaTitle": "About {'|'} SilverGate"
+    },
+    "contact": {
+      "eyebrow": "Contact",
+      "title": "Tell us about your project.",
+      "lead": "Send us the form, or book a meeting directly.",
+      "metaTitle": "Contact {'|'} SilverGate"
+    }
   }
 }

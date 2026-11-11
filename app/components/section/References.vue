@@ -1,3 +1,8 @@
+<script setup lang="ts">
+defineProps<{ more?: boolean }>();
+const { pathTo } = useSiteNav();
+</script>
+
 <template>
   <!-- ===== 5. References ===== -->
   <section class="section" id="references" aria-labelledby="ref-title">
@@ -30,7 +35,7 @@
       <!-- 고객사 목록 (2021 개인사업자 등록 이후 수행)
            공식 로고로 바꾸려면: assets/clients/에 파일을 넣고 <span class="client__name">을
            <img class="client__logo" src="assets/clients/파일명.svg" alt="회사명" />으로 바꾸면 은색 단색으로 표시됨 -->
-      <h3 class="clients__title reveal">{{ $t('cl.title') }}</h3>
+      <h3 id="clients" class="clients__title reveal">{{ $t('cl.title') }}</h3>
       <ul class="clients reveal">
         <li class="client"><a class="client__link" href="https://www.samsungbiologics.com/" target="_blank" rel="noopener noreferrer"><span class="client__name">{{ $t('cl.c1') }}</span><span class="sr-only">{{ $t('a.newtab') }}</span></a><span class="client__field">{{ $t('ind.bio') }}</span></li>
         <li class="client"><a class="client__link" href="https://www.airport.kr/" target="_blank" rel="noopener noreferrer"><span class="client__name">{{ $t('cl.c2') }}</span><span class="sr-only">{{ $t('a.newtab') }}</span></a><span class="client__field">{{ $t('ind.pub') }}</span></li>
@@ -39,7 +44,8 @@
         <li class="client"><a class="client__link" href="https://www.kblife.co.kr/" target="_blank" rel="noopener noreferrer"><span class="client__name">{{ $t('cl.c5') }}</span><span class="sr-only">{{ $t('a.newtab') }}</span></a><span class="client__field">{{ $t('ind.ins') }}</span></li>
         <li class="client"><a class="client__link" href="https://www.lina.co.kr/" target="_blank" rel="noopener noreferrer"><span class="client__name">{{ $t('cl.c6') }}</span><span class="sr-only">{{ $t('a.newtab') }}</span></a><span class="client__field">{{ $t('ind.ins') }}</span></li>
       </ul>
-      <p class="partners reveal"><span>{{ $t('cl.partners') }}</span><span class="chip">{{ $t('ref.p2.partner') }}</span><span class="chip">{{ $t('cl.pt2') }}</span></p>
+      <p id="partners" class="partners reveal"><span>{{ $t('cl.partners') }}</span><span class="chip">{{ $t('ref.p2.partner') }}</span><span class="chip">{{ $t('cl.pt2') }}</span></p>
+      <p v-if="more" class="more-link reveal"><a :href="pathTo('/references')">{{ $t('mn.learnMore') }} <span aria-hidden="true">→</span><span class="sr-only">: {{ $t('ref.title') }}</span></a></p>
     </div>
   </section>
 </template>
