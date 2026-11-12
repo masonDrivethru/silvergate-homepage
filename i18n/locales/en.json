@@ -178,7 +178,7 @@
       "client": "Incheon International Airport Corporation",
       "title": "IFMS Integrated Facility Management System",
       "field": "Public · Airport facilities",
-      "partner": "Hiddenwork"
+      "partner": "Hiddenwork · Nozsoft"
     },
     "partner": "Partner"
   },
@@ -191,7 +191,9 @@
     "c5": "KB Life Insurance",
     "c6": "Lina Life",
     "partners": "Partners",
-    "pt2": "Double Rainbow"
+    "pt1": "Hiddenwork",
+    "pt2": "Double Rainbow",
+    "pt3": "Nozsoft"
   },
   "a": {
     "newtab": " (opens in a new tab)",

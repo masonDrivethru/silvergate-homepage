@@ -44,7 +44,7 @@ const { pathTo } = useSiteNav();
         <li class="client"><a class="client__link" href="https://www.kblife.co.kr/" target="_blank" rel="noopener noreferrer"><span class="client__name">{{ $t('cl.c5') }}</span><span class="sr-only">{{ $t('a.newtab') }}</span></a><span class="client__field">{{ $t('ind.ins') }}</span></li>
         <li class="client"><a class="client__link" href="https://www.lina.co.kr/" target="_blank" rel="noopener noreferrer"><span class="client__name">{{ $t('cl.c6') }}</span><span class="sr-only">{{ $t('a.newtab') }}</span></a><span class="client__field">{{ $t('ind.ins') }}</span></li>
       </ul>
-      <p id="partners" class="partners reveal"><span>{{ $t('cl.partners') }}</span><span class="chip">{{ $t('ref.p2.partner') }}</span><span class="chip">{{ $t('cl.pt2') }}</span></p>
+      <p id="partners" class="partners reveal"><span>{{ $t('cl.partners') }}</span><span class="chip">{{ $t('cl.pt1') }}</span><span class="chip">{{ $t('cl.pt2') }}</span><span class="chip">{{ $t('cl.pt3') }}</span></p>
       <p v-if="more" class="more-link reveal"><a :href="pathTo('/references')">{{ $t('mn.learnMore') }} <span aria-hidden="true">→</span><span class="sr-only">: {{ $t('ref.title') }}</span></a></p>
     </div>
   </section>
