@@ -11,7 +11,7 @@ const tabs = [
 
 <template>
   <!-- ===== Mobile app tab bar ===== -->
-  <nav class="tabbar tabbar--5" :aria-label="$t('a.mmenu')">
+  <nav v-if="!HOME_ONLY" class="tabbar tabbar--5" :aria-label="$t('a.mmenu')">
     <a :href="homeHref" :class="{ 'is-active': isHome }"><svg aria-hidden="true"><use href="#i-house"/></svg><span>{{ $t('tab.home') }}</span></a>
     <a v-for="tb in tabs" :key="tb.to" :href="pathTo(tb.to)" :class="{ 'is-active': isUnder(tb.to) }"><svg aria-hidden="true"><use :href="'#' + tb.icon"/></svg><span>{{ $t(tb.label) }}</span></a>
   </nav>

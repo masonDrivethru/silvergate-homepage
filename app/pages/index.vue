@@ -32,10 +32,10 @@ onBeforeUnmount(() => scenes?.destroy());
   <SectionCompare />
   <SectionCapability />
   <SectionStrengths />
-  <SectionIndustries more />
+  <SectionIndustries :more="!HOME_ONLY" />
   <SectionFaq />
-  <SectionReferences more />
-  <SectionCompany more />
+  <SectionReferences :more="!HOME_ONLY" />
+  <SectionCompany :more="!HOME_ONLY" />
   <SectionClosing />
   <SectionContact />
 </template>

@@ -37,7 +37,7 @@ const linkText = (l: MenuLink) => l.text ?? (l.label ? t(l.label) : '');
         <svg class="brand__mark" aria-hidden="true"><use href="#sg-mark"/></svg>
         <span>SilverGate</span>
       </a>
-      <nav class="nav__links" :aria-label="$t('a.menu')">
+      <nav v-if="!HOME_ONLY" class="nav__links" :aria-label="$t('a.menu')">
         <a v-for="g in menu" :key="g.key" :href="pathTo(g.to)" :class="{ 'is-active': isUnder(g.to), 'is-hover': open === g.key }"
            @mouseenter="enter(g.key)">{{ $t(g.label) }}</a>
         <a :href="pathTo(CONTACT_PATH)" :class="{ 'is-active': isUnder(CONTACT_PATH) }" @mouseenter="enter(null)">{{ $t('nav.contact') }}</a>
@@ -52,14 +52,14 @@ const linkText = (l: MenuLink) => l.text ?? (l.label ? t(l.label) : '');
           <button type="button" data-lang="en" :aria-pressed="locale === 'en'" lang="en" @click="switchLang('en')">EN</button>
           <button type="button" data-lang="ko" :aria-pressed="locale === 'ko'" lang="ko" @click="switchLang('ko')">KO</button>
         </div>
-        <button class="burger" type="button" :aria-expanded="mobileOpen" aria-controls="mmenu" :aria-label="$t(mobileOpen ? 'a.closeMenu' : 'a.openMenu')" @click="mobileOpen = !mobileOpen">
+        <button v-if="!HOME_ONLY" class="burger" type="button" :aria-expanded="mobileOpen" aria-controls="mmenu" :aria-label="$t(mobileOpen ? 'a.closeMenu' : 'a.openMenu')" @click="mobileOpen = !mobileOpen">
           <i aria-hidden="true"></i><i aria-hidden="true"></i>
         </button>
       </div>
     </div>
 
     <!-- PC 펼침 메뉴: 마우스를 올리면 열린다(키보드는 위 링크로 각 페이지에 바로 간다). 메뉴마다 한 판. 왼쪽은 큰 글씨(둘러보기), 오른쪽은 작은 글씨(더 알아보기) -->
-    <div class="mega" @mouseenter="enter(open)">
+    <div v-if="!HOME_ONLY" class="mega" @mouseenter="enter(open)">
       <div v-for="g in menu" :key="g.key" class="mega__panel" :class="{ 'is-on': open === g.key }" :inert="open !== g.key">
         <div class="container mega__inner">
           <div class="mega__col">
@@ -81,7 +81,7 @@ const linkText = (l: MenuLink) => l.text ?? (l.label ? t(l.label) : '');
     </div>
 
     <!-- 휴대폰 전체 메뉴 -->
-    <div id="mmenu" class="mmenu" :inert="!mobileOpen">
+    <div v-if="!HOME_ONLY" id="mmenu" class="mmenu" :inert="!mobileOpen">
       <div class="container">
         <section v-for="g in menu" :key="g.key" class="mmenu__group">
           <a class="mmenu__top" :href="pathTo(g.to)" @click="closeAll">{{ $t(g.label) }}</a>
@@ -97,5 +97,5 @@ const linkText = (l: MenuLink) => l.text ?? (l.label ? t(l.label) : '');
       </div>
     </div>
   </header>
-  <div class="mega-scrim" :class="{ 'is-on': open }" aria-hidden="true" @mouseenter="closeAll"></div>
+  <div v-if="!HOME_ONLY" class="mega-scrim" :class="{ 'is-on': open }" aria-hidden="true" @mouseenter="closeAll"></div>
 </template>

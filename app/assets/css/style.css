@@ -250,6 +250,9 @@ button, input, textarea { font: inherit; color: inherit; }
 .mmenu ul a { display: block; padding-block: 6px; color: var(--text-2); text-decoration: none; }
 html.menu-open, html.menu-open body { overflow: hidden; }
 html.menu-open .tabbar { display: none; }
+/* 홈만 공개(HOME_ONLY): 아래 탭이 없으므로 그 자리만큼 띄우던 여백을 없애고, 메뉴가 빠진 머리글 버튼은 오른쪽 끝으로 */
+html[data-site="home-only"] { --tabbar-h: 0px; }
+html[data-site="home-only"] .nav__actions { margin-left: auto; }
 
 /* =========================================================
    1. Intro — 첫 화면. 스크롤하면 작아지며 사라진다 (--p)

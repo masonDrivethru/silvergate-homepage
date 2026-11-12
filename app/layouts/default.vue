@@ -8,7 +8,7 @@ const initialQuery = useInitialQuery();
 const { isHome } = useSiteNav();
 
 useHead({
-  htmlAttrs: { lang: () => locale.value, 'data-motion': () => (isHome.value ? 'full' : 'calm') },
+  htmlAttrs: { lang: () => locale.value, 'data-site': HOME_ONLY ? 'home-only' : undefined, 'data-motion': () => (isHome.value ? 'full' : 'calm') },
   meta: [{ name: 'theme-color', content: () => (isLight.value ? '#eceef1' : '#050506') }],
 });
 

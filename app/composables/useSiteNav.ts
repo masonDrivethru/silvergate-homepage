@@ -1,6 +1,10 @@
 // 메뉴 링크와 사이트 메뉴 구성
 // - 페이지 주소는 현재 언어에 맞춰 (영어 /products/..., 한국어 /ko/products/...)
 // - 홈 안의 #앵커는 홈에서는 #id, 다른 페이지에서는 홈주소#id
+// 홈만 공개: true 이면 메뉴·아래 탭·세부 페이지 링크를 숨기고 홈 한 페이지(스크롤 연출)만 보여 준다
+// 세부 페이지를 다시 열 때: false 로 바꾸고 nuxt.config.ts 의 PAGES, firebase.json 의 redirects, public/sitemap.xml 도 되돌린다
+export const HOME_ONLY = true;
+
 export const PRODUCT_AUTHOR_PATH = '/products/silverbio-author';
 export const BOOK_URL = 'https://calendar.app.google/wLYapJcPyoxVQvN78';
 
