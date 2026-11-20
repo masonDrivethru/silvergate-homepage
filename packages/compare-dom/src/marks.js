@@ -143,7 +143,7 @@ const MARK_CSS = `
 @keyframes sgc-pulse{0%{outline-color:rgba(37,99,235,1);outline-offset:8px}100%{outline-offset:3px}}
 ins.sgc-ins{background:rgba(34,197,94,.3);text-decoration:underline;text-decoration-color:#16a34a;text-decoration-thickness:2px;color:inherit}
 del.sgc-del{background:rgba(239,68,68,.24);text-decoration:line-through;text-decoration-color:#dc2626;text-decoration-thickness:2px;color:inherit}
-[data-sgc-noscrollbar]{scrollbar-width:none}
-[data-sgc-noscrollbar]::-webkit-scrollbar{display:none}
+[data-sgc-noscrollbar]{scrollbar-color:transparent transparent}
+[data-sgc-noscrollbar]::-webkit-scrollbar-thumb,[data-sgc-noscrollbar]::-webkit-scrollbar-track{background:transparent}
 @media print{[data-sgc-focus]{outline:none!important}}
 `;

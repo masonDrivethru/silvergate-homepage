@@ -60,6 +60,13 @@ select{height:36px;border:1px solid var(--line);border-radius:8px;background:var
 .perf td.total{font-weight:700;color:var(--accent)}
 .perf .mono{font-family:var(--f-mono)}
 .err{color:#dc2626;font-size:13px}
+.cases{display:flex;flex-direction:column;gap:28px}
+.case h3{margin:0 0 4px;font-size:16px;font-weight:700;text-wrap:balance}
+.case p{margin:0 0 10px;color:var(--ink-2);font-size:14px}
+.case .stage{--sgc-height:380px}
+.case.tall .stage{--sgc-height:520px}
+.case-paper{background:#fff;color:#1d2330;padding:20px;font:14px/1.6 "Noto Sans KR",sans-serif;margin:0 8px;box-shadow:0 1px 3px rgba(16,24,40,.12)}
+.case-paper .pg-table td,.case-paper .pg-table th{text-align:center}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;scroll-behavior:auto!important}}
 </style>
 
@@ -81,6 +88,7 @@ select{height:36px;border:1px solid var(--line);border-radius:8px;background:var
     <button class="tab" role="tab" id="t-html" aria-controls="p-html" aria-selected="true">일반 HTML <small>JSP 방식</small></button>
     <button class="tab" role="tab" id="t-vue" aria-controls="p-vue" aria-selected="false">Vue 3</button>
     <button class="tab" role="tab" id="t-react" aria-controls="p-react" aria-selected="false">React 18</button>
+    <button class="tab" role="tab" id="t-cases" aria-controls="p-cases" aria-selected="false">복잡한 표</button>
     <button class="tab" role="tab" id="t-perf" aria-controls="p-perf" aria-selected="false">대용량 성능</button>
   </nav>
 
@@ -105,6 +113,13 @@ select{height:36px;border:1px solid var(--line);border-radius:8px;background:var
       <div class="actions"><button class="btn btn-primary" id="react-edit" type="button">새 버전 고쳐 보기</button><span class="toast" id="react-toast" aria-live="polite"></span></div>
     </div>
     <div id="react-stage" class="stage"></div>
+  </section>
+
+  <section class="panel" id="p-cases" role="tabpanel" aria-labelledby="t-cases" hidden>
+    <div class="panel-head">
+      <p>표 구조가 바뀌는 경우들입니다. 칸 병합(colspan·rowspan), 열 추가, 줄 순서 바뀜, 구조 전체 변경을 각각 비교합니다. 맨 위는 머리글 2단과 설비별 묶음 칸이 섞인 실제 결과표 모양입니다.</p>
+    </div>
+    <div id="cases-host" class="cases"></div>
   </section>
 
   <section class="panel" id="p-perf" role="tabpanel" aria-labelledby="t-perf" hidden>
@@ -151,17 +166,17 @@ select{height:36px;border:1px solid var(--line);border-radius:8px;background:var
 
   // ---------- 요소 모드 비교 화면 (Vue·React·성능 탭 공통) ----------
   function el(tag, cls, kids) { var e = document.createElement(tag); if (cls) e.className = cls; (kids || []).forEach(function (k) { e.append(k); }); return e; }
-  function pane(badge, badgeCls, label) {
+  function pane(badge, badgeCls, label, noZoom) {
     var mount = el('div');
     var zoom = el('div', 'doc-zoom doc-root', [mount]);
     var scroll = el('div', 'doc-scroll', [zoom]);
     var head = el('header', 'sgc-pane-head', [el('span', 'sgc-badge ' + badgeCls, [badge]), label]);
     var p = el('section', 'sgc-pane', [head, scroll]);
-    new ResizeObserver(function () { zoom.style.setProperty('--z', Math.min(1, (scroll.clientWidth - 16) / 794).toFixed(3)); }).observe(scroll);
+    if (!noZoom) new ResizeObserver(function () { zoom.style.setProperty('--z', Math.min(1, (scroll.clientWidth - 16) / 794).toFixed(3)); }).observe(scroll);
     return { el: p, mount: mount, scroll: scroll };
   }
-  function stage(host, leftLabel, rightLabel) {
-    var L = pane('이전', 'sgc-badge-old', leftLabel), R = pane('새 버전', 'sgc-badge-new', rightLabel), X = pane('한 장 보기', 'sgc-badge-new', leftLabel + ' → ' + rightLabel);
+  function stage(host, leftLabel, rightLabel, noZoom) {
+    var L = pane('이전', 'sgc-badge-old', leftLabel, noZoom), R = pane('새 버전', 'sgc-badge-new', rightLabel, noZoom), X = pane('한 장 보기', 'sgc-badge-new', leftLabel + ' → ' + rightLabel, noZoom);
     X.el.hidden = true;
     var bar = el('div'), list = el('aside');
     var root = el('div', 'sgc-viewer', [bar, el('div', 'sgc-body', [el('div', 'sgc-panes', [L.el, R.el, X.el]), list])]);
@@ -258,6 +273,19 @@ select{height:36px;border:1px solid var(--line);border-radius:8px;background:var
     else if (k === 2) p.rows.push(['pH', '6.0 ~ 8.0', '-']);
     else p.checks.shift();
   }
+
+  // ---------- 복잡한 표 ----------
+  START['t-cases'] = function () {
+    var host = document.getElementById('cases-host');
+    D.cases().forEach(function (c) {
+      var box = el('article', 'case' + (c.tall ? ' tall' : ''), [el('h3', null, [c.title]), el('p', null, ['바뀐 것: ' + c.desc])]);
+      var st = el('div', 'stage'); box.append(st); host.append(box);
+      var s = stage(st, 'v3', 'v4', true);
+      s.left.mount.innerHTML = '<div class="case-paper">' + c.left + '</div>';
+      s.right.mount.innerHTML = '<div class="case-paper">' + c.right + '</div>';
+      s.attach(C.createCompare({ left: s.left.mount, right: s.right.mount, leftScroller: s.left.scroll, rightScroller: s.right.scroll }));
+    });
+  };
 
   // ---------- 대용량 성능 ----------
   var perfCtrl = null, perfStage = null;

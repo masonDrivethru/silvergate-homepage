@@ -78,6 +78,44 @@ function* walk(root, opt) {
   /** 백그라운드로 나눠 보낼 평평한 목록 (노드 번호 순 = 문서 순서). 요소는 닫힐 때 h 가 채워짐 */
   const flat = [];
   let count = 0;
+  /** 표: 칸 요소 → 읽은 결과, 줄 묶음(tbody 등) → 위에서 내려오는(rowspan) 칸 */
+  const cellOut = new Map();
+  const spans = new Map();
+
+  /**
+   * 표 한 줄을 "눈에 보이는 격자"대로: 위 줄에서 rowspan 으로 내려온 칸을 그 자리에 가상 칸으로 끼워 넣는다.
+   * → 줄끼리 비교할 때 줄마다 칸 수가 같아져 열 추가·줄 순서 바뀜을 제대로 찾음
+   */
+  function layoutRow(tr, kids) {
+    const group = tr.parentElement;
+    let pend = spans.get(group);
+    if (!pend) spans.set(group, (pend = []));
+    const old = new Set(pend.filter((b) => b && b.left > 0));
+    const out = [];
+    let col = 0;
+    const emitPending = () => {
+      for (;;) {
+        const b = pend[col];
+        if (!b || !old.has(b) || b.left <= 0) return;
+        if (b.start === col) out.push({ virt: b.cell });
+        col += b.cs;
+      }
+    };
+    for (const k of kids) {
+      if (k.nodeType === 1 && (k.tagName === 'TD' || k.tagName === 'TH')) {
+        emitPending();
+        const cs = Math.max(1, k.colSpan || 1), rs = k.rowSpan === 0 ? 1e6 : Math.max(1, k.rowSpan || 1);
+        if (rs > 1) { const b = { cell: k, left: rs - 1, cs, start: col }; for (let c = col; c < col + cs; c++) pend[c] = b; }
+        else for (let c = col; c < col + cs; c++) if (pend[c] && !old.has(pend[c])) pend[c] = undefined; else if (pend[c] && old.has(pend[c]) && pend[c].left <= 0) pend[c] = undefined;
+        out.push(k);
+        col += cs;
+      } else out.push(k);
+    }
+    // 줄 끝에 남은 내려온 칸
+    for (; col < pend.length; ) { const before = col; emitPending(); if (col === before) col++; }
+    for (const b of old) b.left--;
+    return out;
+  }
 
   function open(e, parent) {
     const i = nodes.length;
@@ -110,6 +148,8 @@ function* walk(root, opt) {
     let kids = tag === 'TEXTAREA' || tag === 'SELECT' ? [] : Array.from(e.childNodes);
     // 열린 shadow DOM (웹 컴포넌트) 안쪽도 읽는다
     if (e.shadowRoot && e.shadowRoot.mode === 'open') kids = kids.concat(Array.from(e.shadowRoot.children));
+    if (tag === 'TD' || tag === 'TH') cellOut.set(e, out);
+    else if (tag === 'TR') kids = layoutRow(e, kids);
     return { out, sig, kids, x: 0, ai, rec };
   }
 
@@ -121,6 +161,19 @@ function* walk(root, opt) {
     if (f.x < f.kids.length) {
       const ch = f.kids[f.x++];
       if (++count % 512 === 0) yield;
+      if (ch.virt) {
+        // rowspan 으로 내려온 칸: 원래 칸과 같은 내용(자식 공유), 같은 DOM 요소를 가리킴
+        const o = cellOut.get(ch.virt);
+        if (!o) continue;
+        const vi = nodes.length;
+        nodes.push(ch.virt);
+        const vo = { n: o.n, c: o.c, h: o.h, i: vi, virt: 1 };
+        if (o.a) vo.a = o.a;
+        f.out.c.push(vo);
+        flat[vi] = { ref: o.i, n: o.n, h: o.h, p: f.out.i, virt: 1, ...(o.a ? { a: o.a } : {}) };
+        f.sig += '\u0003' + o.h;
+        continue;
+      }
       const t = ch.nodeType;
       if (t === 3) {
         const v = normText(ch.data);
@@ -153,7 +206,8 @@ export function unflatten(flat) {
   const objs = new Array(flat.length);
   for (let i = 0; i < flat.length; i++) {
     const r = flat[i];
-    const o = r.v !== undefined ? { v: r.v, h: r.h, i } : { n: r.n, c: [], h: r.h, i };
+    const o = r.ref !== undefined ? { n: r.n, c: objs[r.ref].c, h: r.h, i, virt: 1 }
+      : r.v !== undefined ? { v: r.v, h: r.h, i } : { n: r.n, c: [], h: r.h, i };
     if (r.a) o.a = r.a;
     if (r.k) o.k = r.k;
     objs[i] = o;

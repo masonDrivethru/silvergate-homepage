@@ -89,7 +89,10 @@ export function createCompare(options) {
     updateScrollbar();
   }
 
-  /** 스크롤 맞춤 중에는 오른쪽 스크롤바 하나만 (왼쪽은 숨김, 휠·터치는 그대로). 맞춤을 끄면 다시 보임 */
+  /**
+   * 스크롤 맞춤 중에는 오른쪽 스크롤바 하나만 보이게: 왼쪽은 투명하게만 (자리는 그대로 둬서 양쪽 폭이 같음 → 쪽 높이도 같음).
+   * 휠·터치는 그대로. 맞춤을 끄면 다시 보임
+   */
   function updateScrollbar() {
     const sc = scrollers.left;
     if (!sc) return;
@@ -179,6 +182,16 @@ export function createCompare(options) {
    *  3) 같은 표의 같은 열 칸들이 한꺼번에 추가/삭제됐으면 "열 추가/삭제" 한 건으로
    */
   function refine(list) {
+    // 0) 같은 칸이 가상 칸(rowspan) 때문에 여러 번 나온 것은 하나로
+    const ids = new WeakMap(); let idn = 0;
+    const idOf = (n) => { if (!n) return 0; let v = ids.get(n); if (!v) ids.set(n, (v = ++idn)); return v; };
+    const seen = new Set();
+    list = list.filter((ch) => {
+      const key = [ch.type, ch.what, ch.attr ?? '', idOf(ch.left), idOf(ch.right), ch.diffs ? JSON.stringify(ch.diffs) : ''].join('|');
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
     for (const ch of list) {
       if (ch.what !== 'attr') continue;
       const l = ch.left?.nodeType === 1 ? ch.left : null, r = ch.right?.nodeType === 1 ? ch.right : null;
@@ -190,6 +203,27 @@ export function createCompare(options) {
         ch.after = names.map((n) => r?.getAttribute(n) ?? '–').join(', ');
       }
     }
+    // 합쳐진 칸: 오른쪽 같은 칸에 같은 변경이 왼쪽 여러 칸에서 오면 한 건으로 (왼쪽 칸은 모두 표시)
+    const byRight = new Map();
+    list = list.filter((ch) => {
+      if (ch.type !== 'modified' || !ch.right || ch.what === 'moved') return true;
+      const key = [ch.what, ch.attr ?? '', idOf(ch.right), ch.diffs ? JSON.stringify(ch.diffs) : ''].join('|');
+      const first = byRight.get(key);
+      if (!first) { byRight.set(key, ch); return true; }
+      if (ch.left && ch.left !== first.left) (first.alsoLeft ??= []).push(ch.left);
+      return false;
+    });
+    // 같은 칸의 글자 수정과 병합(rowspan·colspan) 바뀜은 한 건으로 (병합 정보를 붙임)
+    const textOf = new Map();
+    for (const ch of list) if (ch.what === 'text' && ch.right) { const cell = ch.right.parentElement?.closest('td,th'); if (cell) textOf.set(cell, ch); }
+    list = list.filter((ch) => {
+      if (ch.what !== 'attr' || !ch.right || !/span/.test(ch.attr ?? '') && ch.attr !== 'a') return true;
+      const t = textOf.get(ch.right);
+      if (!t) return true;
+      t.span = ch;
+      if (ch.left && ch.left !== t.left) (t.alsoLeft ??= []).push(ch.left);
+      return false;
+    });
     // 2) 이동
     const byHash = new Map();
     for (const ch of list) if (ch.type === 'deleted' && ch.what === 'node' && ch.h) {
@@ -215,7 +249,7 @@ export function createCompare(options) {
       if (n?.nodeType !== 1 || (n.localName !== 'td' && n.localName !== 'th')) continue;
       const table = n.closest('table');
       if (!table) continue;
-      const key = ch.type + '|' + n.cellIndex;
+      const key = ch.type + '|' + visualCol(n);
       let byTable = groups.get(table);
       if (!byTable) groups.set(table, (byTable = new Map()));
       if (!byTable.has(key)) byTable.set(key, []);
@@ -231,8 +265,99 @@ export function createCompare(options) {
       for (const c of cells.slice(1)) merged.add(c);
     }
     out = out.filter((ch) => !merged.has(ch));
+    out = rowMoves(out, (c) => [c, ...(c.extra ?? []).map((x) => ({ ...c, [c.type === 'added' ? 'right' : 'left']: x.node }))]);
     out.forEach((ch, i) => { ch.index = i; delete ch.h; });
     return out;
+  }
+
+  /**
+   * 표 줄 자리 바꿈 찾기: 칸 수정이 줄끼리 짝지어 생겼는데, 새로 생긴/없어진 칸(열)을 빼고 보면
+   * 왼쪽 줄이 오른쪽의 "다른" 줄과 내용이 똑같다 → 칸 수정들을 지우고 "이동" 으로
+   */
+  function rowMoves(list, expand) {
+    const addedCells = new Set(), deletedCells = new Set();
+    for (const c of list) for (const x of expand(c)) {
+      if (x.type === 'added' && x.right?.nodeType === 1) addedCells.add(x.right);
+      if (x.type === 'deleted' && x.left?.nodeType === 1) deletedCells.add(x.left);
+    }
+    // 줄 내용: 위에서 rowspan 으로 내려온 칸까지 포함한 "눈에 보이는 줄"
+    const rowText = (tr, skip) => visualRow(tr).filter((td) => !skip.has(td)).map((td) => normText(td.textContent ?? '')).join('\u0001');
+    // 칸 수정이 있는 줄 짝
+    const pairs = new Map();   // 왼쪽 줄 → 오른쪽 줄
+    for (const c of list) {
+      if (c.type !== 'modified' || c.what !== 'text') continue;
+      const lt = c.left?.parentElement?.closest('tr'), rt = c.right?.parentElement?.closest('tr');
+      if (lt && rt && lt.parentElement && rt.parentElement) pairs.set(lt, rt);
+    }
+    if (pairs.size < 2) return list;
+    const rights = new Map();
+    for (const rt of pairs.values()) rights.set(rowText(rt, addedCells), rt);
+    const moved = new Map();   // 왼쪽 줄 → 진짜 짝 오른쪽 줄
+    for (const [lt, rt] of pairs) {
+      const t = rowText(lt, deletedCells);
+      if (rowText(rt, addedCells) === t) continue;
+      const real = rights.get(t);
+      if (real && real !== rt) moved.set(lt, real);
+    }
+    if (!moved.size) return list;
+    const movedRights = new Set(moved.values());
+    const out = list.filter((c) => {
+      if (c.type !== 'modified' || c.what !== 'text') return true;
+      const lt = c.left?.parentElement?.closest('tr'), rt = c.right?.parentElement?.closest('tr');
+      return !(moved.has(lt) || movedRights.has(rt));
+    });
+    for (const [lt, rt] of moved) {
+      out.push({ index: 0, type: 'moved', what: 'moved', path: '', diffs: null, left: lt, right: rt, gap: null, before: null, after: null,
+        page: { left: null, right: null } });
+    }
+    // 문서 순서대로
+    const pos = (c) => c.right ?? c.left ?? c.gap?.node;
+    out.sort((a, b) => { const x = pos(a), y = pos(b); if (!x || !y || x === y) return 0; return x.compareDocumentPosition(y) & 4 ? -1 : 1; });
+    return out;
+  }
+
+  /** 표 한 줄에 보이는 칸들 (위에서 rowspan 으로 내려온 칸 포함, 열 순서) */
+  const rowCache = new WeakMap();
+  function visualRow(tr) {
+    let r = rowCache.get(tr);
+    if (r) return r;
+    const group = tr.parentElement;
+    const grid = [];
+    Array.from(group.rows).forEach((row, y) => {
+      grid[y] ??= [];
+      let c = 0;
+      for (const td of row.cells) {
+        while (grid[y][c]) c++;
+        const cs = Math.max(1, td.colSpan || 1), rs = Math.max(1, td.rowSpan || 1);
+        for (let yy = y; yy < y + rs; yy++) { grid[yy] ??= []; for (let x = c; x < c + cs; x++) grid[yy][x] = td; }
+        c += cs;
+      }
+    });
+    Array.from(group.rows).forEach((row, y) => rowCache.set(row, [...new Set((grid[y] ?? []).filter(Boolean))]));
+    return rowCache.get(tr) ?? [];
+  }
+
+  /** 표 칸의 눈에 보이는 열 번호 (rowspan·colspan 반영) */
+  const colCache = new WeakMap();
+  function visualCol(cell) {
+    let m = colCache.get(cell);
+    if (m !== undefined) return m;
+    const table = cell.closest('table');
+    for (const group of [table.tHead, ...table.tBodies, table.tFoot].filter(Boolean)) {
+      const taken = [];
+      Array.from(group.rows).forEach((tr, r) => {
+        taken[r] ??= [];
+        let c = 0;
+        for (const td of tr.cells) {
+          while (taken[r][c]) c++;
+          colCache.set(td, c);
+          const cs = Math.max(1, td.colSpan || 1), rs = Math.max(1, td.rowSpan || 1);
+          for (let y = r; y < r + rs; y++) { taken[y] ??= []; for (let x = c; x < c + cs; x++) taken[y][x] = 1; }
+          c += cs;
+        }
+      });
+    }
+    return colCache.get(cell) ?? cell.cellIndex;
   }
 
   async function apply(out, id) {
@@ -243,6 +368,8 @@ export function createCompare(options) {
     for (const c of out.changes) {
       if (!(await tick())) return;
       const L = nodeOf('left', c.at?.left), R = nodeOf('right', c.at?.right);
+      // rowspan 으로 내려온 가상 칸이 통째로 생기거나 없어진 것은 원래 칸의 rowspan 바뀜으로 이미 나타남
+      if ((c.type === 'added' || c.type === 'deleted') && ((L.obj?.virt && !L.rest.length) || (R.obj?.virt && !R.rest.length))) continue;
       const ch = {
         index: list.length, type: c.type, path: c.path, diffs: c.diffs,
         left: L.node, right: R.node, what: 'node', gap: null,
@@ -331,6 +458,11 @@ export function createCompare(options) {
       return paint({ ...ch, extra: null, what: 'node' });
     }
     if (ch.what === 'text' && t === 'modified' && ch.diffs) {
+      for (const n of ch.alsoLeft ?? []) {
+        if (n.nodeType === 3) for (const [s0, e0] of sideSpans(ch.diffs, 'left')) marks.left.textRange(n, s0, e0, 'del');
+        marks.left.attr(n.nodeType === 1 ? n : blockOf(n), n.nodeType === 1 ? 'data-sgc' : 'data-sgc-line', 'modified');
+      }
+      if (ch.span) for (const side of ['left', 'right']) { const n = ch.span[side]; if (n?.nodeType === 1) marks[side].attr(n, 'data-sgc', 'modified'); }
       for (const side of ['left', 'right']) {
         const tn = ch[side];
         if (!tn) continue;
@@ -352,7 +484,9 @@ export function createCompare(options) {
           marks[side].attr(n, 'data-sgc', t);
         }
       }
-      if (ch.gap?.node) {
+      // 표 칸 하나가 생기거나 없어진 것은 반대쪽 빈자리 줄을 긋지 않는다 (열 추가 때 줄마다 선이 생겨 어지러움)
+      const isCell = n?.nodeType === 1 && (n.localName === 'td' || n.localName === 'th');
+      if (ch.gap?.node && !isCell) {
         const g = ch.gap.node.nodeType === 1 ? ch.gap.node : ch.gap.node.parentElement;
         marks[ch.gap.side].attr(g, 'data-sgc-gap', ch.gap.end ? 'end' : 'before');
         marks[ch.gap.side].attr(g, 'data-sgc-side', ch.gap.side);
@@ -375,7 +509,7 @@ export function createCompare(options) {
     return clip(textOfNode(node, max * 2), max) || `<${node.localName}>`;
   }
   function describe(ch) {
-    if (ch.what === 'text' && ch.diffs) return { diffs: trimDiffs(ch.diffs) };
+    if (ch.what === 'text' && ch.diffs) return { diffs: trimDiffs(ch.diffs), ...(ch.span ? { span: { attr: ch.span.attr, before: ch.span.before, after: ch.span.after } } : {}) };
     if (ch.what === 'attr') return { attr: ch.attr, before: ch.before, after: ch.after, context: snippet(ch.right ?? ch.left, 60) };
     if (ch.what === 'moved') return { context: snippet(ch.right ?? ch.left) };
     if (ch.what === 'column') {

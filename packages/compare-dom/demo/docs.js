@@ -148,5 +148,49 @@
       '</head><body><main class="doc-root">' + toHtml(d) + '</main></body></html>';
   }
 
-  global.SgDemoDocs = { make: make, toHtml: toHtml, render: render, serverPage: serverPage, CSS: CSS };
+  // ---------- 복잡한 표 시험 (일반 HTML) ----------
+  function cell(c) {
+    if (typeof c === 'string') return '<td>' + esc(c) + '</td>';
+    var tag = c.th ? 'th' : 'td';
+    return '<' + tag + (c.cs ? ' colspan="' + c.cs + '"' : '') + (c.rs ? ' rowspan="' + c.rs + '"' : '') + '>' + esc(c.t) + '</' + tag + '>';
+  }
+  function table(rows, head) {
+    return '<table class="pg-table">' + (head ? '<thead>' + head.map(function (r) { return '<tr>' + r.map(function (c) { return cell(typeof c === 'string' ? { t: c, th: 1 } : Object.assign({ th: 1 }, c)); }).join('') + '</tr>'; }).join('') + '</thead>' : '') +
+      '<tbody>' + rows.map(function (r) { return '<tr>' + r.map(cell).join('') + '</tr>'; }).join('') + '</tbody></table>';
+  }
+  function cases() {
+    var head = [['항목', '기준', '단위']];
+    var base = [['전도도', '≤ 1.3', 'µS/cm'], ['TOC', '≤ 500', 'ppb'], ['온도', '60 ~ 70', '°C'], ['육안', '잔류물 없음', '-']];
+    // 세척 검증 결과표: 머리글 2단 + 설비별 묶음(rowspan) + 측정 결과(colspan)
+    var vh3 = [[{ t: '설비', rs: 2 }, { t: '시료 위치', rs: 2 }, { t: '측정 결과', cs: 3 }], ['전도도 (µS/cm)', 'TOC (ppb)', '육안']];
+    var v3 = [
+      [{ t: 'T-201', rs: 3 }, '벽면', '0.8', '210', '이상 없음'], ['바닥', '0.9', '260', '이상 없음'], ['노즐', '1.1', '340', '이상 없음'],
+      [{ t: 'P-104', rs: 2 }, '입구', '0.7', '180', '이상 없음'], ['출구', '0.9', '230', '이상 없음'],
+      [{ t: 'HX-3', rs: 2 }, '판 1', '1.0', '320', '이상 없음'], ['판 2', '1.2', '390', '이상 없음'],
+    ];
+    var vh4 = [[{ t: '설비', rs: 2 }, { t: '시료 위치', rs: 2 }, { t: '측정 결과', cs: 3 }, { t: '판정', rs: 2 }], ['전도도 (µS/cm)', 'TOC (ppb)', '육안']];
+    var v4 = [
+      [{ t: 'T-201', rs: 4 }, '벽면', '0.8', '210', '이상 없음', '적합'], ['바닥', '0.9', '260', '이상 없음', '적합'], ['노즐', '1.1', '340', '이상 없음', '적합'], ['맨홀', '1.0', '300', '이상 없음', '적합'],
+      [{ t: 'P-104', rs: 2 }, '출구', '0.9', '230', '이상 없음', '적합'], ['입구', '0.7', '180', '이상 없음', '적합'],
+      [{ t: 'HX-3', rs: 2 }, '판 1', '1.0', '410', { t: '이상 없음 (판 1·2 함께 확인)', rs: 2 }, '적합'], ['판 2', '1.2', '390', '적합'],
+    ];
+    return [
+      { id: 'complex', title: '세척 검증 결과표 (머리글 2단·칸 병합·설비별 묶음)', tall: true,
+        desc: '판정 열 추가, T-201 에 맨홀 줄 추가 (설비 칸 rowspan 3 → 4), P-104 입구·출구 순서 바뀜, HX-3 판 1 TOC 320 → 410, HX-3 육안 칸 두 개를 하나로 병합.',
+        left: table(v3, vh3), right: table(v4, vh4) },
+      { id: 'col', title: '열 추가', desc: '가운데에 "담당" 열이 새로 생김.',
+        left: table(base, head), right: table(base.map(function (r, i) { return [r[0], ['김지원', '이서연', '김지원', '최하준'][i], r[1], r[2]]; }), [['항목', '담당', '기준', '단위']]) },
+      { id: 'colspan', title: '가로 병합 (colspan)', desc: 'TOC 줄의 세 칸을 한 칸으로 합침.',
+        left: table(base, head), right: table([base[0], [{ t: 'TOC ≤ 500 ppb', cs: 3 }], base[2], base[3]], head) },
+      { id: 'rowspan', title: '세로 병합 (rowspan)', desc: '전도도·TOC 두 줄의 항목 칸을 한 칸으로 합침.',
+        left: table(base, head), right: table([[{ t: '전도도·TOC', rs: 2 }, '≤ 1.3', 'µS/cm'], ['≤ 500', 'ppb'], base[2], base[3]], head) },
+      { id: 'move', title: '줄 순서만 바뀜', desc: '내용은 그대로, 줄 순서만 바뀜 (ID 없이).',
+        left: table(base, head), right: table([base[2], base[0], base[3], base[1]], head) },
+      { id: 'list', title: '구조가 통째로 바뀜 (표 → 목록)', desc: '같은 내용을 표 대신 목록으로.',
+        left: table(base, head), right: '<ul class="pg-checks">' + base.map(function (r) { return '<li>' + esc(r.join(' ')) + '</li>'; }).join('') + '</ul>' },
+    ];
+  }
+
+  global.SgDemoDocs = {
+    cases: cases, make: make, toHtml: toHtml, render: render, serverPage: serverPage, CSS: CSS };
 })(typeof window !== 'undefined' ? window : globalThis);

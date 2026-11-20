@@ -110,6 +110,10 @@ export function mountChangeList(el, ctrl, o = {}) {
     if (c.text.diffs) {
       body.push(h(doc, 'span', { class: 'sgc-li-diff' }, c.text.diffs.map(([op, t]) =>
         op === 0 ? t : h(doc, op < 0 ? 'del' : 'ins', {}, t))));
+      if (c.text.span) {
+        const an = String(c.text.span.attr ?? '').split(', ').map((a) => m.attrNames?.[a] ?? a).join(', ');
+        body.push(h(doc, 'span', { class: 'sgc-li-attr' }, `${an}: `, h(doc, 'del', {}, String(c.text.span.before ?? '')), ' → ', h(doc, 'ins', {}, String(c.text.span.after ?? ''))));
+      }
     } else if (c.what === 'attr') {
       const an = String(c.text.attr ?? '').split(', ').map((a) => m.attrNames?.[a] ?? a).join(', ');
       body.push(h(doc, 'span', { class: 'sgc-li-ctx' }, c.text.context || ''));

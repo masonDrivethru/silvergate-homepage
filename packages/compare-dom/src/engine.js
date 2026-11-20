@@ -50,7 +50,7 @@ export function similarity(a, b) {
 
 export const DOM_RULES = {
   identity: { '**': (n) => (n && typeof n === 'object' && !Array.isArray(n) ? n.h : undefined) },
-  ignore: ['**.h', '**.i', '**.k'],
+  ignore: ['**.h', '**.i', '**.k', '**.virt'],
   keys: { '**.c': (n) => (n && n.k ? n.n + '#' + n.k : null) },
   similar: { '**.c.*': similarity },
   raw: true,
