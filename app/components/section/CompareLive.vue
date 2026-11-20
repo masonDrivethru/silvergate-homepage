@@ -1,0 +1,122 @@
+<script setup lang="ts">
+// SilverBio Compare 직접 해 보기 (/compare). 두 버전을 각각 그냥 그리고(MbrSheets),
+// 화면 비교 모듈(@silvergate/compare-dom)이 그려진 화면끼리 비교해 원본 위에 색을 입힌다.
+// 예전 화면(CompareDemo + app/compare 엔진)은 그대로 남겨 둠
+import type { MbrDocument } from '~/compare/types.js';
+import { getSamples } from '~/compare/sample-data.js';
+
+defineProps<{ page?: boolean }>();
+const { locale } = useI18n();
+
+const sample = ref<'basic' | 'large'>('basic');
+const largeDocs = shallowRef<Record<string, MbrDocument> | null>(null);
+const loading = ref(false);
+async function loadLarge() {
+  loading.value = true;
+  const { makeLargePair } = await import('~/compare/sample-large.js');
+  const { left, right } = makeLargePair({ groups: 30, stepsPerGroup: 35, lang: locale.value === 'ko' ? 'ko' : 'en' });
+  largeDocs.value = { [left.version]: left, [right.version]: right };
+  loading.value = false;
+}
+watch([sample, locale], () => { if (sample.value === 'large') loadLarge(); });
+
+const docs = computed(() => (sample.value === 'large' && largeDocs.value) || getSamples(locale.value));
+const versions = computed(() => Object.keys(docs.value));
+const leftVer = ref('1.0');
+const rightVer = ref('1.1');
+watch(versions, (v) => { leftVer.value = v[0]!; rightVer.value = v[1] ?? v[0]!; });
+const left = computed(() => docs.value[leftVer.value] ?? docs.value[versions.value[0]!]!);
+const right = computed(() => docs.value[rightVer.value] ?? docs.value[versions.value[1] ?? versions.value[0]!]!);
+function swap() { [leftVer.value, rightVer.value] = [rightVer.value, leftVer.value]; }
+
+// ---------- 화면 비교 모듈 연결 (브라우저에서만) ----------
+const lDoc = ref<HTMLElement>(), rDoc = ref<HTMLElement>(), xDoc = ref<HTMLElement>();
+const lScroll = ref<HTMLElement>(), rScroll = ref<HTMLElement>(), xScroll = ref<HTMLElement>();
+const bar = ref<HTMLElement>(), list = ref<HTMLElement>();
+const mode = ref<'side' | 'redline'>('side');
+const zoom = ref(1);
+let cleanup: (() => void) | null = null;
+
+onMounted(async () => {
+  const { createCompare, mountToolbar, mountChangeList } = await import('@silvergate/compare-dom');
+  const lang = locale.value === 'ko' ? 'ko' : 'en';
+  const ctrl = createCompare({
+    left: lDoc.value!, right: rDoc.value!, leftScroller: lScroll.value, rightScroller: rScroll.value,
+    page: '.mbr-page', watch: true,
+  });
+  let dirty = true;
+  const drawRedline = () => { if (xDoc.value) { ctrl.renderRedline(xDoc.value); dirty = false; } };
+  ctrl.on('update', () => { dirty = true; if (mode.value === 'redline') drawRedline(); });
+  const tb = mountToolbar(bar.value!, ctrl, {
+    locale: lang, modes: true,
+    onMode: (m) => { mode.value = m; if (m === 'redline' && dirty) nextTick(drawRedline); },
+  });
+  const cl = mountChangeList(list.value!, ctrl, { locale: lang });
+  // 문서 칸 폭에 맞춰 A4 를 줄여 보이기 (양쪽 같은 배율)
+  const ro = new ResizeObserver(() => {
+    const w = rScroll.value?.clientWidth ?? 800;
+    zoom.value = Math.min(1, Math.max(0.35, (w - 24) / 794));
+  });
+  ro.observe(rScroll.value!);
+  cleanup = () => { ro.disconnect(); tb.destroy(); cl.destroy(); ctrl.destroy(); };
+});
+onBeforeUnmount(() => cleanup?.());
+</script>
+
+<template>
+  <!-- ===== 3-1. Compare 직접 해 보기: 그려진 두 화면을 비교해 원본 위에 표시 ===== -->
+  <section class="section cmp cmp-live" :class="{ 'cmp--page': page }" id="compare-demo" aria-labelledby="cmp-title">
+    <div class="container">
+      <p v-if="page" class="product__name">SilverBio Compare</p>
+      <component :is="page ? 'h1' : 'h2'" id="cmp-title" class="section__title reveal">{{ $t('cdemo.title') }}</component>
+      <p class="cmp__lead">{{ $t('cdemo.lead') }}</p>
+
+      <div class="cmp-bar">
+        <div class="cmp-seg" role="group" :aria-label="$t('cdemo.sample')">
+          <button type="button" :aria-pressed="sample === 'basic'" @click="sample = 'basic'">{{ $t('cdemo.sampleBasic') }}</button>
+          <button type="button" :aria-pressed="sample === 'large'" @click="sample = 'large'">{{ $t('cdemo.sampleLarge') }}</button>
+        </div>
+        <div class="cmp-vers">
+          <label class="cmp-sel">
+            <span class="sr-only">{{ $t('cdemo.from') }}</span>
+            <select v-model="leftVer"><option v-for="v in versions" :key="v" :value="v">v{{ v }}</option></select>
+          </label>
+          <button type="button" class="cmp-swap" :aria-label="$t('cdemo.swap')" :title="$t('cdemo.swap')" @click="swap">⇄</button>
+          <label class="cmp-sel">
+            <span class="sr-only">{{ $t('cdemo.to') }}</span>
+            <select v-model="rightVer"><option v-for="v in versions" :key="v" :value="v">v{{ v }}</option></select>
+          </label>
+        </div>
+        <p v-if="loading" class="cmp-perf" aria-live="polite">{{ $t('cdemo.loading') }}</p>
+      </div>
+
+      <div class="sgc-viewer cmp-viewer" :data-mode="mode">
+        <div ref="bar" />
+        <div class="sgc-body">
+          <div class="sgc-panes">
+            <section class="sgc-pane" :hidden="mode === 'redline'">
+              <header class="sgc-pane-head"><span class="sgc-badge sgc-badge-old">{{ $t('cdemo.old') }}</span>v{{ left.version }}</header>
+              <div ref="lScroll" class="cmp-desk" tabindex="0" :aria-label="`v${left.version}`">
+                <div ref="lDoc" class="cmp-zoom" :style="{ zoom }"><CompareMbrSheets :doc="left" approved /></div>
+              </div>
+            </section>
+            <section class="sgc-pane" :hidden="mode === 'redline'">
+              <header class="sgc-pane-head"><span class="sgc-badge sgc-badge-new">{{ $t('cdemo.new') }}</span>v{{ right.version }}</header>
+              <div ref="rScroll" class="cmp-desk" tabindex="0" :aria-label="`v${right.version}`">
+                <div ref="rDoc" class="cmp-zoom" :style="{ zoom }"><CompareMbrSheets :doc="right" /></div>
+              </div>
+            </section>
+            <section class="sgc-pane" :hidden="mode !== 'redline'">
+              <header class="sgc-pane-head">v{{ left.version }} → v{{ right.version }}</header>
+              <div ref="xScroll" class="cmp-desk" tabindex="0">
+                <div class="cmp-zoom" :style="{ zoom }"><div ref="xDoc" /></div>
+              </div>
+            </section>
+          </div>
+          <aside ref="list" :aria-label="$t('cdemo.changes')" />
+        </div>
+      </div>
+      <p class="cmp__note">{{ $t('cdemo.note', { product: left.productName }) }}</p>
+    </div>
+  </section>
+</template>

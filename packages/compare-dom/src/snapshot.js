@@ -72,6 +72,8 @@ function* walk(root, opt) {
   const ignoreSel = ['[data-sgc-ignore]', '[hidden]', opt.ignore].filter(Boolean).join(',');
   const anchorSel = opt.anchors ?? DEFAULT_ANCHORS;
   const keyAttrs = opt.keyAttrs ?? KEY_ATTRS;
+  /** 이 요소(예: 쪽)는 없는 것처럼 안쪽을 부모에 바로 붙인다: 쪽 경계가 달라도 내용끼리 비교 */
+  const flattenSel = opt.flatten || '';
   /** @type {Node[]} */
   const nodes = [];
   const anchors = [], anchorHashes = [];
@@ -186,6 +188,7 @@ function* walk(root, opt) {
         f.sig += '\u0003' + h;
       } else if (t === 1) {
         if (SKIP_TAGS.has(ch.tagName) || (ignoreSel && ch.matches(ignoreSel))) continue;
+        if (flattenSel && ch.matches(flattenSel)) { f.kids.splice(f.x, 0, ...Array.from(ch.childNodes)); continue; }
         const sub = open(ch, f.out.i);
         f.out.c.push(sub.out);
         stack.push(sub);

@@ -58,7 +58,8 @@
 - 성능: 300쪽(스텝 1,050개·파라미터 3,100개) 비교 약 4~12ms. 대용량 샘플은 고를 때만 만들어서 홈 첫 화면은 그대로 가벼움, 화면 밖 쪽은 그리지 않음(`content-visibility`)
 - 콘솔 확인: `node app/compare/check.mjs`. 사용 패키지: `diff-match-patch`
 
-**재사용 모듈 (`packages/`, 브랜치 feat/compare-modules-brxjqe, 운영 미반영)** — 다른 프로젝트(JSP·Vue·React 어디든)에 가져가는 화면 비교 모듈. 위 `/compare` 데모와는 별개 (데모 코드는 그대로)
+**재사용 모듈 (`packages/`, 브랜치 feat/compare-modules-brxjqe)** — 다른 프로젝트(JSP·Vue·React 어디든)에 가져가는 화면 비교 모듈.
+- **`/compare` 페이지는 이 모듈로 바뀜**: `app/pages/compare.vue` → `SectionCompareLive` (두 버전을 `CompareMbrSheets` 로 그냥 그리고, 모듈이 그려진 화면끼리 비교). 영어 기본, `/ko/compare` 한국어. 예전 화면(`SectionCompareDemo`, `components/compare/ComparePanel` 등, `app/compare/engine.js`)은 파일만 남겨 둠 — 되돌리려면 compare.vue 한 줄만 바꾸면 됨
 - `compare-core`: 어떤 JSON이든 비교하는 엔진 (키 기반 짝 맞춤, 비슷한 것끼리 짝, 해시로 같은 부분 건너뛰기). `node --test` 21개
 - `compare-dom`: **브라우저에 그려진 화면 두 개**를 원본 그대로 두고 바뀐 곳만 표시 (CSS Highlight API + 속성 하나). Worker 비교, 나눠 읽기, 쪽 단위 스크롤 맞춤, 한 장 보기, 변경 목록. `dist/sg-compare.min.js` 한 파일이면 JSP 에서 바로 사용. 자세한 것은 `packages/compare-dom/README.md`
 - `compare-vue` / `compare-react`: compare-dom 을 감싼 부품 (`<SgCompare>`, 문서 컴포넌트를 그대로 두 번 그림)

@@ -13,6 +13,11 @@ export interface CompareOptions {
   rightScroller?: Element;
   /** 쪽 요소 선택자. 변경 목록에 "n쪽" 표시 + 스크롤 맞춤을 쪽 단위로 가볍게. 예) '.page' */
   page?: string | null;
+  /**
+   * 없는 것처럼 건너뛸 감싸개 선택자 (안쪽 내용만 비교). 기본 = page.
+   * 쪽 나누기가 버전마다 달라도(앞에 단계가 추가돼 뒤가 다음 쪽으로 밀려도) 내용끼리 비교됨. 끄려면 ''
+   */
+  flatten?: string;
   /** 비교할 속성. 기본 ['src','href','alt','colspan','rowspan','type'] (+ 입력칸 값은 항상) */
   attrs?: string[];
   /** 비교에서 뺄 요소 선택자 (data-sgc-ignore 속성도 빠짐) */

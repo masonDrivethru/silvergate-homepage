@@ -17,5 +17,5 @@ useReveal();
   <div class="container cmp-back">
     <a :href="pathTo('/#solutions')"><span aria-hidden="true">←</span> {{ $t('cdemo.back') }}</a>
   </div>
-  <SectionCompareDemo page />
+  <SectionCompareLive page />
 </template>

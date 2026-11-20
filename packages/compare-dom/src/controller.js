@@ -112,7 +112,7 @@ export function createCompare(options) {
       ensureMarkStyle(L.ownerDocument, name + 'l');
       ensureMarkStyle(R.ownerDocument, name + 'r');
       const t0 = performance.now();
-      const sopt = { attrs: opt.attrs, ignore: opt.ignore, anchors: opt.anchors, keyAttrs: opt.keyAttrs };
+      const sopt = { attrs: opt.attrs, ignore: opt.ignore, anchors: opt.anchors, keyAttrs: opt.keyAttrs, flatten: opt.flatten ?? opt.page };
       // 작은 문서는 한 번에, 큰 문서는 나눠 읽으며 화면에 차례를 넘김 (스크롤·입력이 멈추지 않게)
       const big = (L.getElementsByTagName('*').length + R.getElementsByTagName('*').length) > 6000;
       const sl = big ? await snapshotAsync(L, sopt) : snapshot(L, sopt);
@@ -514,7 +514,8 @@ export function createCompare(options) {
     if (ch.what === 'moved') return { context: snippet(ch.right ?? ch.left) };
     if (ch.what === 'column') {
       const n = ch.type === 'added' ? ch.right : ch.left;
-      return { column: ch.count, context: [n, ...ch.extra.map((x) => x.node)].map((x) => snippet(x, 20)).join(' · ') };
+      // 열은 머리글(첫 칸) 이름만
+      return { column: ch.count, context: snippet(n, 40) };
     }
     return { context: snippet(ch.type === 'deleted' ? ch.left : ch.right) };
   }
@@ -583,7 +584,7 @@ export function createCompare(options) {
     const doc = target.ownerDocument;
     ensureMarkStyle(doc, name + 'x');
     const clone = doc.importNode(R, true);
-    const cs = snapshot(clone, { attrs: opt.attrs, ignore: opt.ignore, anchors: '', keyAttrs: opt.keyAttrs });
+    const cs = snapshot(clone, { attrs: opt.attrs, ignore: opt.ignore, anchors: '', keyAttrs: opt.keyAttrs, flatten: opt.flatten ?? opt.page });
     if (cs.nodes.length !== snaps.right.nodes.length) console.warn('[sg-compare] 한 장 보기: 복사본 구조가 달라 일부 표시가 어긋날 수 있습니다');
     const inserts = [];
     const idx = new Map(snaps.right.nodes.map((n, i) => [n, i]));

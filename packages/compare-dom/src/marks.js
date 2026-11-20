@@ -121,28 +121,29 @@ export function ensureMarkStyle(doc, name) {
 }
 
 const highlightCss = (n) => `
-::highlight(${n}-ins){background-color:var(--sgc-ins-bg,rgba(34,197,94,.34));color:inherit;text-decoration:underline;text-decoration-color:var(--sgc-ins-line,#16a34a);text-decoration-thickness:2px}
-::highlight(${n}-del){background-color:var(--sgc-del-bg,rgba(239,68,68,.28));color:inherit;text-decoration:line-through;text-decoration-color:var(--sgc-del-line,#dc2626);text-decoration-thickness:2px}
-::highlight(${n}-focus){background-color:var(--sgc-focus-bg,rgba(37,99,235,.32))}
+::highlight(${n}-ins){background-color:var(--sgc-ins-bg,rgba(34,197,94,.26));color:inherit}
+::highlight(${n}-del){background-color:var(--sgc-del-bg,rgba(239,68,68,.2));color:inherit;text-decoration:line-through;text-decoration-color:var(--sgc-del-line,rgba(220,38,38,.8));text-decoration-thickness:1px}
+::highlight(${n}-focus){background-color:var(--sgc-focus-bg,rgba(37,99,235,.28))}
 `;
 
+/* 읽기 편하게: 테두리 없이 옅은 배경 하나 + 필요한 곳만 가는 막대 */
 const MARK_CSS = `
-[data-sgc-line]{box-shadow:-7px 0 0 -4px var(--sgc-line-color,#ca8a04)}
-[data-sgc-line="added"]{--sgc-line-color:var(--sgc-ins-line,#16a34a)}
-[data-sgc-line="deleted"]{--sgc-line-color:var(--sgc-del-line,#dc2626)}
-[data-sgc-line="modified"]{--sgc-line-color:var(--sgc-mod-line,#ca8a04)}
-[data-sgc]{border-radius:2px}
-[data-sgc="added"]{background-color:var(--sgc-add-block,rgba(34,197,94,.13))!important;box-shadow:inset 0 0 0 1.5px var(--sgc-ins-line,#16a34a)!important}
-[data-sgc="deleted"]{background-color:var(--sgc-del-block,rgba(239,68,68,.11))!important;box-shadow:inset 0 0 0 1.5px var(--sgc-del-line,#dc2626)!important;text-decoration:line-through;text-decoration-color:rgba(220,38,38,.75)}
-[data-sgc="modified"]{background-color:var(--sgc-mod-block,rgba(250,204,21,.16))!important;box-shadow:inset 0 0 0 1.5px var(--sgc-mod-line,#ca8a04)!important}
-[data-sgc="moved"]{background-color:var(--sgc-mov-block,rgba(99,102,241,.09))!important;box-shadow:inset 0 0 0 1.5px var(--sgc-mov-line,#6366f1)!important}
-[data-sgc-gap="before"]{box-shadow:0 -3px 0 0 var(--sgc-gap-line,rgba(220,38,38,.85))}
-[data-sgc-gap="end"]{box-shadow:0 3px 0 0 var(--sgc-gap-line,rgba(220,38,38,.85))}
-[data-sgc-gap][data-sgc-side="left"]{--sgc-gap-line:rgba(22,163,74,.9)}
-[data-sgc-focus]{outline:2.5px solid var(--sgc-focus,#2563eb)!important;outline-offset:3px;animation:sgc-pulse 1.4s ease-out 1}
-@keyframes sgc-pulse{0%{outline-color:rgba(37,99,235,1);outline-offset:8px}100%{outline-offset:3px}}
-ins.sgc-ins{background:rgba(34,197,94,.3);text-decoration:underline;text-decoration-color:#16a34a;text-decoration-thickness:2px;color:inherit}
-del.sgc-del{background:rgba(239,68,68,.24);text-decoration:line-through;text-decoration-color:#dc2626;text-decoration-thickness:2px;color:inherit}
+[data-sgc-line]{box-shadow:-6px 0 0 -4px var(--sgc-line-color,rgba(202,138,4,.7))}
+[data-sgc-line="added"]{--sgc-line-color:var(--sgc-ins-line,rgba(22,163,74,.7))}
+[data-sgc-line="deleted"]{--sgc-line-color:var(--sgc-del-line,rgba(220,38,38,.7))}
+[data-sgc-line="modified"]{--sgc-line-color:var(--sgc-mod-line,rgba(202,138,4,.7))}
+[data-sgc="added"]{background-color:var(--sgc-add-block,rgba(34,197,94,.1))!important}
+[data-sgc="deleted"]{background-color:var(--sgc-del-block,rgba(239,68,68,.08))!important;text-decoration:line-through;text-decoration-color:rgba(220,38,38,.55);text-decoration-thickness:1px}
+[data-sgc="modified"]{background-color:var(--sgc-mod-block,rgba(250,204,21,.13))!important}
+[data-sgc="moved"]{box-shadow:inset 3px 0 0 var(--sgc-mov-line,rgba(99,102,241,.7))!important}
+[data-sgc-gap="before"]{box-shadow:0 -2px 0 0 var(--sgc-gap-line,rgba(220,38,38,.55))}
+[data-sgc-gap="end"]{box-shadow:0 2px 0 0 var(--sgc-gap-line,rgba(220,38,38,.55))}
+[data-sgc-gap][data-sgc-side="left"]{--sgc-gap-line:rgba(22,163,74,.6)}
+[data-sgc-focus]{outline:2px solid var(--sgc-focus,#2563eb)!important;outline-offset:2px;animation:sgc-pulse 1.2s ease-out 1}
+@keyframes sgc-pulse{0%{outline-offset:7px}100%{outline-offset:2px}}
+@media (prefers-reduced-motion:reduce){[data-sgc-focus]{animation:none}}
+ins.sgc-ins{background:rgba(34,197,94,.26);text-decoration:none;color:inherit}
+del.sgc-del{background:rgba(239,68,68,.18);text-decoration:line-through;text-decoration-color:rgba(220,38,38,.8);text-decoration-thickness:1px;color:inherit}
 [data-sgc-noscrollbar]{scrollbar-color:transparent transparent}
 [data-sgc-noscrollbar]::-webkit-scrollbar-thumb,[data-sgc-noscrollbar]::-webkit-scrollbar-track{background:transparent}
 @media print{[data-sgc-focus]{outline:none!important}}
