@@ -1,0 +1,23 @@
+{
+  "name": "@silvergate/compare-core",
+  "version": "0.1.0",
+  "description": "문서 종류와 상관없이 JSON 두 버전을 비교하는 엔진 (DOM·프레임워크 무관)",
+  "type": "module",
+  "main": "./src/index.js",
+  "types": "./src/types.d.ts",
+  "exports": {
+    ".": {
+      "types": "./src/types.d.ts",
+      "default": "./src/index.js"
+    }
+  },
+  "files": ["src", "README.md"],
+  "scripts": {
+    "test": "node --test test/"
+  },
+  "dependencies": {
+    "diff-match-patch": "^1.0.5"
+  },
+  "license": "UNLICENSED",
+  "private": true
+}
