@@ -371,6 +371,8 @@ export function createCompare(options) {
   function unalign() {
     for (const io of lazyIO ?? []) io.disconnect();
     for (const sp of spacers) sp.remove();
+    // 지운 빈 칸을 변경이 계속 가리키지 않게 (이동할 때 없어진 빈 칸을 목표로 잡는 문제)
+    for (const ch of state.changes) ch.spacer = null;
     for (const [el, prop, old] of padded) el.style[prop] = old;
     spacers = []; padded = [];
   }
@@ -822,7 +824,7 @@ export function createCompare(options) {
     emit('focus', ch);
     const targetOf = (side) => {
       let el = elOf(ch[side]);
-      if (!el && ch.gap?.side === side) el = ch.spacer ?? elOf(ch.gap.node);
+      if (!el && ch.gap?.side === side) el = (ch.spacer?.isConnected ? ch.spacer : null) ?? elOf(ch.gap.node);
       if (!el) return null;
       return ch.what === 'text' ? blockOf(ch[side]) ?? el : el;
     };
@@ -833,9 +835,7 @@ export function createCompare(options) {
       const k = pageNo(t, side);
       if (k >= 0) keys.push(`${side}:${k}`, `${side}:${k - 1}`);
     }
-    if (keys.length) await ensureAligned(keys);
-    if (token !== goToken) return;
-    // ② 이동: 부드럽게 (움직임 줄이기 설정이면 바로)
+    // ② 이동: 부드럽게 (움직임 줄이기 설정이면 바로): 부드럽게 (움직임 줄이기 설정이면 바로)
     let sides = ['left', 'right'].map((side) => ({ side, block: targetOf(side) })).filter((x) => x.block);
     // 두 문서가 한 스크롤 영역에 있으면(좌우가 늘 함께 움직임) 한쪽 기준으로만 맞춘다 (새 버전 쪽 우선)
     if (sides.length > 1 && scrollers.left.target === scrollers.right.target) sides = [sides.find((x) => x.side === 'right') ?? sides[0]];
@@ -868,11 +868,38 @@ export function createCompare(options) {
       requestAnimationFrame(tick);
     });
     try {
+      // 먼저 목표가 든 "쪽"으로: 화면 밖(아직 그려지지 않은) 쪽 안 요소는 위치를 물으면 0 이 나올 수 있지만,
+      // 쪽 상자 자체의 위치는 늘 정확하다. 쪽이 화면에 그려진 뒤에 높이 맞추기 → 목표 줄에 정확히
+      if (opt.page) {
+        let movedToPage = false;
+        for (const { side, block } of sides) {
+          const pg = block.closest?.(opt.page);
+          if (!pg) continue;
+          const sc = scrollers[side];
+          const d = topIn(pg, sc.doc) - sc.viewTop();
+          if (d > sc.height() * 1.5 || d + pg.getBoundingClientRect().height < -sc.height() * 0.5) {
+            const v = Math.max(0, Math.min(sc.top + d - sc.height() * 0.15, sc.max()));
+            const t = sc.target;
+            if (t.scrollTo) t.scrollTo({ top: v, behavior: soft ? 'smooth' : 'instant' }); else sc.top = v;
+            movedToPage = true;
+          }
+        }
+        if (movedToPage) {
+          link?.pause(2000);
+          await Promise.all(sides.map(({ side }) => settle(scrollers[side])));
+          await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));   // 쪽이 그려질 시간
+          if (token !== goToken) return;
+        }
+      }
+      if (keys.length) await ensureAligned(keys);
+      if (token !== goToken) return;
       // 부드럽게 가고 → 멈추면 다시 재서(그사이 새로 그려진 쪽·빈 칸 때문에 자리가 바뀌었으면) 다시 부드럽게, 최대 4번
       for (let round = 0; round < 4 && !userMoved; round++) {
         if (keys.length) await ensureAligned(keys);
         if (token !== goToken) return;
         let moving = false;
+        // 높이 맞추기로 빈 칸이 새로 생겼을 수 있으니 목표를 다시 찾는다
+        sides = sides.map(({ side }) => ({ side, block: targetOf(side) })).filter((x) => x.block);
         for (const { side, block } of sides) {
           if (!block.isConnected) continue;
           const sc = scrollers[side];

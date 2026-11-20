@@ -3117,6 +3117,7 @@ function createCompare(options) {
   function unalign() {
     for (const io of lazyIO ?? []) io.disconnect();
     for (const sp of spacers) sp.remove();
+    for (const ch of state.changes) ch.spacer = null;
     for (const [el, prop, old] of padded) el.style[prop] = old;
     spacers = [];
     padded = [];
@@ -3595,7 +3596,7 @@ function createCompare(options) {
     emit("focus", ch);
     const targetOf = (side) => {
       let el = elOf(ch[side]);
-      if (!el && ch.gap?.side === side) el = ch.spacer ?? elOf(ch.gap.node);
+      if (!el && ch.gap?.side === side) el = (ch.spacer?.isConnected ? ch.spacer : null) ?? elOf(ch.gap.node);
       if (!el) return null;
       return ch.what === "text" ? blockOf(ch[side]) ?? el : el;
     };
@@ -3605,8 +3606,6 @@ function createCompare(options) {
       const k = pageNo(t, side);
       if (k >= 0) keys.push(`${side}:${k}`, `${side}:${k - 1}`);
     }
-    if (keys.length) await ensureAligned(keys);
-    if (token !== goToken) return;
     let sides = ["left", "right"].map((side) => ({ side, block: targetOf(side) })).filter((x) => x.block);
     if (sides.length > 1 && scrollers.left.target === scrollers.right.target) sides = [sides.find((x) => x.side === "right") ?? sides[0]];
     const reduce = !!globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -3643,10 +3642,35 @@ function createCompare(options) {
       requestAnimationFrame(tick);
     });
     try {
+      if (opt.page) {
+        let movedToPage = false;
+        for (const { side, block } of sides) {
+          const pg = block.closest?.(opt.page);
+          if (!pg) continue;
+          const sc = scrollers[side];
+          const d = topIn(pg, sc.doc) - sc.viewTop();
+          if (d > sc.height() * 1.5 || d + pg.getBoundingClientRect().height < -sc.height() * 0.5) {
+            const v = Math.max(0, Math.min(sc.top + d - sc.height() * 0.15, sc.max()));
+            const t = sc.target;
+            if (t.scrollTo) t.scrollTo({ top: v, behavior: soft ? "smooth" : "instant" });
+            else sc.top = v;
+            movedToPage = true;
+          }
+        }
+        if (movedToPage) {
+          link?.pause(2e3);
+          await Promise.all(sides.map(({ side }) => settle(scrollers[side])));
+          await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+          if (token !== goToken) return;
+        }
+      }
+      if (keys.length) await ensureAligned(keys);
+      if (token !== goToken) return;
       for (let round = 0; round < 4 && !userMoved; round++) {
         if (keys.length) await ensureAligned(keys);
         if (token !== goToken) return;
         let moving = false;
+        sides = sides.map(({ side }) => ({ side, block: targetOf(side) })).filter((x) => x.block);
         for (const { side, block } of sides) {
           if (!block.isConnected) continue;
           const sc = scrollers[side];

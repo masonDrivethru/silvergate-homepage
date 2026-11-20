@@ -3199,6 +3199,7 @@ tr.sgc-spacer::after{content:none}
     function unalign() {
       for (const io of lazyIO != null ? lazyIO : []) io.disconnect();
       for (const sp of spacers) sp.remove();
+      for (const ch of state.changes) ch.spacer = null;
       for (const [el, prop, old] of padded) el.style[prop] = old;
       spacers = [];
       padded = [];
@@ -3673,7 +3674,7 @@ tr.sgc-spacer::after{content:none}
     const focused = [];
     let goToken = 0;
     async function goTo(i, { smooth = true } = {}) {
-      var _a, _b, _c;
+      var _a, _b, _c, _d;
       if (!state.changes.length) return;
       i = (i % state.changes.length + state.changes.length) % state.changes.length;
       state.current = i;
@@ -3688,11 +3689,11 @@ tr.sgc-spacer::after{content:none}
       focused.length = 0;
       emit("focus", ch);
       const targetOf = (side) => {
-        var _a2, _b2, _c2;
+        var _a2, _b2, _c2, _d2;
         let el = elOf(ch[side]);
-        if (!el && ((_a2 = ch.gap) == null ? void 0 : _a2.side) === side) el = (_b2 = ch.spacer) != null ? _b2 : elOf(ch.gap.node);
+        if (!el && ((_a2 = ch.gap) == null ? void 0 : _a2.side) === side) el = (_c2 = ((_b2 = ch.spacer) == null ? void 0 : _b2.isConnected) ? ch.spacer : null) != null ? _c2 : elOf(ch.gap.node);
         if (!el) return null;
-        return ch.what === "text" ? (_c2 = blockOf(ch[side])) != null ? _c2 : el : el;
+        return ch.what === "text" ? (_d2 = blockOf(ch[side])) != null ? _d2 : el : el;
       };
       const keys = [];
       for (const side of ["left", "right"]) {
@@ -3700,8 +3701,6 @@ tr.sgc-spacer::after{content:none}
         const k = pageNo(t, side);
         if (k >= 0) keys.push(`${side}:${k}`, `${side}:${k - 1}`);
       }
-      if (keys.length) await ensureAligned(keys);
-      if (token !== goToken) return;
       let sides = ["left", "right"].map((side) => ({ side, block: targetOf(side) })).filter((x) => x.block);
       if (sides.length > 1 && scrollers.left.target === scrollers.right.target) sides = [(_a = sides.find((x) => x.side === "right")) != null ? _a : sides[0]];
       const reduce = !!((_b = globalThis.matchMedia) == null ? void 0 : _b.call(globalThis, "(prefers-reduced-motion: reduce)").matches);
@@ -3738,10 +3737,35 @@ tr.sgc-spacer::after{content:none}
         requestAnimationFrame(tick);
       });
       try {
+        if (opt.page) {
+          let movedToPage = false;
+          for (const { side, block } of sides) {
+            const pg = (_c = block.closest) == null ? void 0 : _c.call(block, opt.page);
+            if (!pg) continue;
+            const sc = scrollers[side];
+            const d = topIn(pg, sc.doc) - sc.viewTop();
+            if (d > sc.height() * 1.5 || d + pg.getBoundingClientRect().height < -sc.height() * 0.5) {
+              const v = Math.max(0, Math.min(sc.top + d - sc.height() * 0.15, sc.max()));
+              const t = sc.target;
+              if (t.scrollTo) t.scrollTo({ top: v, behavior: soft ? "smooth" : "instant" });
+              else sc.top = v;
+              movedToPage = true;
+            }
+          }
+          if (movedToPage) {
+            link == null ? void 0 : link.pause(2e3);
+            await Promise.all(sides.map(({ side }) => settle(scrollers[side])));
+            await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+            if (token !== goToken) return;
+          }
+        }
+        if (keys.length) await ensureAligned(keys);
+        if (token !== goToken) return;
         for (let round = 0; round < 4 && !userMoved; round++) {
           if (keys.length) await ensureAligned(keys);
           if (token !== goToken) return;
           let moving = false;
+          sides = sides.map(({ side }) => ({ side, block: targetOf(side) })).filter((x) => x.block);
           for (const { side, block } of sides) {
             if (!block.isConnected) continue;
             const sc = scrollers[side];
@@ -3765,7 +3789,7 @@ tr.sgc-spacer::after{content:none}
       }
       for (const side of ["left", "right"]) {
         const fr = [];
-        if (((_c = ch[side]) == null ? void 0 : _c.nodeType) === 3) {
+        if (((_d = ch[side]) == null ? void 0 : _d.nodeType) === 3) {
           const r = ch[side].ownerDocument.createRange();
           r.selectNodeContents(ch[side]);
           fr.push(r);
