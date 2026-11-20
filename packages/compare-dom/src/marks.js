@@ -120,10 +120,12 @@ export function ensureMarkStyle(doc, name) {
   }
 }
 
+/* 문서 관리에서 흔한 수정 표시(redline): 넣은 글자 = 파란 글씨 + 밑줄, 지운 글자 = 빨간 글씨 + 취소선.
+   색은 --sgc-ins-* / --sgc-del-* 변수로 바꿀 수 있다 */
 const highlightCss = (n) => `
-::highlight(${n}-ins){background-color:var(--sgc-ins-bg,rgba(34,197,94,.26));color:inherit}
-::highlight(${n}-del){background-color:var(--sgc-del-bg,rgba(239,68,68,.2));color:inherit;text-decoration:line-through;text-decoration-color:var(--sgc-del-line,rgba(220,38,38,.8));text-decoration-thickness:1px}
-::highlight(${n}-focus){background-color:var(--sgc-focus-bg,rgba(59,130,246,.18))}
+::highlight(${n}-ins){color:var(--sgc-ins-fg,#1d4ed8);background-color:var(--sgc-ins-bg,rgba(37,99,235,.08));text-decoration:underline;text-decoration-color:var(--sgc-ins-fg,#1d4ed8);text-decoration-thickness:1px}
+::highlight(${n}-del){color:var(--sgc-del-fg,#b91c1c);background-color:var(--sgc-del-bg,rgba(220,38,38,.07));text-decoration:line-through;text-decoration-color:var(--sgc-del-fg,#b91c1c);text-decoration-thickness:1px}
+::highlight(${n}-focus){background-color:var(--sgc-focus-bg,rgba(250,204,21,.35))}
 `;
 
 /* 읽기 편하게: 테두리 없이 옅은 배경 하나 + 필요한 곳만 가는 막대 */
@@ -132,20 +134,20 @@ const MARK_CSS = `
 [data-sgc-line="added"]{--sgc-line-color:var(--sgc-ins-line,rgba(22,163,74,.7))}
 [data-sgc-line="deleted"]{--sgc-line-color:var(--sgc-del-line,rgba(220,38,38,.7))}
 [data-sgc-line="modified"]{--sgc-line-color:var(--sgc-mod-line,rgba(202,138,4,.7))}
-[data-sgc="added"]{background-color:var(--sgc-add-block,rgba(34,197,94,.1))!important}
-[data-sgc="deleted"]{background-color:var(--sgc-del-block,rgba(239,68,68,.08))!important;text-decoration:line-through;text-decoration-color:rgba(220,38,38,.55);text-decoration-thickness:1px}
-[data-sgc="modified"]{background-color:var(--sgc-mod-block,rgba(250,204,21,.13))!important}
+[data-sgc="added"]{background-color:var(--sgc-add-block,rgba(37,99,235,.06))!important;color:var(--sgc-ins-fg,#1d4ed8)}
+[data-sgc="deleted"]{background-color:var(--sgc-del-block,rgba(220,38,38,.05))!important;color:var(--sgc-del-fg,#b91c1c);text-decoration:line-through;text-decoration-color:var(--sgc-del-fg,#b91c1c);text-decoration-thickness:1px}
+[data-sgc="modified"]{background-color:var(--sgc-mod-block,rgba(37,99,235,.06))!important}
 [data-sgc="moved"]{box-shadow:inset 3px 0 0 var(--sgc-mov-line,rgba(99,102,241,.7))!important}
 [data-sgc-gap="before"]{box-shadow:0 -2px 0 0 var(--sgc-gap-line,rgba(220,38,38,.55))}
 [data-sgc-gap="end"]{box-shadow:0 2px 0 0 var(--sgc-gap-line,rgba(220,38,38,.55))}
 [data-sgc-gap][data-sgc-side="left"]{--sgc-gap-line:rgba(22,163,74,.6)}
 @property --sgc-flash{syntax:'<number>';inherits:false;initial-value:0}
-[data-sgc-focus]{--sgc-flash:.5;--sgc-flash-rgb:var(--sgc-focus-rgb,59 130 246);background-image:linear-gradient(rgb(var(--sgc-flash-rgb) / calc(var(--sgc-flash) * .26)),rgb(var(--sgc-flash-rgb) / calc(var(--sgc-flash) * .26)))!important;animation:sgc-flash 1.6s ease-in-out 1 both;border-radius:3px}
+[data-sgc-focus]{--sgc-flash:.5;--sgc-flash-rgb:var(--sgc-focus-rgb,250 204 21);background-image:linear-gradient(rgb(var(--sgc-flash-rgb) / calc(var(--sgc-flash) * .42)),rgb(var(--sgc-flash-rgb) / calc(var(--sgc-flash) * .42)))!important;animation:sgc-flash 1.6s ease-in-out 1 both;border-radius:3px}
 @keyframes sgc-flash{0%{--sgc-flash:0}14%{--sgc-flash:1}36%{--sgc-flash:.2}56%{--sgc-flash:.85}100%{--sgc-flash:0}}
 @media (prefers-reduced-motion:reduce){[data-sgc-focus]{animation:sgc-flash-soft 1.6s ease-out 1 both}}
 @keyframes sgc-flash-soft{0%{--sgc-flash:.7}100%{--sgc-flash:0}}
-ins.sgc-ins{background:rgba(34,197,94,.26);text-decoration:none;color:inherit}
-del.sgc-del{background:rgba(239,68,68,.18);text-decoration:line-through;text-decoration-color:rgba(220,38,38,.8);text-decoration-thickness:1px;color:inherit}
+ins.sgc-ins{background:var(--sgc-ins-bg,rgba(37,99,235,.08));color:var(--sgc-ins-fg,#1d4ed8);text-decoration:underline;text-decoration-thickness:1px}
+del.sgc-del{background:var(--sgc-del-bg,rgba(220,38,38,.07));color:var(--sgc-del-fg,#b91c1c);text-decoration:line-through;text-decoration-thickness:1px}
 .sgc-spacer{display:block;box-sizing:border-box;position:relative;margin:0;padding:0;list-style:none;background:repeating-linear-gradient(135deg,rgba(100,116,139,.09) 0 6px,transparent 6px 12px);border:1px dashed rgba(100,116,139,.4);border-radius:3px}
 .sgc-spacer::after,.sgc-spacer>td::after{content:attr(data-label);position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:11px/1.2 system-ui,sans-serif;color:rgba(71,85,105,.8);pointer-events:none}
 tr.sgc-spacer{display:table-row;background:none;border:0}

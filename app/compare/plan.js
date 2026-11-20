@@ -7,14 +7,15 @@
 
 /** @param {import('./types.js').MbrDocument} doc */
 export function itemsOf(doc) {
-  const out = [{ key: 'head', cost: 3 }];
-  if (doc.materials?.length) out.push({ key: 'mat', cost: 1.2 + doc.materials.length * 0.42 + (doc.materialsLayout === 'detailed' ? 0.5 : 0) });
+  // 대략의 높이 (px, 문서 글자 크기 기준). 쪽 본문 약 900px
+  const out = [{ key: 'head', cost: 330 }];
+  if (doc.materials?.length) out.push({ key: 'mat', cost: 48 + doc.materials.length * 21 + (doc.materialsLayout === 'detailed' ? 22 : 0) });
   doc.groups.forEach((g) => {
     const gid = g.groupId ?? g.title;
-    out.push({ key: `g:${gid}`, cost: 1.2 });
+    out.push({ key: `g:${gid}`, cost: 34 });
     for (const s of g.steps ?? []) {
-      const len = (s.instruction?.length ?? 0) / 90;
-      out.push({ key: `s:${gid}:${s.stepId ?? s.title}`, cost: 1.7 + Math.ceil(len) * 0.35 + (s.params?.length ? 0.5 + s.params.length * 0.42 : 0) });
+      const lines = Math.max(1, Math.ceil((s.instruction?.length ?? 0) / 110));
+      out.push({ key: `s:${gid}:${s.stepId ?? s.title}`, cost: 44 + lines * 16 + (s.params?.length ? 24 + s.params.length * 21 : 0) + 26 });
     }
   });
   return out;
@@ -23,7 +24,7 @@ export function itemsOf(doc) {
 /**
  * @returns {string[][]} 쪽마다 항목 키 목록 (양쪽 공통)
  */
-export function planPages(left, right, pageCost = 22) {
+export function planPages(left, right, pageCost = 880) {
   const L = itemsOf(left), R = itemsOf(right);
   const lpos = new Map(L.map((x, i) => [x.key, i]));
   const rset = new Set(R.map((x) => x.key));

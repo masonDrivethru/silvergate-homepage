@@ -51,26 +51,43 @@ const matKey = (m: Material) => 'm:' + m.name;
 <template>
   <div class="mbr">
     <article v-for="(page, pi) in pages" :key="pi" class="mbr-page">
+      <!-- 쪽마다 반복되는 머리말 (비교에서 뺌) -->
+      <table class="mbr-run" data-sgc-ignore aria-hidden="true">
+        <tbody>
+          <tr>
+            <td class="mbr-run__org" rowspan="2">{{ t('cdemo.paper.company') }}</td>
+            <td class="mbr-run__title" rowspan="2"><b>{{ t('cdemo.paper.docTitle') }}</b><br>{{ doc.productName }}</td>
+            <td class="mbr-run__k">{{ t('cdemo.paper.docNo') }}</td><td class="mbr-run__v">{{ docNo }}</td>
+          </tr>
+          <tr><td class="mbr-run__k">{{ t('cdemo.paper.version') }}</td><td class="mbr-run__v">{{ doc.version }} · {{ t('cdemo.paper.pageOf', { n: pi + 1, total: pages.length }) }}</td></tr>
+        </tbody>
+      </table>
+
       <template v-for="[key, it] in page" :key="key">
-        <!-- 표지 머리말 (비교 대상) -->
-        <header v-if="it.kind === 'head'" class="mbr-head" data-sgc-key="head">
-          <div class="mbr-brand">
-            <span>{{ t('cdemo.paper.company') }}</span>
-            <b>{{ t('cdemo.paper.title') }}</b>
-            <span class="mbr-stamp" data-sgc-ignore :class="approved ? 'is-ok' : 'is-draft'">{{ t(approved ? 'cdemo.paper.approved' : 'cdemo.paper.review') }}</span>
-          </div>
-          <dl class="mbr-meta">
-            <div><dt>{{ t('cdemo.paper.product') }}</dt><dd>{{ doc.productName }}</dd></div>
-            <div><dt>{{ t('cdemo.paper.docNo') }}</dt><dd>{{ docNo }}</dd></div>
-            <div><dt>{{ t('cdemo.paper.version') }}</dt><dd>{{ doc.version }}</dd></div>
-            <div><dt>{{ t('cdemo.paper.effective') }}</dt><dd>{{ doc.effectiveDate }}</dd></div>
-          </dl>
-        </header>
+        <!-- 첫 쪽: 문서 정보 + 승인 (비교 대상) -->
+        <section v-if="it.kind === 'head'" class="mbr-cover" data-sgc-key="head">
+          <h2 class="mbr-doc-title">{{ t('cdemo.paper.docTitle') }} — {{ doc.productName }}</h2>
+          <table class="mbr-tbl mbr-info">
+            <tbody>
+              <tr><th>{{ t('cdemo.paper.docNo') }}</th><td>{{ docNo }}</td><th>{{ t('cdemo.paper.version') }}</th><td>{{ doc.version }}</td></tr>
+              <tr><th>{{ t('cdemo.paper.effective') }}</th><td>{{ doc.effectiveDate }}</td><th>{{ t('cdemo.paper.status') }}</th><td><span data-sgc-ignore>{{ approved ? t('cdemo.paper.statusEff') : t('cdemo.paper.review') }}</span></td></tr>
+              <tr v-if="doc.reason"><th>{{ t('cdemo.paper.reason') }}</th><td colspan="3">{{ doc.reason }}</td></tr>
+            </tbody>
+          </table>
+          <table v-if="doc.signatures" class="mbr-tbl mbr-sigs">
+            <thead><tr><th>{{ t('cdemo.paper.role') }}</th><th>{{ t('cdemo.paper.name') }}</th><th>{{ t('cdemo.paper.dept') }}</th><th>{{ t('cdemo.paper.signDate') }}</th></tr></thead>
+            <tbody>
+              <tr data-sgc-key="sig:prep"><td>{{ t('cdemo.paper.prepared') }}</td><td>{{ doc.signatures[0] }}</td><td>{{ t('cdemo.paper.deptProd') }}</td><td>{{ doc.signatures[1] }}</td></tr>
+              <tr data-sgc-key="sig:rev"><td>{{ t('cdemo.paper.reviewed') }}</td><td>{{ doc.signatures[2] }}</td><td>{{ t('cdemo.paper.deptQa') }}</td><td>{{ doc.signatures[3] }}</td></tr>
+              <tr data-sgc-key="sig:app"><td>{{ t('cdemo.paper.approvedBy') }}</td><td>{{ doc.signatures[4] }}</td><td>{{ t('cdemo.paper.deptQaHead') }}</td><td>{{ doc.signatures[5] }}</td></tr>
+            </tbody>
+          </table>
+        </section>
 
         <!-- 원자재 표: 단순(열 3개) 또는 상세(머리글 2단 · 단계별 묶음 · 공급사) -->
         <section v-else-if="it.kind === 'mat'" class="mbr-mat" data-sgc-key="mat">
           <h3 class="mbr-sec">{{ t('cdemo.paper.materials') }}</h3>
-          <table v-if="doc.materialsLayout === 'detailed'" class="mbr-params mbr-params--grid">
+          <table v-if="doc.materialsLayout === 'detailed'" class="mbr-tbl mbr-tbl--grid">
             <thead>
               <tr>
                 <th rowspan="2">{{ t('cdemo.paper.colPhase') }}</th>
@@ -83,12 +100,12 @@ const matKey = (m: Material) => 'm:' + m.name;
             </thead>
             <tbody>
               <tr v-for="r in matRows" :key="matKey(r.m)" :data-sgc-key="matKey(r.m)">
-                <td v-if="r.first" :rowspan="r.span" class="mbr-phase">{{ r.m.phase }}</td>
+                <td v-if="r.first" :rowspan="r.span">{{ r.m.phase }}</td>
                 <td>{{ r.m.name }}</td><td>{{ r.m.qty }}</td><td>{{ r.m.min }}</td><td>{{ r.m.max }}</td><td>{{ r.m.unit }}</td><td>{{ r.m.supplier }}</td>
               </tr>
             </tbody>
           </table>
-          <table v-else class="mbr-params">
+          <table v-else class="mbr-tbl">
             <thead><tr><th>{{ t('cdemo.paper.colMaterial') }}</th><th>{{ t('cdemo.paper.colQty') }}</th><th>{{ t('cdemo.paper.colUnit') }}</th></tr></thead>
             <tbody>
               <tr v-for="m in doc.materials" :key="matKey(m)" :data-sgc-key="matKey(m)"><td>{{ m.name }}</td><td>{{ m.qty }}</td><td>{{ m.unit }}</td></tr>
@@ -99,12 +116,9 @@ const matKey = (m: Material) => 'm:' + m.name;
         <h3 v-else-if="it.kind === 'group'" class="mbr-sec" :data-sgc-key="key">{{ it.no }}. {{ it.title }}</h3>
 
         <section v-else class="mbr-step" :data-sgc-key="key">
-          <div class="mbr-step__top">
-            <span class="mbr-no">{{ it.step.stepId }}</span>
-            <h4 class="mbr-title">{{ it.step.title }}</h4>
-          </div>
+          <h4 class="mbr-step__title"><span class="mbr-no">{{ it.step.stepId }}</span>{{ it.step.title }}</h4>
           <p v-if="it.step.instruction" class="mbr-ins">{{ it.step.instruction }}</p>
-          <table v-if="it.step.params?.length" class="mbr-params">
+          <table v-if="it.step.params?.length" class="mbr-tbl">
             <thead>
               <tr>
                 <th>{{ t('cdemo.paper.colStep') }}</th><th>{{ t('cdemo.paper.colTarget') }}</th><th>{{ t('cdemo.paper.colRange') }}</th>
@@ -121,9 +135,10 @@ const matKey = (m: Material) => 'm:' + m.name;
           <p class="mbr-sign" aria-hidden="true" data-sgc-ignore><span>{{ t('cdemo.paper.done') }}</span><span>{{ t('cdemo.paper.checked') }}</span></p>
         </section>
       </template>
+
       <footer class="mbr-foot" data-sgc-ignore>
-        <span>{{ t('cdemo.paper.sample') }}</span>
-        <span>{{ t('cdemo.paper.page', { n: pi + 1, total: pages.length }) }}</span>
+        <span>{{ t('cdemo.paper.confidential') }} · {{ t('cdemo.paper.controlled') }}</span>
+        <span>{{ docNo }} v{{ doc.version }} · {{ t('cdemo.paper.pageOf', { n: pi + 1, total: pages.length }) }}</span>
       </footer>
     </article>
   </div>

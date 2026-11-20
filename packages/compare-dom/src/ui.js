@@ -235,16 +235,16 @@ export function mountViewer(host, o) {
 const UI_CSS = `
 .sgc-viewer,.sgc-toolbar,.sgc-list{
   --sgc-bg:#ffffff;--sgc-bg2:#f6f7f9;--sgc-bd:#e3e6eb;--sgc-fg:#14171c;--sgc-mut:#667085;--sgc-acc:#2563eb;
-  --sgc-c-added:#16a34a;--sgc-c-modified:#ca8a04;--sgc-c-deleted:#dc2626;--sgc-c-moved:#6366f1;
+  --sgc-c-added:#1d4ed8;--sgc-c-modified:#b45309;--sgc-c-deleted:#b91c1c;--sgc-c-moved:#6d28d9;
   font:13px/1.5 Pretendard,"Pretendard Variable",-apple-system,BlinkMacSystemFont,"Segoe UI","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif;
   color:var(--sgc-fg);box-sizing:border-box}
 .sgc-viewer *,.sgc-toolbar *,.sgc-list *{box-sizing:border-box}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) :is(.sgc-viewer,.sgc-toolbar,.sgc-list){
   --sgc-bg:#15181d;--sgc-bg2:#1c2027;--sgc-bd:#2b313b;--sgc-fg:#e8ebf0;--sgc-mut:#9aa3b2;--sgc-acc:#60a5fa;
-  --sgc-c-added:#4ade80;--sgc-c-modified:#facc15;--sgc-c-deleted:#f87171;--sgc-c-moved:#a5b4fc}}
+  --sgc-c-added:#60a5fa;--sgc-c-modified:#fbbf24;--sgc-c-deleted:#f87171;--sgc-c-moved:#c4b5fd}}
 :root[data-theme="dark"] :is(.sgc-viewer,.sgc-toolbar,.sgc-list),:is(.sgc-viewer,.sgc-toolbar,.sgc-list).sgc-dark{
   --sgc-bg:#15181d;--sgc-bg2:#1c2027;--sgc-bd:#2b313b;--sgc-fg:#e8ebf0;--sgc-mut:#9aa3b2;--sgc-acc:#60a5fa;
-  --sgc-c-added:#4ade80;--sgc-c-modified:#facc15;--sgc-c-deleted:#f87171;--sgc-c-moved:#a5b4fc}
+  --sgc-c-added:#60a5fa;--sgc-c-modified:#fbbf24;--sgc-c-deleted:#f87171;--sgc-c-moved:#c4b5fd}
 .sgc-viewer{display:flex;flex-direction:column;height:var(--sgc-height,80vh);min-height:420px;background:var(--sgc-bg2);border:1px solid var(--sgc-bd);border-radius:12px;overflow:hidden}
 .sgc-body{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 300px}
 .sgc-panes{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--sgc-bd);min-height:0}
@@ -294,8 +294,8 @@ const UI_CSS = `
 .sgc-tag{font-size:11px;font-weight:700;padding:1px 7px;border-radius:5px;color:var(--c);background:color-mix(in srgb,var(--c) 13%,transparent)}
 .sgc-tag-added{--c:var(--sgc-c-added)}.sgc-tag-modified{--c:var(--sgc-c-modified)}.sgc-tag-deleted{--c:var(--sgc-c-deleted)}.sgc-tag-moved{--c:var(--sgc-c-moved)}
 .sgc-li-body{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:12.5px;line-height:1.5;overflow-wrap:anywhere;color:var(--sgc-fg)}
-.sgc-li-body del{background:color-mix(in srgb,var(--sgc-c-deleted) 18%,transparent);text-decoration-color:var(--sgc-c-deleted)}
-.sgc-li-body ins{background:color-mix(in srgb,var(--sgc-c-added) 20%,transparent);text-decoration:none;border-radius:2px}
+.sgc-li-body del{color:var(--sgc-c-deleted);background:none;text-decoration-thickness:1px}
+.sgc-li-body ins{color:var(--sgc-c-added);background:none;text-decoration:underline;text-decoration-thickness:1px}
 .sgc-li-ctx{color:var(--sgc-mut)}
 .sgc-li-attr{margin-left:6px;font-size:12px;color:var(--sgc-mut)}
 .sgc-empty{padding:24px 12px;text-align:center;color:var(--sgc-mut)}
