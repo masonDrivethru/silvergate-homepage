@@ -44,7 +44,7 @@ export class SideMarks {
   constructor(name) {
     this.name = name;              // 하이라이트 이름 앞부분 (컨트롤러마다 다름)
     this.attrs = [];               // [el, 속성 이름]
-    this.ranges = { ins: [], del: [], focus: [] };
+    this.ranges = { add: [], ins: [], del: [], focus: [] };
     this.wins = new Set();
   }
   attr(el, name, value) {
@@ -77,7 +77,7 @@ export class SideMarks {
   flush() {
     for (const win of this.wins) {
       if (!hasHighlightApi(win)) continue;
-      for (const kind of ['ins', 'del', 'focus']) {
+      for (const kind of ['add', 'ins', 'del', 'focus']) {
         const key = `${this.name}-${kind}`;
         const list = this.ranges[kind].filter((r) => r.startContainer.ownerDocument.defaultView === win);
         if (list.length) win.CSS.highlights.set(key, new win.Highlight(...list));
@@ -93,10 +93,10 @@ export class SideMarks {
   clear() {
     for (const [el, name] of this.attrs) el.removeAttribute(name);
     this.attrs = [];
-    this.ranges = { ins: [], del: [], focus: [] };
+    this.ranges = { add: [], ins: [], del: [], focus: [] };
     for (const win of this.wins) {
       if (!hasHighlightApi(win)) continue;
-      for (const kind of ['ins', 'del', 'focus']) win.CSS.highlights.delete(`${this.name}-${kind}`);
+      for (const kind of ['add', 'ins', 'del', 'focus']) win.CSS.highlights.delete(`${this.name}-${kind}`);
     }
   }
 }
@@ -120,9 +120,10 @@ export function ensureMarkStyle(doc, name) {
   }
 }
 
-/* 문서 관리에서 흔한 수정 표시(redline): 넣은 글자 = 파란 글씨 + 밑줄, 지운 글자 = 빨간 글씨 + 취소선.
-   색은 --sgc-ins-* / --sgc-del-* 변수로 바꿀 수 있다 */
+/* Git 처럼: 추가 = 초록, 수정(새로 들어간 글자) = 파랑 밑줄, 삭제 = 빨강 취소선.
+   색은 --sgc-add-* / --sgc-ins-* / --sgc-del-* 변수로 바꿀 수 있다 */
 const highlightCss = (n) => `
+::highlight(${n}-add){color:var(--sgc-add-fg,#15803d);background-color:var(--sgc-add-bg,rgba(22,163,74,.1))}
 ::highlight(${n}-ins){color:var(--sgc-ins-fg,#1d4ed8);background-color:var(--sgc-ins-bg,rgba(37,99,235,.08));text-decoration:underline;text-decoration-color:var(--sgc-ins-fg,#1d4ed8);text-decoration-thickness:1px}
 ::highlight(${n}-del){color:var(--sgc-del-fg,#b91c1c);background-color:var(--sgc-del-bg,rgba(220,38,38,.07));text-decoration:line-through;text-decoration-color:var(--sgc-del-fg,#b91c1c);text-decoration-thickness:1px}
 ::highlight(${n}-focus){background-color:var(--sgc-focus-bg,rgba(250,204,21,.35))}
@@ -134,7 +135,7 @@ const MARK_CSS = `
 [data-sgc-line="added"]{--sgc-line-color:var(--sgc-ins-line,rgba(22,163,74,.7))}
 [data-sgc-line="deleted"]{--sgc-line-color:var(--sgc-del-line,rgba(220,38,38,.7))}
 [data-sgc-line="modified"]{--sgc-line-color:var(--sgc-mod-line,rgba(202,138,4,.7))}
-[data-sgc="added"]{background-color:var(--sgc-add-block,rgba(37,99,235,.06))!important;color:var(--sgc-ins-fg,#1d4ed8)}
+[data-sgc="added"]{background-color:var(--sgc-add-block,rgba(22,163,74,.08))!important;color:var(--sgc-add-fg,#15803d)}
 [data-sgc="deleted"]{background-color:var(--sgc-del-block,rgba(220,38,38,.05))!important;color:var(--sgc-del-fg,#b91c1c);text-decoration:line-through;text-decoration-color:var(--sgc-del-fg,#b91c1c);text-decoration-thickness:1px}
 [data-sgc="modified"]{background-color:var(--sgc-mod-block,rgba(37,99,235,.06))!important}
 [data-sgc="moved"]{box-shadow:inset 3px 0 0 var(--sgc-mov-line,rgba(99,102,241,.7))!important}
@@ -146,6 +147,7 @@ const MARK_CSS = `
 @keyframes sgc-flash{0%{--sgc-flash:0}14%{--sgc-flash:1}36%{--sgc-flash:.2}56%{--sgc-flash:.85}100%{--sgc-flash:0}}
 @media (prefers-reduced-motion:reduce){[data-sgc-focus]{animation:sgc-flash-soft 1.6s ease-out 1 both}}
 @keyframes sgc-flash-soft{0%{--sgc-flash:.7}100%{--sgc-flash:0}}
+ins.sgc-add{background:var(--sgc-add-bg,rgba(22,163,74,.1));color:var(--sgc-add-fg,#15803d);text-decoration:none}
 ins.sgc-ins{background:var(--sgc-ins-bg,rgba(37,99,235,.08));color:var(--sgc-ins-fg,#1d4ed8);text-decoration:underline;text-decoration-thickness:1px}
 del.sgc-del{background:var(--sgc-del-bg,rgba(220,38,38,.07));color:var(--sgc-del-fg,#b91c1c);text-decoration:line-through;text-decoration-thickness:1px}
 .sgc-spacer{display:block;box-sizing:border-box;position:relative;margin:0;padding:0;list-style:none;background:repeating-linear-gradient(135deg,rgba(100,116,139,.09) 0 6px,transparent 6px 12px);border:1px dashed rgba(100,116,139,.4);border-radius:3px}

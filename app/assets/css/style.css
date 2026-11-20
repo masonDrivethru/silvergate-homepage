@@ -1239,10 +1239,10 @@ html[data-motion="calm"] main .section__title { background-position: 0 0; }
   --sgc-fg: var(--text);
   --sgc-mut: var(--text-2);
   --sgc-acc: var(--silver-hi);
-  --sgc-c-added: #60a5fa; --sgc-c-modified: #fbbf24; --sgc-c-deleted: #f87171; --sgc-c-moved: #c4b5fd;
+  --sgc-c-added: #4ade80; --sgc-c-modified: #60a5fa; --sgc-c-deleted: #f87171; --sgc-c-moved: #c4b5fd;
   font-family: inherit;
 }
-:root[data-theme="light"] .cmp-live.cmp-live :is(.sgc-viewer, .sgc-toolbar, .sgc-list) { --sgc-c-added: #1d4ed8; --sgc-c-modified: #b45309; --sgc-c-deleted: #b91c1c; --sgc-c-moved: #6d28d9; }
+:root[data-theme="light"] .cmp-live.cmp-live :is(.sgc-viewer, .sgc-toolbar, .sgc-list) { --sgc-c-added: #15803d; --sgc-c-modified: #1d4ed8; --sgc-c-deleted: #b91c1c; --sgc-c-moved: #6d28d9; }
 .cmp-live .cmp-viewer { margin-top: var(--s3); --sgc-height: min(82vh, 980px); border-radius: var(--r-md); box-shadow: var(--glass-shadow); }
 .cmp-desk { flex: 1; min-height: 0; overflow: auto; background: #525659; padding: 16px 0; }  /* PDF 뷰어처럼 짙은 회색 바탕 */
 .cmp-zoom { width: max-content; margin: 0 auto; }

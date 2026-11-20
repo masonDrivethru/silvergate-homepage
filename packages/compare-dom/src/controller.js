@@ -747,7 +747,7 @@ export function createCompare(options) {
       const n = ch[side];
       if (n) {
         if (n.nodeType === 3) {
-          marks[side].wholeText(n, t === 'added' ? 'ins' : 'del');
+          marks[side].wholeText(n, t === 'added' ? 'add' : 'del');
           if (!hasHighlightApi(n.ownerDocument.defaultView)) marks[side].attr(n.parentElement, 'data-sgc', t);
         } else {
           marks[side].attr(n, 'data-sgc', t);
@@ -947,7 +947,7 @@ export function createCompare(options) {
       } else if (ch.type === 'added' && ch.right) {
         const n = cs.nodes[idx.get(ch.right)];
         if (!n) continue;
-        if (n.nodeType === 3) { const e = doc.createElement('ins'); e.className = 'sgc-ins'; n.replaceWith(e); e.append(n); }
+        if (n.nodeType === 3) { const e = doc.createElement('ins'); e.className = 'sgc-add'; n.replaceWith(e); e.append(n); }
         else n.setAttribute('data-sgc', 'added');
       } else if (ch.type === 'deleted' && ch.left && ch.gap) {
         let n = doc.importNode(ch.left, true);
