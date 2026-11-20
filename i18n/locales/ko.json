@@ -101,7 +101,17 @@
       "sample": "샘플 문서 — 가상 제품",
       "page": "{n} / {total}쪽",
       "notInOld": "이 버전에는 없음",
-      "notInNew": "이 버전에서 삭제됨"
+      "notInNew": "이 버전에서 삭제됨",
+      "materials": "원자재",
+      "colMaterial": "원자재",
+      "colQty": "수량",
+      "colUnit": "단위",
+      "colPhase": "공정 단계",
+      "colMin": "하한",
+      "colMax": "상한",
+      "colSupplier": "공급사",
+      "colCpp": "CPP",
+      "yes": "예"
     },
     "entry": "직접 비교해 보기",
     "back": "홈으로",

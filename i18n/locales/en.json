@@ -138,7 +138,17 @@
       "sample": "Sample — fictional product",
       "page": "Page {n} of {total}",
       "notInOld": "Not in this version",
-      "notInNew": "Removed in this version"
+      "notInNew": "Removed in this version",
+      "materials": "Raw materials",
+      "colMaterial": "Material",
+      "colQty": "Quantity",
+      "colUnit": "Unit",
+      "colPhase": "Process phase",
+      "colMin": "Min",
+      "colMax": "Max",
+      "colSupplier": "Supplier",
+      "colCpp": "CPP",
+      "yes": "Yes"
     },
     "entry": "Try it yourself",
     "back": "Back to home",

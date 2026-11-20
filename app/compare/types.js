@@ -20,6 +20,19 @@
  * @property {string} value     설정값 (문자열로 보관: "36.5", "7.0 ± 0.2")
  * @property {string} [unit]
  * @property {Spec}   [spec]
+ * @property {boolean} [cpp]    핵심 공정 변수 (v2.0 샘플의 CPP 열)
+ */
+
+/**
+ * 원자재 한 줄 (샘플 표지 뒤 원자재 표)
+ * @typedef {Object} Material
+ * @property {string} phase  공정 단계
+ * @property {string} name
+ * @property {string} qty
+ * @property {string} [min]
+ * @property {string} [max]
+ * @property {string} unit
+ * @property {string} [supplier]
  */
 
 /**
@@ -44,6 +57,9 @@
  * @property {string} productName
  * @property {string} [effectiveDate]  YYYY-MM-DD
  * @property {Group[]} groups
+ * @property {Material[]} [materials]                    원자재 표 (샘플)
+ * @property {'simple' | 'detailed'} [materialsLayout]   표 모양: 단순(열 3개) / 상세(머리글 2단·단계별 묶음·공급사)
+ * @property {boolean} [paramCpp]                        파라미터 표에 CPP 열 표시
  */
 
 /** @typedef {"added" | "modified" | "deleted"} ChangeType */

@@ -2506,6 +2506,11 @@ var MARK_CSS = `
 @media (prefers-reduced-motion:reduce){[data-sgc-focus]{animation:none}}
 ins.sgc-ins{background:rgba(34,197,94,.26);text-decoration:none;color:inherit}
 del.sgc-del{background:rgba(239,68,68,.18);text-decoration:line-through;text-decoration-color:rgba(220,38,38,.8);text-decoration-thickness:1px;color:inherit}
+.sgc-spacer{display:block;box-sizing:border-box;position:relative;margin:0;padding:0;list-style:none;background:repeating-linear-gradient(135deg,rgba(100,116,139,.09) 0 6px,transparent 6px 12px);border:1px dashed rgba(100,116,139,.4);border-radius:3px}
+.sgc-spacer::after,.sgc-spacer>td::after{content:attr(data-label);position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:11px/1.2 system-ui,sans-serif;color:rgba(71,85,105,.8);pointer-events:none}
+tr.sgc-spacer{display:table-row;background:none;border:0}
+tr.sgc-spacer>td{position:relative;padding:0!important;background:repeating-linear-gradient(135deg,rgba(100,116,139,.09) 0 6px,transparent 6px 12px);border:1px dashed rgba(100,116,139,.4)}
+tr.sgc-spacer::after{content:none}
 [data-sgc-noscrollbar]{scrollbar-color:transparent transparent}
 [data-sgc-noscrollbar]::-webkit-scrollbar-thumb,[data-sgc-noscrollbar]::-webkit-scrollbar-track{background:transparent}
 @media print{[data-sgc-focus]{outline:none!important}}
@@ -2673,6 +2678,66 @@ function linkScroll(A, B, getAnchors) {
   };
 }
 
+// src/messages.js
+var messages = {
+  ko: {
+    added: "\uCD94\uAC00",
+    modified: "\uC218\uC815",
+    deleted: "\uC0AD\uC81C",
+    moved: "\uC774\uB3D9",
+    changes: "\uBCC0\uACBD \uBAA9\uB85D",
+    noChanges: "\uBC14\uB010 \uACF3 \uC5C6\uC74C",
+    running: "\uBE44\uAD50\uD558\uB294 \uC911\u2026",
+    empty: "(\uBE48 \uCE78)",
+    before: "\uC774\uC804",
+    after: "\uC0C8 \uBC84\uC804",
+    side: "\uB098\uB780\uD788",
+    redline: "\uD55C \uC7A5 \uBCF4\uAE30",
+    sync: "\uC2A4\uD06C\uB864 \uB9DE\uCDA4",
+    prev: "\uC774\uC804 \uBCC0\uACBD",
+    next: "\uB2E4\uC74C \uBCC0\uACBD",
+    filterHint: "\uB20C\uB7EC\uC11C \uC774 \uC885\uB958\uB9CC \uBCF4\uAE30",
+    gapAdded: "\uC0C8 \uBC84\uC804\uC5D0\uC11C \uCD94\uAC00\uB428",
+    gapDeleted: "\uC0C8 \uBC84\uC804\uC5D0\uC11C \uC0AD\uC81C\uB428",
+    column: (n) => `\uD45C \uC5F4 ${n}\uCE78`,
+    attrNames: { colspan: "\uAC00\uB85C \uBCD1\uD569(colspan)", rowspan: "\uC138\uB85C \uBCD1\uD569(rowspan)", value: "\uC785\uB825\uAC12", src: "\uADF8\uB9BC", href: "\uB9C1\uD06C" },
+    nodes: "\uC77D\uC740 \uC694\uC18C",
+    took: (s) => `\uBE44\uAD50 ${s}\uCD08`,
+    page: (p) => `${p}\uCABD`,
+    more: (n) => `${n.toLocaleString()}\uAC74 \uB354 \uBCF4\uAE30`
+  },
+  en: {
+    added: "Added",
+    modified: "Modified",
+    deleted: "Deleted",
+    moved: "Moved",
+    changes: "Changes",
+    noChanges: "No differences",
+    running: "Comparing\u2026",
+    empty: "(empty)",
+    before: "Before",
+    after: "After",
+    side: "Side by side",
+    redline: "Redline",
+    sync: "Sync scroll",
+    prev: "Previous change",
+    next: "Next change",
+    filterHint: "Show only this type",
+    gapAdded: "Added in the new version",
+    gapDeleted: "Removed in the new version",
+    column: (n) => `Table column (${n} cells)`,
+    attrNames: { colspan: "Merge (colspan)", rowspan: "Merge (rowspan)", value: "Input value", src: "Image", href: "Link" },
+    nodes: "Nodes",
+    took: (s) => `${s}s`,
+    page: (p) => `p.${p}`,
+    more: (n) => `Show ${n.toLocaleString()} more`
+  }
+};
+function getMessages(locale, overrides) {
+  const base = messages[locale] ?? messages[String(locale ?? "").slice(0, 2)] ?? messages.ko;
+  return overrides ? { ...base, ...overrides } : base;
+}
+
 // src/controller.js
 var seq = 0;
 var sharedWorker = null;
@@ -2727,6 +2792,8 @@ function createCompare(options) {
     debounce: 300,
     syncScroll: true,
     page: null,
+    align: true,
+    locale: "ko",
     ...options
   };
   const name = `sgc${++seq}`;
@@ -3031,6 +3098,275 @@ function createCompare(options) {
     }
     return colCache.get(cell) ?? cell.cellIndex;
   }
+  let spacers = [], padded = [];
+  function unalign() {
+    for (const io of lazyIO ?? []) io.disconnect();
+    for (const sp of spacers) sp.remove();
+    for (const [el, prop, old] of padded) el.style[prop] = old;
+    spacers = [];
+    padded = [];
+  }
+  const zoomOf = (el) => {
+    if (typeof el.currentCSSZoom === "number") return el.currentCSSZoom;
+    const h2 = el.offsetHeight;
+    return h2 ? el.getBoundingClientRect().height / h2 : 1;
+  };
+  let pageIdx = null;
+  const pageNo = (n, side) => {
+    if (!opt.page || !n) return -1;
+    const el = n.nodeType === 1 ? n : n.parentElement;
+    const pg = el?.closest(opt.page);
+    if (!pg) return -1;
+    if (!pageIdx) pageIdx = {};
+    if (!pageIdx[side]) pageIdx[side] = new Map(Array.from(root(side).querySelectorAll(opt.page), (p, i) => [p, i]));
+    return pageIdx[side].get(pg) ?? -1;
+  };
+  const px = (v) => parseFloat(v) || 0;
+  function layoutHeight(el) {
+    const cs = el.ownerDocument.defaultView.getComputedStyle(el);
+    const ch = parseFloat(cs.height);
+    if (!Number.isFinite(ch)) {
+      const z = zoomOf(el) || 1;
+      return el.getBoundingClientRect().height / z;
+    }
+    return cs.boxSizing === "border-box" ? ch : ch + px(cs.paddingTop) + px(cs.paddingBottom) + px(cs.borderTopWidth) + px(cs.borderBottomWidth);
+  }
+  function spaceOf(el) {
+    const z = zoomOf(el) || 1;
+    const r = el.getBoundingClientRect();
+    const win = el.ownerDocument.defaultView;
+    const cs = win.getComputedStyle(el);
+    const ps = el.parentElement ? win.getComputedStyle(el.parentElement) : null;
+    const h2 = layoutHeight(el);
+    if (ps && /flex|grid/.test(ps.display)) return h2 + px(cs.marginTop) + px(cs.marginBottom) + px(ps.rowGap);
+    let next = el.nextElementSibling;
+    while (next && (next.classList.contains("sgc-spacer") || next.hasAttribute("data-sgc-ignore"))) next = next.nextElementSibling;
+    if (next) {
+      const nr = next.getBoundingClientRect();
+      if (nr.top >= r.bottom - 1 && nr.top - r.top < r.height * 3 + 200) return (nr.top - r.top) / z;
+    }
+    return h2 + px(cs.marginTop) + px(cs.marginBottom);
+  }
+  function parentGap(el) {
+    const p = el.parentElement;
+    if (!p) return 0;
+    const cs = p.ownerDocument.defaultView.getComputedStyle(p);
+    return /flex|grid/.test(cs.display) ? px(cs.rowGap) : 0;
+  }
+  function makeSpacer(ref, end, height, label, afterNode = null, gapPx = null) {
+    const doc = ref.ownerDocument;
+    const parent = end ? ref : ref.parentNode;
+    const ctx = end ? ref : ref.parentElement;
+    const tag = ctx?.localName;
+    let sp;
+    if (ref.localName === "tr" || /^(tbody|thead|tfoot|table)$/.test(tag ?? "")) {
+      sp = doc.createElement("tr");
+      const td = doc.createElement("td");
+      td.colSpan = 1e3;
+      td.setAttribute("data-label", label);
+      sp.appendChild(td);
+      sp.style.height = height + "px";
+    } else {
+      sp = doc.createElement(tag === "ul" || tag === "ol" ? "li" : "div");
+      sp.setAttribute("data-label", label);
+      sp.style.height = Math.max(0, height - (gapPx ?? parentGap(end ? ref.lastElementChild ?? ref : ref))) + "px";
+    }
+    sp.className = "sgc-spacer";
+    sp.setAttribute("data-sgc-ignore", "");
+    sp.setAttribute("aria-hidden", "true");
+    if (afterNode) afterNode.parentNode.insertBefore(sp, afterNode.nextSibling);
+    else if (end) parent.appendChild(sp);
+    else parent.insertBefore(sp, ref);
+    spacers.push(sp);
+    return sp;
+  }
+  const unitOf = (n) => {
+    const el = n?.nodeType === 1 ? n : n?.parentElement;
+    if (!el) return null;
+    const tr = el.closest("tr");
+    return tr ?? blockOf(el);
+  };
+  function topUnit(n, side) {
+    const r = root(side);
+    let el = n?.nodeType === 1 ? n : n?.parentElement;
+    while (el && el.parentElement && el.parentElement !== r && !(opt.page && el.parentElement.matches(opt.page))) el = el.parentElement;
+    return el && el !== r ? el : null;
+  }
+  let lazyIO = [];
+  async function alignHeights(list, tick) {
+    unalign();
+    pageIdx = null;
+    for (const io of lazyIO) io.disconnect();
+    lazyIO = [];
+    if (!opt.page) return alignBatch(list, tick);
+    const groups = /* @__PURE__ */ new Map();
+    const add = (side, n, ch) => {
+      const k = pageNo(n, side);
+      if (k < 0) return;
+      const key = side + ":" + k;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(ch);
+    };
+    for (const ch of list) {
+      add("left", ch.left, ch);
+      add("right", ch.right, ch);
+      if (ch.gap) {
+        add(ch.gap.side, ch.gap.node, ch);
+        add(ch.gap.side, ch.gap.prev, ch);
+      }
+      for (const x of ch.extra ?? []) add(ch.type === "added" ? "right" : "left", x.node, ch);
+      for (const n of ch.alsoLeft ?? []) add("left", n, ch);
+    }
+    const done = /* @__PURE__ */ new Set(), queue = /* @__PURE__ */ new Set();
+    let draining = false;
+    const drain = async () => {
+      if (draining) return;
+      draining = true;
+      try {
+        while (queue.size) {
+          const batch = [];
+          for (const key of queue) for (const ch of groups.get(key) ?? []) if (!done.has(ch)) {
+            done.add(ch);
+            batch.push(ch);
+          }
+          queue.clear();
+          if (batch.length) await alignBatch(batch, async () => !destroyed);
+        }
+      } finally {
+        draining = false;
+      }
+    };
+    for (const side of ["left", "right"]) {
+      const r = root(side);
+      const win = r.ownerDocument.defaultView;
+      if (!win.IntersectionObserver) return alignBatch(list, tick);
+      const sc = side === "left" ? opt.leftScroller : opt.rightScroller;
+      const scEl = sc ?? makeScroller(r).target;
+      const pages = Array.from(r.querySelectorAll(opt.page));
+      const idx = new Map(pages.map((p, i) => [p, i]));
+      const io = new win.IntersectionObserver((entries) => {
+        for (const e of entries) if (e.isIntersecting) queue.add(side + ":" + idx.get(e.target));
+        drain();
+      }, { root: scEl && scEl.nodeType === 1 ? scEl : null, rootMargin: "150% 0px 150% 0px" });
+      for (const p of pages) if (groups.has(side + ":" + idx.get(p))) io.observe(p);
+      lazyIO.push(io);
+    }
+  }
+  async function alignBatch(list, tick) {
+    const msg = getMessages(opt.locale);
+    const el = (x) => x ? x.nodeType === 1 ? x : x.parentElement : null;
+    const plans = [];
+    for (const ch of list) {
+      const exp = ch.extra ? [ch, ...ch.extra.map((x) => ({ ...ch, [ch.type === "added" ? "right" : "left"]: x.node, gap: x.gap }))] : [ch];
+      for (const c of exp) {
+        if (c.type !== "added" && c.type !== "deleted") continue;
+        const n = c.type === "added" ? c.right : c.left;
+        if (n?.nodeType !== 1 || /^(td|th)$/.test(n.localName) || !c.gap?.node) continue;
+        if (!await tick()) return;
+        const gside = c.gap.side, oside = gside === "left" ? "right" : "left";
+        let ref = el(c.gap.node), end = c.gap.end, after = null;
+        const want = pageNo(n, oside);
+        const prev = el(c.gap.prev);
+        if (want >= 0) {
+          if (prev && pageNo(prev, gside) === want && (end || pageNo(ref, gside) !== want)) after = prev;
+          else if (end && prev) after = prev;
+        } else if (end && prev) after = prev;
+        if (!ref && !after) continue;
+        const h2 = spaceOf(n);
+        if (h2 < 1) continue;
+        plans.push({ c, ref, end, after, h: h2, label: c.type === "added" ? msg.gapAdded : msg.gapDeleted, gap: parentGap(after ?? (end ? ref.lastElementChild ?? ref : ref)) });
+      }
+    }
+    for (const pl of plans) {
+      const { c, ref, end, after, h: h2, label } = pl;
+      if (after) {
+        const nxt = after.nextSibling;
+        c.spacer = nxt ? makeSpacer(nxt.nodeType === 1 ? nxt : after.parentElement, !nxt || nxt.nodeType !== 1, h2, label, after, pl.gap) : makeSpacer(after.parentElement, true, h2, label, null, pl.gap);
+      } else c.spacer = makeSpacer(ref, end, h2, label, null, pl.gap);
+    }
+    const pairs = [];
+    for (const ch of list) {
+      if (ch.type === "added" || ch.type === "deleted" || !ch.left || !ch.right) continue;
+      pairs.push([unitOf(ch.left), unitOf(ch.right)]);
+      for (const n of ch.alsoLeft ?? []) pairs.push([unitOf(n), unitOf(ch.right)]);
+    }
+    const fixes = [];
+    for (const [a, b] of pairs) {
+      if (!await tick()) return;
+      const f = measurePair(a, b);
+      if (f) fixes.push(f);
+    }
+    applyFixes(fixes);
+    const seen = /* @__PURE__ */ new Set(), tops = [];
+    for (const ch of list) {
+      if (!ch.left || !ch.right) continue;
+      const a = topUnit(ch.left, "left"), b = topUnit(ch.right, "right");
+      if (!a || !b || seen.has(a)) continue;
+      seen.add(a);
+      tops.push([a, b]);
+    }
+    const fixes2 = [];
+    for (const [a, b] of tops) {
+      if (!await tick()) return;
+      const f = measurePair(a, b);
+      if (f) fixes2.push(f);
+    }
+    applyFixes(fixes2);
+  }
+  function measurePair(a, b) {
+    if (!a || !b || a === b || !a.isConnected || !b.isConnected) return null;
+    const ha = layoutHeight(a), hb = layoutHeight(b);
+    if (Math.abs(ha - hb) < 0.5) return null;
+    const lo = ha < hb ? a : b, diff = Math.abs(ha - hb);
+    if (lo.localName === "tr") return { el: lo, prop: "height", value: Math.max(ha, hb) + "px" };
+    const cs = lo.ownerDocument.defaultView.getComputedStyle(lo);
+    return { el: lo, prop: "paddingBottom", value: px(cs.paddingBottom) + diff + "px" };
+  }
+  function applyFixes(fixes) {
+    for (const { el, prop, value } of fixes) {
+      padded.push([el, prop, el.style[prop]]);
+      el.style[prop] = value;
+    }
+  }
+  let realignTimer = 0, realignSetup = false;
+  function scheduleRealign() {
+    clearTimeout(realignTimer);
+    realignTimer = setTimeout(() => {
+      if (destroyed || state.running || opt.align === false || !state.changes.length) return;
+      alignHeights(state.changes, async () => true);
+    }, 120);
+  }
+  function setupRealign() {
+    if (realignSetup) return;
+    realignSetup = true;
+    const docs = /* @__PURE__ */ new Set([root("left").ownerDocument, root("right").ownerDocument]);
+    for (const d of docs) {
+      d.fonts?.addEventListener?.("loadingdone", scheduleRealign);
+      d.fonts?.ready?.then(scheduleRealign);
+    }
+    const RO = root("left").ownerDocument.defaultView.ResizeObserver;
+    if (RO) {
+      let widths = /* @__PURE__ */ new Map();
+      const ro = new RO((entries) => {
+        let changed = false;
+        for (const e of entries) {
+          const w = Math.round(e.contentRect.width);
+          if (widths.get(e.target) !== w) {
+            widths.set(e.target, w);
+            changed = true;
+          }
+        }
+        if (changed) scheduleRealign();
+      });
+      ro.observe(root("left"));
+      ro.observe(root("right"));
+      observers.push(() => ro.disconnect());
+    }
+    observers.push(() => {
+      for (const d of docs) d.fonts?.removeEventListener?.("loadingdone", scheduleRealign);
+      clearTimeout(realignTimer);
+    });
+  }
   async function apply(out, id) {
     const tick = slicer(id);
     const list = [];
@@ -3064,8 +3400,9 @@ function createCompare(options) {
         const kids = p.obj?.c;
         if (kids) {
           const ref = kids[c.at.gap.index];
+          const prev = kids[c.at.gap.index - 1];
           const refNode = ref ? snaps[gside].nodes[ref.i] : p.node;
-          ch.gap = { side: gside, node: refNode, end: !ref };
+          ch.gap = { side: gside, node: refNode, end: !ref, prev: prev ? snaps[gside].nodes[prev.i] : null };
         }
       }
       if (ch.what === "attr" || ch.what === "moved") {
@@ -3086,6 +3423,10 @@ function createCompare(options) {
     for (const ch of final) paint(ch);
     marks.left.flush();
     marks.right.flush();
+    if (opt.align !== false) {
+      await alignHeights(final, tick);
+      setupRealign();
+    }
     state.changes = final;
     state.stats = { added: 0, modified: 0, deleted: 0, moved: 0 };
     for (const ch of final) state.stats[ch.type]++;
@@ -3221,7 +3562,7 @@ function createCompare(options) {
     focused.length = 0;
     for (const side of ["left", "right"]) {
       let el = elOf(ch[side]);
-      if (!el && ch.gap?.side === side) el = elOf(ch.gap.node);
+      if (!el && ch.gap?.side === side) el = ch.spacer ?? elOf(ch.gap.node);
       if (!el) continue;
       const block = ch.what === "text" ? blockOf(ch[side]) ?? el : el;
       scrollIntoScroller(scrollers[side], block, 0.3, smooth);
@@ -3260,7 +3601,11 @@ function createCompare(options) {
     };
     for (const side of ["left", "right"]) {
       const r = root(side);
-      const mo = new r.ownerDocument.defaultView.MutationObserver(kick);
+      const isOurs = (n) => n.nodeType === 1 && n.classList?.contains("sgc-spacer");
+      const mo = new r.ownerDocument.defaultView.MutationObserver((recs) => {
+        const real = recs.some((m) => m.type !== "childList" ? !(m.target.nodeType === 1 ? m.target : m.target.parentElement)?.closest?.(".sgc-spacer") : [...m.addedNodes, ...m.removedNodes].some((n) => !isOurs(n)));
+        if (real) kick();
+      });
       mo.observe(r, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: [...opt.attrs, "data-sgc-key", "data-key", "hidden", "data-sgc-ignore"] });
       r.addEventListener("input", kick, true);
       r.addEventListener("change", kick, true);
@@ -3281,6 +3626,10 @@ function createCompare(options) {
     const doc = target.ownerDocument;
     ensureMarkStyle(doc, name + "x");
     const clone = doc.importNode(R, true);
+    for (const sp of clone.querySelectorAll(".sgc-spacer")) sp.remove();
+    for (const el of clone.querySelectorAll("[style]")) {
+      if (padded.some(([p]) => p === el)) el.removeAttribute("style");
+    }
     const cs = snapshot(clone, { attrs: opt.attrs, ignore: opt.ignore, anchors: "", keyAttrs: opt.keyAttrs, flatten: opt.flatten ?? opt.page });
     if (cs.nodes.length !== snaps.right.nodes.length) console.warn("[sg-compare] \uD55C \uC7A5 \uBCF4\uAE30: \uBCF5\uC0AC\uBCF8 \uAD6C\uC870\uAC00 \uB2EC\uB77C \uC77C\uBD80 \uD45C\uC2DC\uAC00 \uC5B4\uAE0B\uB0A0 \uC218 \uC788\uC2B5\uB2C8\uB2E4");
     const inserts = [];
@@ -3403,6 +3752,7 @@ function createCompare(options) {
       if (l) l.splice(l.indexOf(f) >>> 0, 1);
     },
     clear() {
+      unalign();
       marks.left.clear();
       marks.right.clear();
       state.changes = [];
@@ -3415,6 +3765,7 @@ function createCompare(options) {
       clearTimeout(focusTimer);
       unwatch();
       link?.destroy();
+      unalign();
       try {
         const sc = scrollers.left;
         (sc?.target.nodeType === 1 ? sc.target : sc?.doc.documentElement)?.removeAttribute("data-sgc-noscrollbar");
@@ -3448,62 +3799,6 @@ function trimDiffs(diffs, ctx = 28) {
     if (k === diffs.length - 1) return [0, t.length > ctx ? t.slice(0, ctx) + "\u2026" : t];
     return [0, t.length > ctx * 2 ? t.slice(0, ctx) + " \u2026 " + t.slice(-ctx) : t];
   });
-}
-
-// src/messages.js
-var messages = {
-  ko: {
-    added: "\uCD94\uAC00",
-    modified: "\uC218\uC815",
-    deleted: "\uC0AD\uC81C",
-    moved: "\uC774\uB3D9",
-    changes: "\uBCC0\uACBD \uBAA9\uB85D",
-    noChanges: "\uBC14\uB010 \uACF3 \uC5C6\uC74C",
-    running: "\uBE44\uAD50\uD558\uB294 \uC911\u2026",
-    empty: "(\uBE48 \uCE78)",
-    before: "\uC774\uC804",
-    after: "\uC0C8 \uBC84\uC804",
-    side: "\uB098\uB780\uD788",
-    redline: "\uD55C \uC7A5 \uBCF4\uAE30",
-    sync: "\uC2A4\uD06C\uB864 \uB9DE\uCDA4",
-    prev: "\uC774\uC804 \uBCC0\uACBD",
-    next: "\uB2E4\uC74C \uBCC0\uACBD",
-    filterHint: "\uB20C\uB7EC\uC11C \uC774 \uC885\uB958\uB9CC \uBCF4\uAE30",
-    column: (n) => `\uD45C \uC5F4 ${n}\uCE78`,
-    attrNames: { colspan: "\uAC00\uB85C \uBCD1\uD569(colspan)", rowspan: "\uC138\uB85C \uBCD1\uD569(rowspan)", value: "\uC785\uB825\uAC12", src: "\uADF8\uB9BC", href: "\uB9C1\uD06C" },
-    nodes: "\uC77D\uC740 \uC694\uC18C",
-    took: (s) => `\uBE44\uAD50 ${s}\uCD08`,
-    page: (p) => `${p}\uCABD`,
-    more: (n) => `${n.toLocaleString()}\uAC74 \uB354 \uBCF4\uAE30`
-  },
-  en: {
-    added: "Added",
-    modified: "Modified",
-    deleted: "Deleted",
-    moved: "Moved",
-    changes: "Changes",
-    noChanges: "No differences",
-    running: "Comparing\u2026",
-    empty: "(empty)",
-    before: "Before",
-    after: "After",
-    side: "Side by side",
-    redline: "Redline",
-    sync: "Sync scroll",
-    prev: "Previous change",
-    next: "Next change",
-    filterHint: "Show only this type",
-    column: (n) => `Table column (${n} cells)`,
-    attrNames: { colspan: "Merge (colspan)", rowspan: "Merge (rowspan)", value: "Input value", src: "Image", href: "Link" },
-    nodes: "Nodes",
-    took: (s) => `${s}s`,
-    page: (p) => `p.${p}`,
-    more: (n) => `Show ${n.toLocaleString()} more`
-  }
-};
-function getMessages(locale, overrides) {
-  const base = messages[locale] ?? messages[String(locale ?? "").slice(0, 2)] ?? messages.ko;
-  return overrides ? { ...base, ...overrides } : base;
 }
 
 // src/ui.js

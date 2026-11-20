@@ -58,7 +58,22 @@ ID가 없어도 동작합니다: 똑같은 덩어리를 기준점으로 잡고, 
 
 비교에서 빼고 싶은 곳(인쇄 시각, 조회한 사람 등)에는 `data-sgc-ignore` 를 달거나 `ignore: '.print-time'` 옵션을 씁니다.
 
-## 4. 어려운 경우는 이렇게 표시합니다
+## 4. 좌우 높이 맞추기 (`align`, 기본 켜짐)
+
+비교는 같은 내용이 같은 높이에 있어야 의미가 있습니다. 바뀌지 않은 덩어리는 내용이 같으니 높이도 같으므로, **바뀐 곳만** 맞춥니다.
+
+| 경우 | 맞추는 방법 |
+| --- | --- |
+| 한쪽에만 추가 / 한쪽에서 삭제 | 반대쪽 같은 자리(쪽 문서면 같은 쪽)에 같은 높이의 빗금 빈 칸 ("새 버전에서 추가됨/삭제됨") |
+| 수정으로 줄 수가 달라짐 | 짧은 쪽 아래 여백을 늘려 같은 높이 (표 줄은 줄 높이) |
+| 글꼴이 늦게 내려오거나 칸 폭이 바뀜 | 높이만 다시 맞춤 (다시 비교하지 않음) |
+
+- 빈 칸은 `data-sgc-ignore` 라 비교에서 빠지고, 다시 비교할 때 지웠다가 새로 넣습니다. 모듈이 넣은 빈 칸 때문에 다시 비교가 반복되지 않습니다.
+- **쪽 문서(`page`)는 화면에 보이는 쪽과 앞뒤 몇 장만 맞추고, 스크롤로 다가오는 쪽을 그때 맞춥니다.** 3,000쪽에서도 비교 전체 약 3초, 화면 멈춤 0ms (전부 한 번에 맞추면 50초 이상).
+- 쪽 문서는 두 버전이 **같은 쪽 나누기**를 쓰게 그리는 것이 좋습니다 (같은 쪽 번호에 같은 항목). 홈페이지 `/compare` 는 `app/compare/plan.js` 로 두 버전의 항목을 합쳐 쪽을 나눕니다.
+- `page` 를 주면 쪽 요소는 비교에서 없는 것처럼 건너뜁니다(`flatten`). 쪽 경계가 버전마다 달라도 내용끼리 비교됩니다.
+
+## 5. 어려운 경우는 이렇게 표시합니다
 
 | 경우 | 표시 |
 | --- | --- |
@@ -73,7 +88,7 @@ ID가 없어도 동작합니다: 똑같은 덩어리를 기준점으로 잡고, 
 
 **스크롤바:** 스크롤 맞춤이 켜져 있으면 오른쪽 스크롤바 하나만 보입니다 (왼쪽은 숨김, 휠·터치는 그대로 됨). 맞춤을 끄면 양쪽 다 보입니다. 늘 양쪽 다 보이게 하려면 `scrollbars: 'both'`.
 
-## 5. 속도: 수천 쪽에서도 가볍게
+## 6. 속도: 수천 쪽에서도 가볍게
 
 | 무엇이 | 어떻게 가볍게 |
 | --- | --- |
@@ -96,17 +111,17 @@ ID가 없어도 동작합니다: 똑같은 덩어리를 기준점으로 잡고, 
 
 측정 페이지: `demo/bench.html?pages=3000&cv=1` (저장소에서 `npx serve packages/compare-dom` 후 열기).
 
-## 6. 옵션 요약
+## 7. 옵션 요약
 
-`left`, `right`, `leftScroller`, `rightScroller`, `page`, `attrs`(비교할 속성, 기본 src·href·alt·colspan·rowspan·type + 입력칸 값), `ignore`, `keyAttrs`, `worker`('auto'), `watch`, `debounce`, `syncScroll`, `scrollbars`('one' | 'both'), `auto`. 자세한 타입은 `src/index.d.ts`.
+`left`, `right`, `leftScroller`, `rightScroller`, `page`, `attrs`(비교할 속성, 기본 src·href·alt·colspan·rowspan·type + 입력칸 값), `ignore`, `keyAttrs`, `worker`('auto'), `watch`, `debounce`, `syncScroll`, `scrollbars`('one' | 'both'), `align`(true), `flatten`(= page), `locale`('ko' | 'en', 빈 칸 문구), `auto`. 자세한 타입은 `src/index.d.ts`.
 
 색은 CSS 변수로 바꿀 수 있습니다: `--sgc-ins-bg`, `--sgc-del-bg`, `--sgc-ins-line`, `--sgc-del-line`, `--sgc-mod-line`, `--sgc-focus` 등.
 
-## 7. 브라우저
+## 8. 브라우저
 
 Chrome·Edge 105+, Safari 17.2+, Firefox 140+ 에서 글자 단위 표시까지 됩니다. 그보다 오래된 브라우저에서는 글자 대신 바뀐 문단 전체에 색이 들어갑니다.
 
-## 8. 개발
+## 9. 개발
 
 ```
 npm test            # 엔진 단위 테스트 (packages/compare-core)

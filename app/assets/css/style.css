@@ -1268,4 +1268,8 @@ html[data-motion="calm"] main .section__title { background-position: 0 0; }
 .mbr-params td { font-variant-numeric: tabular-nums; }
 .mbr-sign { margin: 0; display: flex; gap: 24px; font-size: 11px; color: var(--ink-2); }
 .mbr-sign span { flex: 1; border-top: 1px dashed var(--rule); padding-top: 4px; }
+.mbr-mat { display: grid; gap: 8px; }
+.mbr-mat .mbr-sec { margin-top: 0; }
+.mbr-params--grid th, .mbr-params--grid td { text-align: center; }
+.mbr-phase { font-weight: 600; background: #fafbfc; }
 .mbr-foot { margin-top: auto; display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-2); border-top: 1px solid var(--rule); padding-top: 8px; }

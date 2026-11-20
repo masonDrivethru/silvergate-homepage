@@ -3,7 +3,8 @@
 // 화면 비교 모듈(@silvergate/compare-dom)이 그려진 화면끼리 비교해 원본 위에 색을 입힌다.
 // 예전 화면(CompareDemo + app/compare 엔진)은 그대로 남겨 둠
 import type { MbrDocument } from '~/compare/types.js';
-import { getSamples } from '~/compare/sample-data.js';
+import { getAllSamples } from '~/compare/sample-more.js';
+import { planPages } from '~/compare/plan.js';
 
 defineProps<{ page?: boolean }>();
 const { locale } = useI18n();
@@ -20,13 +21,15 @@ async function loadLarge() {
 }
 watch([sample, locale], () => { if (sample.value === 'large') loadLarge(); });
 
-const docs = computed(() => (sample.value === 'large' && largeDocs.value) || getSamples(locale.value));
+const docs = computed(() => (sample.value === 'large' && largeDocs.value) || getAllSamples(locale.value));
 const versions = computed(() => Object.keys(docs.value));
 const leftVer = ref('1.0');
 const rightVer = ref('1.1');
 watch(versions, (v) => { leftVer.value = v[0]!; rightVer.value = v[1] ?? v[0]!; });
 const left = computed(() => docs.value[leftVer.value] ?? docs.value[versions.value[0]!]!);
 const right = computed(() => docs.value[rightVer.value] ?? docs.value[versions.value[1] ?? versions.value[0]!]!);
+/** 두 버전이 같은 쪽 나누기를 쓰게 (좌우 쪽마다 같은 항목 → 빈 칸과 함께 높이가 늘 맞음) */
+const plan = computed(() => planPages(left.value, right.value));
 function swap() { [leftVer.value, rightVer.value] = [rightVer.value, leftVer.value]; }
 
 // ---------- 화면 비교 모듈 연결 (브라우저에서만) ----------
@@ -42,7 +45,7 @@ onMounted(async () => {
   const lang = locale.value === 'ko' ? 'ko' : 'en';
   const ctrl = createCompare({
     left: lDoc.value!, right: rDoc.value!, leftScroller: lScroll.value, rightScroller: rScroll.value,
-    page: '.mbr-page', watch: true,
+    page: '.mbr-page', watch: true, locale: lang,
   });
   let dirty = true;
   const drawRedline = () => { if (xDoc.value) { ctrl.renderRedline(xDoc.value); dirty = false; } };
@@ -97,13 +100,13 @@ onBeforeUnmount(() => cleanup?.());
             <section class="sgc-pane" :hidden="mode === 'redline'">
               <header class="sgc-pane-head"><span class="sgc-badge sgc-badge-old">{{ $t('cdemo.old') }}</span>v{{ left.version }}</header>
               <div ref="lScroll" class="cmp-desk" tabindex="0" :aria-label="`v${left.version}`">
-                <div ref="lDoc" class="cmp-zoom" :style="{ zoom }"><CompareMbrSheets :doc="left" approved /></div>
+                <div ref="lDoc" class="cmp-zoom" :style="{ zoom }"><CompareMbrSheets :doc="left" :plan="plan" approved /></div>
               </div>
             </section>
             <section class="sgc-pane" :hidden="mode === 'redline'">
               <header class="sgc-pane-head"><span class="sgc-badge sgc-badge-new">{{ $t('cdemo.new') }}</span>v{{ right.version }}</header>
               <div ref="rScroll" class="cmp-desk" tabindex="0" :aria-label="`v${right.version}`">
-                <div ref="rDoc" class="cmp-zoom" :style="{ zoom }"><CompareMbrSheets :doc="right" /></div>
+                <div ref="rDoc" class="cmp-zoom" :style="{ zoom }"><CompareMbrSheets :doc="right" :plan="plan" /></div>
               </div>
             </section>
             <section class="sgc-pane" :hidden="mode !== 'redline'">

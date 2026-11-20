@@ -144,6 +144,11 @@ const MARK_CSS = `
 @media (prefers-reduced-motion:reduce){[data-sgc-focus]{animation:none}}
 ins.sgc-ins{background:rgba(34,197,94,.26);text-decoration:none;color:inherit}
 del.sgc-del{background:rgba(239,68,68,.18);text-decoration:line-through;text-decoration-color:rgba(220,38,38,.8);text-decoration-thickness:1px;color:inherit}
+.sgc-spacer{display:block;box-sizing:border-box;position:relative;margin:0;padding:0;list-style:none;background:repeating-linear-gradient(135deg,rgba(100,116,139,.09) 0 6px,transparent 6px 12px);border:1px dashed rgba(100,116,139,.4);border-radius:3px}
+.sgc-spacer::after,.sgc-spacer>td::after{content:attr(data-label);position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:11px/1.2 system-ui,sans-serif;color:rgba(71,85,105,.8);pointer-events:none}
+tr.sgc-spacer{display:table-row;background:none;border:0}
+tr.sgc-spacer>td{position:relative;padding:0!important;background:repeating-linear-gradient(135deg,rgba(100,116,139,.09) 0 6px,transparent 6px 12px);border:1px dashed rgba(100,116,139,.4)}
+tr.sgc-spacer::after{content:none}
 [data-sgc-noscrollbar]{scrollbar-color:transparent transparent}
 [data-sgc-noscrollbar]::-webkit-scrollbar-thumb,[data-sgc-noscrollbar]::-webkit-scrollbar-track{background:transparent}
 @media print{[data-sgc-focus]{outline:none!important}}

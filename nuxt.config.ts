@@ -9,6 +9,8 @@ const PAGES = ['/', '/compare'];   // 홈 + Compare 직접 해 보기 (홈만 �
 export default defineNuxtConfig({
   compatibilityDate: '2026-11-01',
   devtools: { enabled: false },
+  // 운영 사이트에 원본 소스가 나가지 않게: 소스맵 만들지 않음 (코드는 압축·이름 줄임, 주석 제거)
+  sourcemap: { client: false, server: false },
   modules: ['@nuxtjs/i18n'],
   css: ['~/assets/css/style.css'],
 

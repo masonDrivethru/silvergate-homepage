@@ -7,6 +7,7 @@ import { diffTrees } from './engine.js';
 import { spawnWorker } from './spawn.js';
 import { SideMarks, ensureMarkStyle, sideSpans, blockOf, hasHighlightApi } from './marks.js';
 import { makeScroller, scrollIntoScroller, linkScroll } from './scroll.js';
+import { getMessages } from './messages.js';
 
 let seq = 0;
 let sharedWorker = null, workerBroken = false, jobSeq = 0;
@@ -63,7 +64,7 @@ async function runJob(sl, sr, extra, useWorker) {
  */
 export function createCompare(options) {
   const opt = {
-    attrs: DEFAULT_ATTRS, worker: 'auto', watch: false, debounce: 300, syncScroll: true, page: null,
+    attrs: DEFAULT_ATTRS, worker: 'auto', watch: false, debounce: 300, syncScroll: true, page: null, align: true, locale: 'ko',
     ...options,
   };
   const name = `sgc${++seq}`;
@@ -360,6 +361,266 @@ export function createCompare(options) {
     return colCache.get(cell) ?? cell.cellIndex;
   }
 
+  // ---------- 좌우 높이 맞추기 ----------
+  // 바뀌지 않은 덩어리는 내용이 같으니 높이도 같다. 그래서 바뀐 곳만 맞추면 전체가 늘 나란히 간다.
+  //  - 한쪽에만 있는 덩어리(추가·삭제): 반대쪽 같은 자리에 같은 높이의 빈 칸(빗금)
+  //  - 양쪽 다 있는데 높이가 다른 덩어리(수정): 짧은 쪽 아래 여백을 늘림
+  // 원본 구조는 그대로: 빈 칸은 data-sgc-ignore 로 비교에서 빠지고, 다시 비교할 때 지웠다가 새로 넣는다
+  let spacers = [], padded = [];
+  function unalign() {
+    for (const io of lazyIO ?? []) io.disconnect();
+    for (const sp of spacers) sp.remove();
+    for (const [el, prop, old] of padded) el.style[prop] = old;
+    spacers = []; padded = [];
+  }
+  const zoomOf = (el) => {
+    if (typeof el.currentCSSZoom === 'number') return el.currentCSSZoom;
+    const h = el.offsetHeight; return h ? el.getBoundingClientRect().height / h : 1;
+  };
+  /** 쪽 번호 (opt.page 가 있을 때) */
+  let pageIdx = null;   // { left: Map(쪽 요소 → 번호), right: ... } 높이 맞추기 한 번에 한 번만 만든다
+  const pageNo = (n, side) => {
+    if (!opt.page || !n) return -1;
+    const el = n.nodeType === 1 ? n : n.parentElement;
+    const pg = el?.closest(opt.page);
+    if (!pg) return -1;
+    if (!pageIdx) pageIdx = {};
+    if (!pageIdx[side]) pageIdx[side] = new Map(Array.from(root(side).querySelectorAll(opt.page), (p, i) => [p, i]));
+    return pageIdx[side].get(pg) ?? -1;
+  };
+  const px = (v) => parseFloat(v) || 0;
+  /** 덩어리가 차지하는 세로 공간 (자기 높이 + 위아래 여백 + flex/grid 간격), 줌 없는 px */
+  /** 배율(zoom)과 상관없는 실제 높이: 계산된 높이 + (content-box 면) 안쪽 여백·테두리 */
+  function layoutHeight(el) {
+    const cs = el.ownerDocument.defaultView.getComputedStyle(el);
+    const ch = parseFloat(cs.height);
+    if (!Number.isFinite(ch)) { const z = zoomOf(el) || 1; return el.getBoundingClientRect().height / z; }
+    return cs.boxSizing === 'border-box' ? ch : ch + px(cs.paddingTop) + px(cs.paddingBottom) + px(cs.borderTopWidth) + px(cs.borderBottomWidth);
+  }
+  function spaceOf(el) {
+    const z = zoomOf(el) || 1;
+    const r = el.getBoundingClientRect();
+    const win = el.ownerDocument.defaultView;
+    const cs = win.getComputedStyle(el);
+    const ps = el.parentElement ? win.getComputedStyle(el.parentElement) : null;
+    const h = layoutHeight(el);
+    if (ps && /flex|grid/.test(ps.display)) return h + px(cs.marginTop) + px(cs.marginBottom) + px(ps.rowGap);
+    // 일반 흐름: 여백이 겹치므로 다음 형제까지 거리 (다음 형제가 없으면 자기 높이 + 여백)
+    let next = el.nextElementSibling;
+    while (next && (next.classList.contains('sgc-spacer') || next.hasAttribute('data-sgc-ignore'))) next = next.nextElementSibling;
+    if (next) { const nr = next.getBoundingClientRect(); if (nr.top >= r.bottom - 1 && nr.top - r.top < r.height * 3 + 200) return (nr.top - r.top) / z; }
+    return h + px(cs.marginTop) + px(cs.marginBottom);
+  }
+  function parentGap(el) {
+    const p = el.parentElement;
+    if (!p) return 0;
+    const cs = p.ownerDocument.defaultView.getComputedStyle(p);
+    return /flex|grid/.test(cs.display) ? px(cs.rowGap) : 0;
+  }
+  function makeSpacer(ref, end, height, label, afterNode = null, gapPx = null) {
+    const doc = ref.ownerDocument;
+    const parent = end ? ref : ref.parentNode;
+    const ctx = end ? ref : ref.parentElement;
+    const tag = ctx?.localName;
+    let sp;
+    if (ref.localName === 'tr' || /^(tbody|thead|tfoot|table)$/.test(tag ?? '')) {
+      sp = doc.createElement('tr');
+      const td = doc.createElement('td');
+      td.colSpan = 1000;
+      td.setAttribute('data-label', label);
+      sp.appendChild(td);
+      sp.style.height = height + 'px';
+    } else {
+      sp = doc.createElement(tag === 'ul' || tag === 'ol' ? 'li' : 'div');
+      sp.setAttribute('data-label', label);
+      sp.style.height = Math.max(0, height - (gapPx ?? parentGap(end ? ref.lastElementChild ?? ref : ref))) + 'px';
+    }
+    sp.className = 'sgc-spacer';
+    sp.setAttribute('data-sgc-ignore', '');
+    sp.setAttribute('aria-hidden', 'true');
+    if (afterNode) afterNode.parentNode.insertBefore(sp, afterNode.nextSibling);
+    else if (end) parent.appendChild(sp); else parent.insertBefore(sp, ref);
+    spacers.push(sp);
+    return sp;
+  }
+  /** 줄 단위 덩어리: 표 칸이면 그 줄, 아니면 가까운 문단류 */
+  const unitOf = (n) => {
+    const el = n?.nodeType === 1 ? n : n?.parentElement;
+    if (!el) return null;
+    const tr = el.closest('tr');
+    return tr ?? blockOf(el);
+  };
+  /** 바뀐 곳을 감싼 가장 큰 덩어리 (문서 맨 위 바로 아래 또는 쪽 바로 아래) */
+  function topUnit(n, side) {
+    const r = root(side);
+    let el = n?.nodeType === 1 ? n : n?.parentElement;
+    while (el && el.parentElement && el.parentElement !== r && !(opt.page && el.parentElement.matches(opt.page))) el = el.parentElement;
+    return el && el !== r ? el : null;
+  }
+  /**
+   * 읽기와 쓰기를 섞지 않는다: "전부 재기 → 한꺼번에 넣기" × 3번.
+   * (재고-넣고를 번갈아 하면 넣을 때마다 문서 전체 배치를 다시 계산해 수천 쪽에서 수십 초가 걸림)
+   */
+  let lazyIO = [];
+  /**
+   * 쪽 문서(opt.page): 화면에 보이는 쪽과 그 앞뒤 몇 장만 맞춘다. 스크롤해서 새 쪽이 다가오면 그 쪽만.
+   * 화면 밖 쪽은 브라우저가 그리지 않으므로(content-visibility) 높이를 잴 필요도 없고, 재면 억지로 그리느라 느려진다.
+   * 쪽이 없는 문서는 한 번에 전부 맞춘다.
+   */
+  async function alignHeights(list, tick) {
+    unalign();
+    pageIdx = null;
+    for (const io of lazyIO) io.disconnect();
+    lazyIO = [];
+    if (!opt.page) return alignBatch(list, tick);
+    const groups = new Map();   // 'left:3' → 그 쪽에 걸친 변경들
+    const add = (side, n, ch) => {
+      const k = pageNo(n, side);
+      if (k < 0) return;
+      const key = side + ':' + k;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(ch);
+    };
+    for (const ch of list) {
+      add('left', ch.left, ch); add('right', ch.right, ch);
+      if (ch.gap) { add(ch.gap.side, ch.gap.node, ch); add(ch.gap.side, ch.gap.prev, ch); }
+      for (const x of ch.extra ?? []) add(ch.type === 'added' ? 'right' : 'left', x.node, ch);
+      for (const n of ch.alsoLeft ?? []) add('left', n, ch);
+    }
+    const done = new Set(), queue = new Set();
+    let draining = false;
+    const drain = async () => {
+      if (draining) return;
+      draining = true;
+      try {
+        while (queue.size) {
+          const batch = [];
+          for (const key of queue) for (const ch of groups.get(key) ?? []) if (!done.has(ch)) { done.add(ch); batch.push(ch); }
+          queue.clear();
+          if (batch.length) await alignBatch(batch, async () => !destroyed);
+        }
+      } finally { draining = false; }
+    };
+    for (const side of ['left', 'right']) {
+      const r = root(side);
+      const win = r.ownerDocument.defaultView;
+      if (!win.IntersectionObserver) return alignBatch(list, tick);
+      const sc = side === 'left' ? opt.leftScroller : opt.rightScroller;
+      const scEl = sc ?? makeScroller(r).target;
+      const pages = Array.from(r.querySelectorAll(opt.page));
+      const idx = new Map(pages.map((p, i) => [p, i]));
+      const io = new win.IntersectionObserver((entries) => {
+        for (const e of entries) if (e.isIntersecting) queue.add(side + ':' + idx.get(e.target));
+        drain();
+      }, { root: scEl && scEl.nodeType === 1 ? scEl : null, rootMargin: '150% 0px 150% 0px' });
+      for (const p of pages) if (groups.has(side + ':' + idx.get(p))) io.observe(p);
+      lazyIO.push(io);
+    }
+  }
+
+  async function alignBatch(list, tick) {
+    const msg = getMessages(opt.locale);
+    const el = (x) => (x ? (x.nodeType === 1 ? x : x.parentElement) : null);
+    // 1) 재기: 한쪽에만 있는 덩어리의 높이와 넣을 자리
+    const plans = [];
+    for (const ch of list) {
+      const exp = ch.extra ? [ch, ...ch.extra.map((x) => ({ ...ch, [ch.type === 'added' ? 'right' : 'left']: x.node, gap: x.gap }))] : [ch];
+      for (const c of exp) {
+        if (c.type !== 'added' && c.type !== 'deleted') continue;
+        const n = c.type === 'added' ? c.right : c.left;
+        if (n?.nodeType !== 1 || /^(td|th)$/.test(n.localName) || !c.gap?.node) continue;
+        if (!(await tick())) return;
+        const gside = c.gap.side, oside = gside === 'left' ? 'right' : 'left';
+        let ref = el(c.gap.node), end = c.gap.end, after = null;
+        // 쪽 문서: 원본이 있는 쪽 번호와 같은 쪽에 빈 칸을 넣는다 (다음 항목이 다음 쪽이면 앞 항목 뒤에)
+        const want = pageNo(n, oside);
+        const prev = el(c.gap.prev);
+        if (want >= 0) {
+          if (prev && pageNo(prev, gside) === want && (end || pageNo(ref, gside) !== want)) after = prev;
+          else if (end && prev) after = prev;
+        } else if (end && prev) after = prev;
+        if (!ref && !after) continue;
+        const h = spaceOf(n);
+        if (h < 1) continue;
+        plans.push({ c, ref, end, after, h, label: c.type === 'added' ? msg.gapAdded : msg.gapDeleted, gap: parentGap(after ?? (end ? ref.lastElementChild ?? ref : ref)) });
+      }
+    }
+    // 2) 넣기 (한꺼번에)
+    for (const pl of plans) {
+      const { c, ref, end, after, h, label } = pl;
+      if (after) {
+        const nxt = after.nextSibling;
+        c.spacer = nxt ? makeSpacer(nxt.nodeType === 1 ? nxt : after.parentElement, !nxt || nxt.nodeType !== 1, h, label, after, pl.gap) : makeSpacer(after.parentElement, true, h, label, null, pl.gap);
+      } else c.spacer = makeSpacer(ref, end, h, label, null, pl.gap);
+    }
+    // 3) 재기 → 쓰기: 양쪽 다 있는 변경을 줄 단위로 같은 높이
+    const pairs = [];
+    for (const ch of list) {
+      if (ch.type === 'added' || ch.type === 'deleted' || !ch.left || !ch.right) continue;
+      pairs.push([unitOf(ch.left), unitOf(ch.right)]);
+      for (const n of ch.alsoLeft ?? []) pairs.push([unitOf(n), unitOf(ch.right)]);
+    }
+    const fixes = [];
+    for (const [a, b] of pairs) { if (!(await tick())) return; const f = measurePair(a, b); if (f) fixes.push(f); }
+    applyFixes(fixes);
+    // 4) 재기 → 쓰기: 감싼 큰 덩어리끼리 한 번 더 (안쪽에서 맞추지 못한 차이까지)
+    const seen = new Set(), tops = [];
+    for (const ch of list) {
+      if (!ch.left || !ch.right) continue;
+      const a = topUnit(ch.left, 'left'), b = topUnit(ch.right, 'right');
+      if (!a || !b || seen.has(a)) continue;
+      seen.add(a);
+      tops.push([a, b]);
+    }
+    const fixes2 = [];
+    for (const [a, b] of tops) { if (!(await tick())) return; const f = measurePair(a, b); if (f) fixes2.push(f); }
+    applyFixes(fixes2);
+  }
+  /** 같은 높이로 만들 값 계산 (읽기만) */
+  function measurePair(a, b) {
+    if (!a || !b || a === b || !a.isConnected || !b.isConnected) return null;
+    const ha = layoutHeight(a), hb = layoutHeight(b);
+    if (Math.abs(ha - hb) < 0.5) return null;
+    const lo = ha < hb ? a : b, diff = Math.abs(ha - hb);
+    if (lo.localName === 'tr') return { el: lo, prop: 'height', value: Math.max(ha, hb) + 'px' };
+    const cs = lo.ownerDocument.defaultView.getComputedStyle(lo);
+    return { el: lo, prop: 'paddingBottom', value: (px(cs.paddingBottom) + diff) + 'px' };
+  }
+  function applyFixes(fixes) {
+    for (const { el, prop, value } of fixes) { padded.push([el, prop, el.style[prop]]); el.style[prop] = value; }
+  }
+
+  /** 글꼴이 늦게 내려오거나 칸 폭이 바뀌면 줄 높이가 달라지므로 높이만 다시 맞춘다 (다시 비교하지 않음) */
+  let realignTimer = 0, realignSetup = false;
+  function scheduleRealign() {
+    clearTimeout(realignTimer);
+    realignTimer = setTimeout(() => {
+      if (destroyed || state.running || opt.align === false || !state.changes.length) return;
+      alignHeights(state.changes, async () => true);
+    }, 120);
+  }
+  function setupRealign() {
+    if (realignSetup) return;
+    realignSetup = true;
+    const docs = new Set([root('left').ownerDocument, root('right').ownerDocument]);
+    for (const d of docs) {
+      d.fonts?.addEventListener?.('loadingdone', scheduleRealign);
+      d.fonts?.ready?.then(scheduleRealign);
+    }
+    const RO = root('left').ownerDocument.defaultView.ResizeObserver;
+    if (RO) {
+      let widths = new Map();
+      const ro = new RO((entries) => {
+        let changed = false;
+        for (const e of entries) { const w = Math.round(e.contentRect.width); if (widths.get(e.target) !== w) { widths.set(e.target, w); changed = true; } }
+        if (changed) scheduleRealign();
+      });
+      ro.observe(root('left')); ro.observe(root('right'));
+      observers.push(() => ro.disconnect());
+    }
+    observers.push(() => { for (const d of docs) d.fonts?.removeEventListener?.('loadingdone', scheduleRealign); clearTimeout(realignTimer); });
+  }
+
   async function apply(out, id) {
     const tick = slicer(id);
     const list = [];
@@ -387,8 +648,9 @@ export function createCompare(options) {
         const kids = p.obj?.c;
         if (kids) {
           const ref = kids[c.at.gap.index];
+          const prev = kids[c.at.gap.index - 1];
           const refNode = ref ? snaps[gside].nodes[ref.i] : p.node;
-          ch.gap = { side: gside, node: refNode, end: !ref };
+          ch.gap = { side: gside, node: refNode, end: !ref, prev: prev ? snaps[gside].nodes[prev.i] : null };
         }
       }
       // 같은 부모 안의 이름 바뀜(태그)·속성 바뀜: 요소 자체가 대상
@@ -406,6 +668,7 @@ export function createCompare(options) {
     marks.left.clear(); marks.right.clear();
     for (const ch of final) paint(ch);
     marks.left.flush(); marks.right.flush();
+    if (opt.align !== false) { await alignHeights(final, tick); setupRealign(); }
     state.changes = final;
     state.stats = { added: 0, modified: 0, deleted: 0, moved: 0 };
     for (const ch of final) state.stats[ch.type]++;
@@ -536,7 +799,7 @@ export function createCompare(options) {
     focused.length = 0;
     for (const side of ['left', 'right']) {
       let el = elOf(ch[side]);
-      if (!el && ch.gap?.side === side) el = elOf(ch.gap.node);
+      if (!el && ch.gap?.side === side) el = ch.spacer ?? elOf(ch.gap.node);
       if (!el) continue;
       const block = ch.what === 'text' ? blockOf(ch[side]) ?? el : el;
       scrollIntoScroller(scrollers[side], block, 0.3, smooth);
@@ -568,7 +831,14 @@ export function createCompare(options) {
     const kick = () => { clearTimeout(debounceTimer); debounceTimer = setTimeout(run, opt.debounce); };
     for (const side of ['left', 'right']) {
       const r = root(side);
-      const mo = new (r.ownerDocument.defaultView.MutationObserver)(kick);
+      const isOurs = (n) => n.nodeType === 1 && n.classList?.contains('sgc-spacer');
+      const mo = new (r.ownerDocument.defaultView.MutationObserver)((recs) => {
+        // 모듈이 넣고 뺀 빈 칸 때문에 생긴 변화는 무시 (다시 비교가 끝없이 반복되지 않게)
+        const real = recs.some((m) => m.type !== 'childList'
+          ? !(m.target.nodeType === 1 ? m.target : m.target.parentElement)?.closest?.('.sgc-spacer')
+          : [...m.addedNodes, ...m.removedNodes].some((n) => !isOurs(n)));
+        if (real) kick();
+      });
       mo.observe(r, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: [...opt.attrs, 'data-sgc-key', 'data-key', 'hidden', 'data-sgc-ignore'] });
       r.addEventListener('input', kick, true);
       r.addEventListener('change', kick, true);
@@ -584,6 +854,8 @@ export function createCompare(options) {
     const doc = target.ownerDocument;
     ensureMarkStyle(doc, name + 'x');
     const clone = doc.importNode(R, true);
+    for (const sp of clone.querySelectorAll('.sgc-spacer')) sp.remove();
+    for (const el of clone.querySelectorAll('[style]')) { if (padded.some(([p]) => p === el)) el.removeAttribute('style'); }
     const cs = snapshot(clone, { attrs: opt.attrs, ignore: opt.ignore, anchors: '', keyAttrs: opt.keyAttrs, flatten: opt.flatten ?? opt.page });
     if (cs.nodes.length !== snaps.right.nodes.length) console.warn('[sg-compare] 한 장 보기: 복사본 구조가 달라 일부 표시가 어긋날 수 있습니다');
     const inserts = [];
@@ -655,11 +927,11 @@ export function createCompare(options) {
     run, goTo, next: () => step(1), prev: () => step(-1), renderRedline,
     on(ev, f) { if (!listeners.has(ev)) listeners.set(ev, []); listeners.get(ev).push(f); return () => api.off(ev, f); },
     off(ev, f) { const l = listeners.get(ev); if (l) l.splice(l.indexOf(f) >>> 0, 1); },
-    clear() { marks.left.clear(); marks.right.clear(); state.changes = []; emit('update', api); },
+    clear() { unalign(); marks.left.clear(); marks.right.clear(); state.changes = []; emit('update', api); },
     destroy() {
       destroyed = true; runId++;
       clearTimeout(debounceTimer); clearTimeout(focusTimer);
-      unwatch(); link?.destroy();
+      unwatch(); link?.destroy(); unalign();
       try { const sc = scrollers.left; (sc?.target.nodeType === 1 ? sc.target : sc?.doc.documentElement)?.removeAttribute('data-sgc-noscrollbar'); } catch {}
       marks.left.clear(); marks.right.clear();
       listeners.clear();

@@ -34,6 +34,10 @@ export interface CompareOptions {
   debounce?: number;
   /** 좌우 스크롤 맞춤. 기본 true */
   syncScroll?: boolean;
+  /** 좌우 높이 맞추기 (추가·삭제 자리에 빈 칸, 수정으로 높이가 다르면 여백). 기본 true. 쪽 문서는 보이는 쪽만 그때그때 */
+  align?: boolean;
+  /** 빈 칸 문구 언어. 기본 'ko' */
+  locale?: 'ko' | 'en' | string;
   /** 'one' (기본): 스크롤 맞춤 중에는 오른쪽 스크롤바만 보임. 'both': 늘 양쪽 */
   scrollbars?: 'one' | 'both';
   /** 만들자마자 비교. 기본 true */
