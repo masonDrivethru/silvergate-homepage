@@ -1,0 +1,52 @@
+# 운영 배포 (Firebase Hosting)
+#  - main 브랜치에 올라오면 자동으로: 설치 → 시험 → 빌드 → 운영 사이트 배포
+#  - GitHub 웹 Actions 탭 → "Deploy to Firebase" → Run workflow 로 직접 실행도 가능
+# 필요한 것: 저장소 Settings → Secrets and variables → Actions 에
+#   FIREBASE_SERVICE_ACCOUNT = Firebase 서비스 계정 키(JSON) 전체 내용
+# 되돌리기: Firebase 콘솔 → Hosting → 출시 기록에서 이전 버전 "롤백"
+name: Deploy to Firebase
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# 배포가 겹치지 않게 (새로 올라오면 앞의 것은 취소)
+concurrency:
+  group: firebase-live
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Test (compare engine)
+        run: npm test -w @silvergate/compare-core
+
+      - name: Build (nuxt generate)
+        run: npm run build
+
+      - name: Check build output
+        run: test -f .output/public/index.html && test -f .output/public/compare/index.html
+
+      - name: Deploy to Firebase Hosting (live)
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          projectId: silvergate-web
+          channelId: live

@@ -89,6 +89,12 @@
 
 ---
 
+
+### 자동 배포 (GitHub Actions)
+- `.github/workflows/deploy.yml`: **main 에 올라오면** 설치 → compare-core 시험 → `nuxt generate` → Firebase Hosting(silvergate-web) 운영 배포. Actions 탭 → "Deploy to Firebase" → Run workflow 로 직접 실행도 가능
+- 필요: 저장소 Settings → Secrets and variables → Actions → `FIREBASE_SERVICE_ACCOUNT` (서비스 계정 키 JSON 전체). 서비스 계정 역할: Firebase Hosting 관리자 + API 키 뷰어
+- `./deploy.sh` 는 그대로 써도 됨 (PC 에서 직접 배포)
+
 ## 4. 산업 · 실적 · 고객사
 
 ### 산업
