@@ -3193,11 +3193,15 @@ function createCompare(options) {
     return el && el !== r ? el : null;
   }
   let lazyIO = [];
+  let ensureAligned = async () => {
+  };
   async function alignHeights(list, tick) {
     unalign();
     pageIdx = null;
     for (const io of lazyIO) io.disconnect();
     lazyIO = [];
+    ensureAligned = async () => {
+    };
     if (!opt.page) return alignBatch(list, tick);
     const groups = /* @__PURE__ */ new Map();
     const add = (side, n, ch) => {
@@ -3235,6 +3239,11 @@ function createCompare(options) {
       } finally {
         draining = false;
       }
+    };
+    ensureAligned = async (keys) => {
+      for (const k of keys) if (groups.has(k)) queue.add(k);
+      while (draining) await yieldToBrowser();
+      await drain();
     };
     for (const side of ["left", "right"]) {
       const r = root(side);
@@ -3551,21 +3560,40 @@ function createCompare(options) {
   }
   let focusTimer = 0;
   const focused = [];
-  function goTo(i, { smooth = true } = {}) {
+  let goToken = 0;
+  async function goTo(i, { smooth = true } = {}) {
     if (!state.changes.length) return;
     i = (i % state.changes.length + state.changes.length) % state.changes.length;
     state.current = i;
     const ch = state.changes[i];
+    const token = ++goToken;
     if (!scrollers.left) setupScroll();
-    link?.pause(smooth ? 900 : 200);
+    link?.pause(2e3);
     for (const el of focused) el.removeAttribute("data-sgc-focus");
     focused.length = 0;
-    for (const side of ["left", "right"]) {
+    emit("focus", ch);
+    const targetOf = (side) => {
       let el = elOf(ch[side]);
       if (!el && ch.gap?.side === side) el = ch.spacer ?? elOf(ch.gap.node);
-      if (!el) continue;
-      const block = ch.what === "text" ? blockOf(ch[side]) ?? el : el;
-      scrollIntoScroller(scrollers[side], block, 0.3, smooth);
+      if (!el) return null;
+      return ch.what === "text" ? blockOf(ch[side]) ?? el : el;
+    };
+    const keys = [];
+    for (const side of ["left", "right"]) {
+      const t = targetOf(side);
+      const k = pageNo(t, side);
+      if (k >= 0) keys.push(`${side}:${k}`, `${side}:${k - 1}`);
+    }
+    if (keys.length) await ensureAligned(keys);
+    if (token !== goToken) return;
+    const sides = ["left", "right"].map((side) => ({ side, block: targetOf(side) })).filter((x) => x.block);
+    let anySmooth = false;
+    for (const { side, block } of sides) {
+      const sc = scrollers[side];
+      const dist = Math.abs(block.getBoundingClientRect().top - sc.viewTop());
+      const soft = smooth && dist < sc.height() * 1.5 && !matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+      anySmooth || (anySmooth = soft);
+      scrollIntoScroller(sc, block, 0.3, soft);
       block.setAttribute("data-sgc-focus", "");
       focused.push(block);
       const fr = [];
@@ -3576,6 +3604,38 @@ function createCompare(options) {
       }
       marks[side].setFocus(fr);
     }
+    if (anySmooth) await new Promise((r) => setTimeout(r, 450));
+    let userMoved = false;
+    const stopper = () => {
+      userMoved = true;
+    };
+    const docsSet = new Set(sides.map(({ side }) => root(side).ownerDocument));
+    for (const d of docsSet) for (const ev of ["wheel", "touchstart", "keydown", "mousedown"]) d.addEventListener(ev, stopper, { passive: true, capture: true });
+    try {
+      const until = performance.now() + 1e3;
+      let stable = 0;
+      while (performance.now() < until && stable < 8 && !userMoved) {
+        await new Promise((r) => requestAnimationFrame(r));
+        if (token !== goToken) return;
+        if (keys.length) await ensureAligned(keys);
+        let moved = false;
+        for (const { side, block } of sides) {
+          if (!block.isConnected) continue;
+          const sc = scrollers[side];
+          const want = sc.top + (block.getBoundingClientRect().top - sc.viewTop()) - sc.height() * 0.3;
+          const v = Math.max(0, Math.min(want, sc.max()));
+          if (Math.abs(v - sc.top) > 2) {
+            scrollIntoScroller(sc, block, 0.3, false);
+            moved = true;
+          }
+        }
+        stable = moved ? 0 : stable + 1;
+        link?.pause(300);
+      }
+    } finally {
+      for (const d of docsSet) for (const ev of ["wheel", "touchstart", "keydown", "mousedown"]) d.removeEventListener(ev, stopper, { capture: true });
+    }
+    link?.pause(250);
     clearTimeout(focusTimer);
     focusTimer = setTimeout(() => {
       for (const el of focused) el.removeAttribute("data-sgc-focus");
@@ -3583,7 +3643,6 @@ function createCompare(options) {
       marks.left.setFocus([]);
       marks.right.setFocus([]);
     }, 1800);
-    emit("focus", ch);
   }
   function step(d) {
     const vis = visible();

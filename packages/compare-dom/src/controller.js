@@ -462,6 +462,8 @@ export function createCompare(options) {
    * (재고-넣고를 번갈아 하면 넣을 때마다 문서 전체 배치를 다시 계산해 수천 쪽에서 수십 초가 걸림)
    */
   let lazyIO = [];
+  /** 이동하기 전에 그 쪽들의 높이 맞추기를 먼저 끝낸다 (쪽 문서). 키: 'left:3' */
+  let ensureAligned = async () => {};
   /**
    * 쪽 문서(opt.page): 화면에 보이는 쪽과 그 앞뒤 몇 장만 맞춘다. 스크롤해서 새 쪽이 다가오면 그 쪽만.
    * 화면 밖 쪽은 브라우저가 그리지 않으므로(content-visibility) 높이를 잴 필요도 없고, 재면 억지로 그리느라 느려진다.
@@ -472,6 +474,7 @@ export function createCompare(options) {
     pageIdx = null;
     for (const io of lazyIO) io.disconnect();
     lazyIO = [];
+    ensureAligned = async () => {};
     if (!opt.page) return alignBatch(list, tick);
     const groups = new Map();   // 'left:3' → 그 쪽에 걸친 변경들
     const add = (side, n, ch) => {
@@ -500,6 +503,11 @@ export function createCompare(options) {
           if (batch.length) await alignBatch(batch, async () => !destroyed);
         }
       } finally { draining = false; }
+    };
+    ensureAligned = async (keys) => {
+      for (const k of keys) if (groups.has(k)) queue.add(k);
+      while (draining) await yieldToBrowser();
+      await drain();
     };
     for (const side of ['left', 'right']) {
       const r = root(side);
@@ -788,34 +796,88 @@ export function createCompare(options) {
   let focusTimer = 0;
   const focused = [];
   /** i 번째 변경으로 이동 (양쪽 모두) */
-  function goTo(i, { smooth = true } = {}) {
+  let goToken = 0;
+  /**
+   * i 번째 변경으로 이동 (양쪽 모두).
+   * 큰 문서는 화면 밖 쪽이 아직 그려지지 않았고(어림 높이) 높이 맞추기도 아직이라, 한 번에 계산하면 빗나간다.
+   * → ① 그 쪽(과 앞쪽)의 높이 맞추기를 먼저 끝내고 ② 바로 이동한 뒤 ③ 자리가 잡히면 다시 재서 바로잡는다
+   */
+  async function goTo(i, { smooth = true } = {}) {
     if (!state.changes.length) return;
     i = ((i % state.changes.length) + state.changes.length) % state.changes.length;
     state.current = i;
     const ch = state.changes[i];
+    const token = ++goToken;
     if (!scrollers.left) setupScroll();
-    link?.pause(smooth ? 900 : 200);
+    link?.pause(2000);
     for (const el of focused) el.removeAttribute('data-sgc-focus');
     focused.length = 0;
-    for (const side of ['left', 'right']) {
+    emit('focus', ch);
+    const targetOf = (side) => {
       let el = elOf(ch[side]);
       if (!el && ch.gap?.side === side) el = ch.spacer ?? elOf(ch.gap.node);
-      if (!el) continue;
-      const block = ch.what === 'text' ? blockOf(ch[side]) ?? el : el;
-      scrollIntoScroller(scrollers[side], block, 0.3, smooth);
+      if (!el) return null;
+      return ch.what === 'text' ? blockOf(ch[side]) ?? el : el;
+    };
+    // ① 높이 맞추기 먼저
+    const keys = [];
+    for (const side of ['left', 'right']) {
+      const t = targetOf(side);
+      const k = pageNo(t, side);
+      if (k >= 0) keys.push(`${side}:${k}`, `${side}:${k - 1}`);
+    }
+    if (keys.length) await ensureAligned(keys);
+    if (token !== goToken) return;
+    // ② 이동: 가까우면 부드럽게, 멀면 바로
+    const sides = ['left', 'right'].map((side) => ({ side, block: targetOf(side) })).filter((x) => x.block);
+    let anySmooth = false;
+    for (const { side, block } of sides) {
+      const sc = scrollers[side];
+      const dist = Math.abs(block.getBoundingClientRect().top - sc.viewTop());
+      const soft = smooth && dist < sc.height() * 1.5 && !matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+      anySmooth ||= soft;
+      scrollIntoScroller(sc, block, 0.3, soft);
       block.setAttribute('data-sgc-focus', '');
       focused.push(block);
       const fr = [];
       if (ch[side]?.nodeType === 3) { const r = ch[side].ownerDocument.createRange(); r.selectNodeContents(ch[side]); fr.push(r); }
       marks[side].setFocus(fr);
     }
+    // ③ 자리가 잡힐 때까지(새로 그려진 쪽의 높이 변화, 늦게 들어간 빈 칸) 최대 1초 동안 지켜보며 바로잡는다.
+    //    사용자가 직접 스크롤(휠·터치·키)하면 바로 멈춘다
+    if (anySmooth) await new Promise((r) => setTimeout(r, 450));
+    let userMoved = false;
+    const stopper = () => { userMoved = true; };
+    const docsSet = new Set(sides.map(({ side }) => root(side).ownerDocument));
+    for (const d of docsSet) for (const ev of ['wheel', 'touchstart', 'keydown', 'mousedown']) d.addEventListener(ev, stopper, { passive: true, capture: true });
+    try {
+      const until = performance.now() + 1000;
+      let stable = 0;
+      while (performance.now() < until && stable < 8 && !userMoved) {
+        await new Promise((r) => requestAnimationFrame(r));
+        if (token !== goToken) return;
+        if (keys.length) await ensureAligned(keys);
+        let moved = false;
+        for (const { side, block } of sides) {
+          if (!block.isConnected) continue;
+          const sc = scrollers[side];
+          const want = sc.top + (block.getBoundingClientRect().top - sc.viewTop()) - sc.height() * 0.3;
+          const v = Math.max(0, Math.min(want, sc.max()));
+          if (Math.abs(v - sc.top) > 2) { scrollIntoScroller(sc, block, 0.3, false); moved = true; }
+        }
+        stable = moved ? 0 : stable + 1;
+        link?.pause(300);
+      }
+    } finally {
+      for (const d of docsSet) for (const ev of ['wheel', 'touchstart', 'keydown', 'mousedown']) d.removeEventListener(ev, stopper, { capture: true });
+    }
+    link?.pause(250);
     clearTimeout(focusTimer);
     focusTimer = setTimeout(() => {
       for (const el of focused) el.removeAttribute('data-sgc-focus');
       focused.length = 0;
       marks.left.setFocus([]); marks.right.setFocus([]);
     }, 1800);
-    emit('focus', ch);
   }
   function step(d) {
     const vis = visible();
