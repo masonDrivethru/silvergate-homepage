@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><title>Compare 속도 측정</title>
+<style>
+html,body{margin:0;height:100%;font:13px sans-serif}
+.grid{display:grid;grid-template-columns:1fr 1fr;height:100vh}
+.sc{overflow:auto;background:#e7eaf0;padding:16px 0}
+.doc-root{zoom:.7}
+</style></head><body>
+<!-- 측정용: ?pages=3000&cv=0|1&module=0|1&sync=0|1 -->
+<div class="grid"><div class="sc" id="ls"><div class="doc-root" id="L"></div></div><div class="sc" id="rs"><div class="doc-root" id="R"></div></div></div>
+<script src="../dist/sg-compare.js"></script>
+<script src="docs.js"></script>
+<script>
+(async function () {
+  var q = new URLSearchParams(location.search), n = +(q.get('pages') || 1000);
+  var css = SgDemoDocs.CSS;
+  if (q.get('cv') === '0') css = css.replace(/content-visibility:auto;contain-intrinsic-size:[^;]+;/, '');
+  var st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
+  // 화면이 멈춘 시간 (long task)
+  var longs = [];
+  try { new PerformanceObserver(function (l) { l.getEntries().forEach(function (e) { longs.push(e.duration); }); }).observe({ type: 'longtask', buffered: true }); } catch (e) {}
+  var t0 = performance.now();
+  L.innerHTML = SgDemoDocs.toHtml(SgDemoDocs.make(3, n));
+  R.innerHTML = SgDemoDocs.toHtml(SgDemoDocs.make(4, n));
+  document.body.getBoundingClientRect();
+  await new Promise(function (r) { requestAnimationFrame(function () { setTimeout(r, 0); }); });
+  var draw = performance.now() - t0;
+  var res = { pages: n, draw: draw };
+  longs.length = 0;
+  if (q.get('module') !== '0') {
+    var c = SgCompare.createCompare({ left: L, right: R, leftScroller: ls, rightScroller: rs, page: '.page', auto: false, syncScroll: q.get('sync') !== '0' });
+    var t1 = performance.now();
+    await c.run();
+    res.run = performance.now() - t1;
+    res.timing = c.timing; res.changes = c.changes.length;
+    window.ctrl = c;
+  }
+  if (q.get('simple') === '1') ls.addEventListener('scroll', function () { rs.scrollTop = ls.scrollTop; }, { passive: true });
+  // 스크롤 처리 시간 측정 (모듈 핸들러 포함 전체)
+  window.handlerMs = [];
+  ls.addEventListener('scroll', function () { var t = performance.now(); queueMicrotask(function () { window.handlerMs.push(performance.now() - t); }); }, { passive: true, capture: true });
+  res.longDuringRun = longs.slice();
+  window.bench = res;
+})();
+</script>
+</body></html>

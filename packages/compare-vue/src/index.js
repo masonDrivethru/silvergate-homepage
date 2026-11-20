@@ -1,0 +1,97 @@
+// @silvergate/compare-vue — Vue 3 용. 빌드 없이 쓰는 순수 JS (defineComponent + h)
+//
+//   <SgCompare :left="v1" :right="v2" page=".page">
+//     <template #doc="{ data }"><MyDocument :doc="data" /></template>
+//   </SgCompare>
+//
+// 사용자의 문서 컴포넌트를 왼쪽·오른쪽에 그대로 그리고, 그려진 화면을 비교한다. 문서 컴포넌트는 고칠 필요 없음.
+import { defineComponent, h, ref, onMounted, onBeforeUnmount, watch, shallowRef, nextTick } from 'vue';
+import { createCompare, mountToolbar, mountChangeList } from '@silvergate/compare-dom';
+
+export const SgCompare = defineComponent({
+  name: 'SgCompare',
+  props: {
+    left: { default: undefined },
+    right: { default: undefined },
+    leftLabel: { type: String, default: '' },
+    rightLabel: { type: String, default: '' },
+    /** 'side' (좌우) | 'redline' (한 장) */
+    mode: { type: String, default: 'side' },
+    locale: { type: String, default: 'ko' },
+    labels: { type: Object, default: undefined },
+    /** 쪽 요소 선택자 (변경 목록에 "n쪽" 표시) */
+    page: { type: String, default: null },
+    height: { type: String, default: '80vh' },
+    /** compare-dom 의 나머지 옵션 (attrs, ignore, anchors, rules, worker ...) */
+    options: { type: Object, default: () => ({}) },
+    toolbar: { type: Boolean, default: true },
+    list: { type: Boolean, default: true },
+  },
+  emits: ['update', 'focus', 'update:mode'],
+  setup(props, { slots, emit, expose }) {
+    const lMount = ref(), rMount = ref(), xMount = ref(), lScroll = ref(), rScroll = ref(), bar = ref(), listEl = ref();
+    const mode = ref(props.mode);
+    const ctrl = shallowRef(null);
+    let tb = null, cl = null, redlineDirty = true;
+
+    const drawRedline = () => { if (ctrl.value && xMount.value) { ctrl.value.renderRedline(xMount.value); redlineDirty = false; } };
+    const setMode = (m) => { mode.value = m; emit('update:mode', m); if (m === 'redline' && redlineDirty) nextTick(drawRedline); };
+    watch(() => props.mode, (m) => { if (m !== mode.value) { setMode(m); tb?.setMode(m); } });
+
+    onMounted(() => {
+      const c = createCompare({
+        ...props.options, left: lMount.value, right: rMount.value,
+        leftScroller: lScroll.value, rightScroller: rScroll.value, page: props.page, watch: true,
+      });
+      c.on('update', () => { redlineDirty = true; if (mode.value === 'redline') drawRedline(); emit('update', c); });
+      c.on('focus', (ch) => emit('focus', ch));
+      if (props.toolbar) tb = mountToolbar(bar.value, c, { locale: props.locale, labels: props.labels, modes: true, mode: mode.value, onMode: setMode });
+      if (props.list) cl = mountChangeList(listEl.value, c, { locale: props.locale, labels: props.labels });
+      ctrl.value = c;
+    });
+    onBeforeUnmount(() => { tb?.destroy(); cl?.destroy(); ctrl.value?.destroy(); });
+
+    expose({
+      controller: ctrl,
+      run: () => ctrl.value?.run(), next: () => ctrl.value?.next(), prev: () => ctrl.value?.prev(),
+      goTo: (i) => ctrl.value?.goTo(i),
+    });
+
+    const pane = (side, label, badge, mountRef, scrollRef, data, hidden) => h('section', { class: 'sgc-pane', hidden },
+      [
+        h('header', { class: 'sgc-pane-head' }, [h('span', { class: `sgc-badge sgc-badge-${side === 'left' ? 'old' : 'new'}` }, badge), label]),
+        h('div', { class: 'sgc-doc-scroll', ref: scrollRef, style: 'flex:1;min-height:0;overflow:auto' },
+          [h('div', { ref: mountRef, class: 'sgc-doc' }, side === 'merged' ? [] : slots.doc?.({ data, side }))]),
+      ]);
+
+    return () => {
+      const red = mode.value === 'redline';
+      const ko = props.locale !== 'en';
+      return h('div', { class: 'sgc-viewer', 'data-mode': mode.value, style: { '--sgc-height': props.height } }, [
+        props.toolbar ? h('div', { ref: bar }) : null,
+        h('div', { class: 'sgc-body', style: props.list ? null : 'grid-template-columns:1fr' }, [
+          h('div', { class: 'sgc-panes' }, [
+            pane('left', props.leftLabel, ko ? '이전' : 'Before', lMount, lScroll, props.left, red),
+            pane('right', props.rightLabel, ko ? '새 버전' : 'After', rMount, rScroll, props.right, red),
+            pane('merged', `${props.leftLabel} → ${props.rightLabel}`, ko ? '한 장 보기' : 'Redline', xMount, undefined, undefined, !red),
+          ]),
+          props.list ? h('aside', { ref: listEl }) : null,
+        ]),
+      ]);
+    };
+  },
+});
+
+/**
+ * 레이아웃은 직접 만들고 비교만 붙이고 싶을 때: 두 요소의 ref 를 넘긴다.
+ *   const { controller } = useCompare(leftEl, rightEl, { page: '.page' })
+ */
+export function useCompare(leftRef, rightRef, options = {}) {
+  const controller = shallowRef(null);
+  onMounted(() => { controller.value = createCompare({ watch: true, ...options, left: leftRef.value, right: rightRef.value }); });
+  onBeforeUnmount(() => controller.value?.destroy());
+  return { controller };
+}
+
+export default { install(app) { app.component('SgCompare', SgCompare); } };
+export * from '@silvergate/compare-dom';

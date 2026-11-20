@@ -121,3 +121,73 @@ test('큰 문서도 빠름 (스텝 2,000개)', () => {
   assert.ok(r.changes.length > 0);
   assert.ok(ms < 500, `took ${ms}ms`);
 });
+
+test('pathOf(배열, 순번): 문자열 배열 항목도 위치를 찾음 (left·right·merged 각각의 순번)', () => {
+  const L = { tags: ['A', 'B', 'C'] };
+  const R = { tags: ['A', 'C', 'D'] };
+  const r = compare(L, R);
+  assert.equal(r.statusOf(L.tags, 1), 'deleted');
+  assert.equal(r.statusOf(R.tags, 2), 'added');
+  assert.equal(r.statusOf(R.tags, 0), null);
+  assert.equal(r.pathOf(R.tags, 1), r.pathOf(L.tags, 2));
+  const mi = r.merged.tags.indexOf('B');
+  assert.equal(r.statusOf(r.merged.tags, mi), 'deleted');
+  assert.equal(r.pathOf(R.tags, 9), null);
+  // 키 있는 배열·추가된 덩어리 안쪽 배열도
+  const r2 = compare({ s: [] }, { s: [{ id: 'x', refs: ['a', 'b'] }] });
+  assert.equal(r2.statusOf(r2.merged.s[0].refs, 1), 'added');
+});
+
+test('similar: 문단 추가 + 옆 문단 수정을 구분 (자리끼리 짝이면 엉뚱하게 수정으로 나옴)', () => {
+  const L = { p: ['첫째 문단입니다.', '둘째 문단은 원래 이렇습니다.', '끝'] };
+  const R = { p: ['첫째 문단입니다.', '완전히 새로 들어간 안내 문구', '둘째 문단은 이렇게 바뀌었습니다.', '끝'] };
+  const sim = (a, b) => { const A = new Set(a), B = new Set(b); let n = 0; for (const c of A) if (B.has(c)) n++; return n / Math.max(A.size, B.size); };
+  const r = compare(L, R, { similar: { 'p.*': sim } });
+  assert.deepEqual(r.changes.map((c) => c.type), ['added', 'modified']);
+  assert.equal(r.changes[1].left, '둘째 문단은 원래 이렇습니다.');
+  assert.deepEqual(compare(L, R).changes.map((c) => c.type), ['modified', 'added']); // 규칙 없으면 자리끼리
+});
+
+test('키 함수가 일부 항목에 null 이면 그 배열은 키 없이 비교', () => {
+  const keyOf = (x) => x.k ?? null;
+  const r = compare({ a: [{ k: 'x', v: 1 }, { v: 2 }] }, { a: [{ k: 'x', v: 1 }, { v: 3 }] }, { keys: { a: keyOf } });
+  assert.deepEqual(types(r), ['modified:a[#1].v']);
+});
+
+test('identity: 같은 해시면 안쪽을 건너뜀 + raw: 양쪽 실제 위치', () => {
+  const L = { c: [{ h: 'a', v: 'x' }, { h: 'b', v: 'y' }, { h: 'c', v: 'z' }] };
+  const R = { c: [{ h: 'a', v: 'DIFFERENT-but-same-hash' }, { h: 'q', v: 'new' }, { h: 'c2', v: 'zz' }] };
+  const r = compare(L, R, { identity: { '**': (n) => n?.h }, ignore: '**.h', raw: true, similar: { 'c.*': () => 0 } });
+  // a 는 해시가 같아서 건너뜀, b 삭제 · q 추가 (비슷하지 않음), c → c2 도 삭제·추가
+  assert.deepEqual(r.changes.map((c) => c.type), ['deleted', 'deleted', 'added', 'added']);
+  const del = r.changes.find((c) => c.type === 'deleted' && c.left.v === 'y');
+  assert.deepEqual(del.at.left, ['c', 1]);
+  assert.equal(del.at.right, null);
+  assert.deepEqual(del.at.gap, { side: 'right', parent: ['c'], index: 1 });
+  const add = r.changes.find((c) => c.type === 'added' && c.right.v === 'new');
+  assert.deepEqual(add.at.right, ['c', 1]);
+  assert.deepEqual(add.at.gap, { side: 'left', parent: ['c'], index: 3 });
+  const r2 = compare({ s: 'abc', n: { t: 'x' } }, { s: 'abd', n: { t: 'y' } }, { raw: true });
+  assert.deepEqual(r2.changes.map((c) => c.at), [{ left: ['s'], right: ['s'] }, { left: ['n', 't'], right: ['n', 't'] }]);
+});
+
+test('아주 긴 키 없는 배열(5만 개)도 흩어진 변경을 정확히 짝지음 (Myers)', async () => {
+  const { alignSequences } = await import('../src/index.js');
+  const L = Array.from({ length: 50000 }, (_, i) => `p${i}`);
+  const R = L.slice();
+  R[100] = 'X'; R.splice(20000, 0, 'NEW'); R.splice(40000, 1);
+  const t = performance.now();
+  const r = compare({ c: L }, { c: R });
+  const ms = performance.now() - t;
+  assert.deepEqual(r.changes.map((c) => c.type), ['modified', 'added', 'deleted']);
+  assert.ok(ms < 1500, `took ${ms}ms`);
+  const pairs = alignSequences(L, R);
+  assert.equal(pairs.length, 49998);
+});
+
+test('similar: 0.7 처럼 소수점이 딱 떨어지지 않는 점수도 같은 것끼리 짝지음 (정밀도 회귀)', () => {
+  const L = { c: [{ t: 'a1' }, { t: 'b1' }, { t: 'c1' }] };
+  const R = { c: [{ t: 'a2' }, { t: 'b2' }, { t: 'c2' }] };
+  const r = compare(L, R, { similar: { 'c.*': (a, b) => (a.t[0] === b.t[0] ? 0.7 : 0.1) } });
+  assert.deepEqual(r.changes.map((c) => `${c.type}:${c.path}`), ['modified:c[#0].t', 'modified:c[#1].t', 'modified:c[#2].t']);
+});

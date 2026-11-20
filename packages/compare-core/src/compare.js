@@ -27,6 +27,8 @@ export function compare(left, right, rules = {}) {
     titles: makeMatcher(opt.titles),
     labels: makeMatcher(opt.labels),
     equals: makeMatcher(opt.equals),
+    similar: makeMatcher(opt.similar),
+    identity: makeMatcher(opt.identity),
     units: makeMatcher(opt.countBy),
   };
   const ignored = (pat) => !!find.ignore(pat);
@@ -38,6 +40,8 @@ export function compare(left, right, rules = {}) {
   /** 원본 객체 → 경로 (화면에서 v-diff="step" 처럼 객체만 넘겨도 위치를 찾게) */
   const paths = new WeakMap();
   const remember = (v, path) => { if (v && typeof v === 'object') paths.set(v, path); };
+  /** 배열 → 순번별 항목 id (문자열 배열처럼 객체가 아닌 항목도 pathOf(배열, 순번)으로 찾게) */
+  const itemIds = new WeakMap();
   const setNode = (path, status, own) => {
     const cur = nodes.get(path);
     if (!cur || RANK[status] > RANK[cur.status] || (own && !cur.own && RANK[status] >= RANK[cur.status])) nodes.set(path, { status, own });
@@ -47,7 +51,11 @@ export function compare(left, right, rules = {}) {
   function keyRule(pat, L, R) {
     const rule = find.keys(pat);
     if (rule === false) return null;                                  // 키 없이 비교하라고 지정
-    if (typeof rule === 'function') return rule;
+    if (typeof rule === 'function') {
+      // 함수가 어느 항목에든 null/undefined 를 돌려주면 그 배열은 키 없이 비교 (키가 일부에만 있는 경우)
+      const ok = [L, R].every((arr) => arr.every((x, i) => { const k = rule(x, i); return k !== null && k !== undefined; }));
+      return ok ? rule : null;
+    }
     if (typeof rule === 'string' || Array.isArray(rule)) {
       const fields = Array.isArray(rule) ? rule : [rule];
       return (item, idx) => {
@@ -67,6 +75,19 @@ export function compare(left, right, rules = {}) {
       if (ok) return (item) => String(item[f]);
     }
     return null;
+  }
+
+  /** 키 없는 배열의 "똑같음" 판정용 글자. identity 규칙이 있으면 그것(예: 미리 계산한 해시), 없으면 값 전체 */
+  function hashFn(itemPat) {
+    const id = find.identity(itemPat);
+    const full = (x) => stableHash(x, (p) => ignored(`${itemPat}${p ? '.' + p : ''}`));
+    if (typeof id !== 'function') return full;
+    return (x) => { const h = id(x); return h === undefined || h === null ? full(x) : 'id:' + h; };
+  }
+
+  function similarFn(itemPat) {
+    const rule = find.similar(itemPat);
+    return typeof rule === 'function' ? rule : null;
   }
 
   function titleOf(item, pat, id) {
@@ -102,11 +123,13 @@ export function compare(left, right, rules = {}) {
     const pat = toPattern(segs);
     if (Array.isArray(v)) {
       const keyOf = keyRule(pat, v, []) ?? ((_x, i) => (status === 'deleted' ? `#~${i}` : `#${i}`));
-      const ids = new Map();
+      const ids = new Map(), list = [];
       v.forEach((x, i) => {
         let id = String(keyOf(x, i)); const n = (ids.get(id) ?? 0) + 1; ids.set(id, n); if (n > 1) id += `#${n}`;
+        list.push(id);
         registerTree(x, [...segs, { i: id }], status);
       });
+      itemIds.set(v, list);
     } else if (isObj(v)) {
       for (const k of Object.keys(v)) if (!ignored(toPattern([...segs, { k }]))) registerTree(v[k], [...segs, { k }], status);
     }
@@ -116,9 +139,10 @@ export function compare(left, right, rules = {}) {
    * 한 위치 비교. 합친 값(merged)을 돌려준다: 삭제된 것도 남긴 한 장짜리 문서용
    * @param {{path:string, pattern:string}[]} anc  조상 위치 (문서 위쪽부터)
    */
-  function visit(l, r, hasL, hasR, segs, crumbs, anc) {
+  function visit(l, r, hasL, hasR, segs, crumbs, anc, lr, rr, gap) {
     const path = toPath(segs), pattern = toPattern(segs);
     const base = { path, pattern, crumbs: crumbs.slice(), ancestors: anc.map((a) => a.path), ancestorPatterns: anc.map((a) => a.pattern) };
+    if (opt.raw) base.at = { left: hasL ? lr : null, right: hasR ? rr : null, ...(gap ? { gap } : {}) };
     const push = (c) => { const ch = { ...base, ...c }; ch.label = labelOf(pattern, segs, c.label, ch); changes.push(ch); setNode(path, ch.type, true); };
 
     if (!hasL && !hasR) return undefined;
@@ -126,14 +150,33 @@ export function compare(left, right, rules = {}) {
     if (!hasR) { registerTree(l, segs, 'deleted'); push({ type: 'deleted', kind: kindOf(l), left: l, right: undefined, diffs: null }); return l; }
     remember(l, path); remember(r, path);
 
+    // 같다고 미리 알 수 있으면(identity 가 같음) 안쪽은 보지 않는다: 큰 문서에서 바뀌지 않은 부분을 건너뜀
+    const idf = find.identity(pattern);
+    if (typeof idf === 'function' && l && r && typeof l === 'object' && typeof r === 'object') {
+      const a = idf(l);
+      if (a !== undefined && a !== null && a === idf(r)) return r;
+    }
+
     if (Array.isArray(l) && Array.isArray(r)) {
       const keyOf = keyRule(pattern, l, r);
       const pairs = keyOf
         ? matchKeyed(l, r, keyOf, opt.detectMoves)
-        : matchKeyless(l, r, (x, side, i) => stableHash(x, (p) => ignored(`${pattern}.*${p ? '.' + p : ''}`)));
+        : matchKeyless(l, r, hashFn(pattern ? `${pattern}.*` : '*'), similarFn(pattern ? `${pattern}.*` : '*'));
       const merged = [];
       const itemPat = pattern ? `${pattern}.*` : '*';
+      const lIds = new Array(l.length), rIds = new Array(r.length), mIds = [];
+      // 삭제된 항목이 오른쪽에서 어디 앞에 있었는지 (다음에 오는 오른쪽 항목 순번, 없으면 끝)
+      const nextR = new Array(pairs.length), nextL = new Array(pairs.length);
+      if (opt.raw) {
+        for (let k = pairs.length - 1, n = r.length; k >= 0; k--) { nextR[k] = n; if (pairs[k].hasR) n = pairs[k].ri; }
+        for (let k = pairs.length - 1, n = l.length; k >= 0; k--) { nextL[k] = n; if (pairs[k].hasL && !pairs[k].moved) n = pairs[k].li; }
+      }
+      let pk = -1;
       for (const p of pairs) {
+        pk++;
+        if (p.hasL) lIds[p.li] = p.id;
+        if (p.hasR) rIds[p.ri] = p.id;
+        mIds.push(p.id);
         const item = p.hasR ? p.r : p.l;
         const seg = { i: p.id };
         const nextSegs = [...segs, seg];
@@ -141,14 +184,19 @@ export function compare(left, right, rules = {}) {
         const nextAnc = [...anc, { path, pattern }];
         if (p.moved) {
           const ipath = toPath(nextSegs);
-          changes.push({ path: ipath, pattern: itemPat, crumbs: [...crumbs, title], ancestors: nextAnc.map((a) => a.path), ancestorPatterns: nextAnc.map((a) => a.pattern),
-            type: 'moved', kind: 'node', label: title, left: p.li + 1, right: p.ri + 1, diffs: null });
+          const mc = { path: ipath, pattern: itemPat, crumbs: [...crumbs, title], ancestors: nextAnc.map((a) => a.path), ancestorPatterns: nextAnc.map((a) => a.pattern),
+            type: 'moved', kind: 'node', label: title, left: p.li + 1, right: p.ri + 1, diffs: null };
+          if (opt.raw) mc.at = { left: [...lr, p.li], right: [...rr, p.ri] };
+          changes.push(mc);
           setNode(ipath, 'moved', true);
         }
-        const m = visit(p.l, p.r, p.hasL, p.hasR, nextSegs, [...crumbs, title], nextAnc);
+        const m = visit(p.l, p.r, p.hasL, p.hasR, nextSegs, [...crumbs, title], nextAnc,
+          opt.raw && p.hasL ? [...lr, p.li] : null, opt.raw && p.hasR ? [...rr, p.ri] : null,
+          !opt.raw ? null : !p.hasR ? { side: 'right', parent: rr, index: nextR[pk] } : !p.hasL ? { side: 'left', parent: lr, index: nextL[pk] } : null);
         if (m && typeof m === 'object') remember(m, toPath(nextSegs));
         merged.push(m);
       }
+      itemIds.set(l, lIds); itemIds.set(r, rIds); itemIds.set(merged, mIds);
       return merged;
     }
 
@@ -158,7 +206,8 @@ export function compare(left, right, rules = {}) {
       for (const k of keys) {
         const nextSegs = [...segs, { k }];
         if (ignored(toPattern(nextSegs))) { merged[k] = hasOwn(r, k) ? r[k] : l[k]; continue; }
-        const m = visit(l[k], r[k], hasOwn(l, k), hasOwn(r, k), nextSegs, crumbs, [...anc, { path, pattern }]);
+        const m = visit(l[k], r[k], hasOwn(l, k), hasOwn(r, k), nextSegs, crumbs, [...anc, { path, pattern }],
+          opt.raw ? [...lr, k] : null, opt.raw ? [...rr, k] : null, null);
         if (m && typeof m === 'object') remember(m, toPath(nextSegs));
         merged[k] = m;
       }
@@ -173,7 +222,7 @@ export function compare(left, right, rules = {}) {
     return r;
   }
 
-  const merged = visit(left, right, left !== undefined, right !== undefined, [], [], []);
+  const merged = visit(left, right, left !== undefined, right !== undefined, [], [], [], [], [], null);
 
   // 롤업: 바뀐 곳의 조상은 모두 "안쪽에 변경 있음(child)"
   for (const c of changes) for (const a of c.ancestors) setNode(a, 'child', false);
@@ -186,7 +235,12 @@ export function compare(left, right, rules = {}) {
     pathOf: (target, field) => {
       const p = typeof target === 'string' ? target : paths.get(target);
       if (p === undefined) return null;
-      return field === undefined ? p : `${p}${p ? '.' : ''}${field}`;
+      if (field === undefined) return p;
+      if (typeof field === 'number') {
+        const id = Array.isArray(target) ? itemIds.get(target)?.[field] : undefined;
+        return id === undefined ? null : `${p}[${String(id).replace(/[\\[\]]/g, (m) => '\\' + m)}]`;
+      }
+      return `${p}${p ? '.' : ''}${field}`;
     },
     statusOf: (target, field) => {
       const p = result.pathOf(target, field);

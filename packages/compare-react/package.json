@@ -1,0 +1,31 @@
+{
+  "name": "@silvergate/compare-react",
+  "version": "0.1.0",
+  "description": "React 용 화면 비교 부품 (@silvergate/compare-dom 을 감싼 것). JSX 없이 쓰는 순수 JS",
+  "type": "module",
+  "main": "./src/index.js",
+  "types": "./src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "default": "./src/index.js"
+    }
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "peerDependencies": {
+    "react": ">=17"
+  },
+  "dependencies": {
+    "@silvergate/compare-dom": "0.1.0"
+  },
+  "license": "UNLICENSED",
+  "private": true,
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  }
+}

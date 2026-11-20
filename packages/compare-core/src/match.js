@@ -5,6 +5,42 @@
  * 결과는 문서 순서(새 버전 순서 + 삭제된 항목은 원래 자리 근처)를 따른다.
  */
 
+import DiffMatchPatch from 'diff-match-patch';
+
+const myers = new DiffMatchPatch();
+myers.Diff_Timeout = 0;      // 끝까지 (최소 편집)
+
+/**
+ * 아주 긴 배열용 LCS: 항목 해시를 글자 하나로 바꿔 Myers diff (바뀐 곳이 적으면 거의 선형)
+ * 서로 다른 해시가 65,000개를 넘으면 null
+ */
+function anchorsByMyers(hl, hr, pre, n, m) {
+  const code = new Map();
+  const enc = (h) => { let c = code.get(h); if (c === undefined) { c = code.size + 1; if (c >= 0xd800) c += 0x800; code.set(h, c); } return c; };
+  const a = [], b = [];
+  for (let i = 0; i < n; i++) a.push(enc(hl[pre + i]));
+  for (let j = 0; j < m; j++) b.push(enc(hr[pre + j]));
+  if (code.size > 63000) return null;
+  const d = myers.diff_main(chunked(a), chunked(b), false);
+  const out = [];
+  let i = 0, j = 0;
+  for (const [op, t] of d) {
+    if (op === 0) { for (let k = 0; k < t.length; k++) out.push([pre + i + k, pre + j + k]); i += t.length; j += t.length; }
+    else if (op === -1) i += t.length;
+    else j += t.length;
+  }
+  return out;
+}
+function chunked(arr) { let s = ''; for (let i = 0; i < arr.length; i += 8192) s += String.fromCharCode(...arr.slice(i, i + 8192)); return s; }
+
+/** 두 해시 목록에서 똑같은 것끼리 짝지은 순번 쌍 (스크롤 맞춤 등에 사용). LCS */
+export function alignSequences(hl, hr) {
+  const pairs = matchKeyless(hl, hr, (x) => x);
+  const out = [];
+  for (const p of pairs) if (p.hasL && p.hasR && hl[p.li] === hr[p.ri]) out.push([p.li, p.ri]);
+  return out;
+}
+
 /**
  * @typedef {Object} Pair
  * @property {string} id         경로에 쓸 항목 id
@@ -91,7 +127,7 @@ const LCS_LIMIT = 4_000_000; // 칸 수가 이보다 크면 LCS 대신 자리끼
  * @param {any[]} L @param {any[]} R @param {(item:any, side:'l'|'r', idx:number)=>string} hashOf
  * @returns {Pair[]}
  */
-export function matchKeyless(L, R, hashOf) {
+export function matchKeyless(L, R, hashOf, similar = null) {
   const hl = L.map((x, i) => hashOf(x, 'l', i));
   const hr = R.map((x, i) => hashOf(x, 'r', i));
   // 앞뒤 공통 부분은 바로 짝
@@ -104,7 +140,9 @@ export function matchKeyless(L, R, hashOf) {
   /** 기준점(같은 항목) 쌍: [li, ri] */
   const anchors = [];
   for (let i = 0; i < pre; i++) anchors.push([i, i]);
-  if (n > 0 && m > 0 && (n + 1) * (m + 1) <= LCS_LIMIT) {
+  const big = n > 0 && m > 0 && (n + 1) * (m + 1) > LCS_LIMIT ? anchorsByMyers(hl, hr, pre, n, m) : null;
+  if (big) anchors.push(...big);
+  else if (n > 0 && m > 0 && (n + 1) * (m + 1) <= LCS_LIMIT) {
     const W = m + 1, dp = new Uint32Array((n + 1) * W);
     for (let i = n - 1; i >= 0; i--) {
       for (let j = m - 1; j >= 0; j--) {
@@ -129,12 +167,49 @@ export function matchKeyless(L, R, hashOf) {
   let pl = 0, pr = 0;
   for (const [al, ar] of anchors) {
     // 기준점 사이: 자리끼리 짝 → 수정, 남는 것은 추가/삭제
-    const gl = al - pl, gr = ar - pr, both = Math.min(gl, gr);
-    for (let k = 0; k < both; k++) add(pl + k, pr + k);
-    for (let k = both; k < gl; k++) add(pl + k, -1);
-    for (let k = both; k < gr; k++) add(-1, pr + k);
+    const gl = al - pl, gr = ar - pr;
+    if (similar && gl > 0 && gr > 0 && gl * gr <= GAP_LIMIT) {
+      for (const [a, b] of alignGap(L, R, pl, gl, pr, gr, similar)) add(a, b);
+    } else {
+      const both = Math.min(gl, gr);
+      for (let k = 0; k < both; k++) add(pl + k, pr + k);
+      for (let k = both; k < gl; k++) add(pl + k, -1);
+      for (let k = both; k < gr; k++) add(-1, pr + k);
+    }
     if (al < L.length) add(al, ar);
     pl = al + 1; pr = ar + 1;
   }
+  return out;
+}
+
+const GAP_LIMIT = 250_000;   // 기준점 사이 칸 수가 이보다 크면 비슷함 비교 대신 자리끼리
+const SIM_MIN = 0.5;         // 이 이상 비슷해야 "수정"으로 짝지음, 아니면 삭제 + 추가
+
+/**
+ * 기준점 사이(gap)를 비슷한 것끼리 짝짓기. 순서는 지키면서 비슷함 합이 가장 크게 (정렬 DP).
+ * @returns {Array<[number, number]>} [왼쪽 순번 | -1, 오른쪽 순번 | -1] 문서 순서
+ */
+function alignGap(L, R, pl, gl, pr, gr, similar) {
+  const W = gr + 1;
+  const sim = new Float64Array(gl * gr);
+  for (let i = 0; i < gl; i++) for (let j = 0; j < gr; j++) {
+    const s = Number(similar(L[pl + i], R[pr + j])) || 0;
+    sim[i * gr + j] = s >= SIM_MIN ? s : -1;
+  }
+  const dp = new Float64Array((gl + 1) * W);
+  for (let i = gl - 1; i >= 0; i--) for (let j = gr - 1; j >= 0; j--) {
+    const s = sim[i * gr + j];
+    dp[i * W + j] = Math.max(dp[(i + 1) * W + j], dp[i * W + j + 1], s >= 0 ? s + dp[(i + 1) * W + j + 1] : -1);
+  }
+  const out = [];
+  let i = 0, j = 0;
+  while (i < gl && j < gr) {
+    const s = sim[i * gr + j];
+    if (s >= 0 && dp[i * W + j] === s + dp[(i + 1) * W + j + 1]) { out.push([pl + i, pr + j]); i++; j++; }
+    else if (dp[i * W + j] === dp[(i + 1) * W + j]) { out.push([pl + i, -1]); i++; }
+    else { out.push([-1, pr + j]); j++; }
+  }
+  for (; i < gl; i++) out.push([pl + i, -1]);
+  for (; j < gr; j++) out.push([-1, pr + j]);
   return out;
 }

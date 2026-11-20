@@ -1,0 +1,3571 @@
+var __create = Object.create;
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getProtoOf = Object.getPrototypeOf;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __commonJS = (cb, mod) => function __require() {
+  try {
+    return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
+  } catch (e) {
+    throw mod = 0, e;
+  }
+};
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+  // If the importer is in node compatibility mode or this is not an ESM
+  // file that has been converted to a CommonJS file using a Babel-
+  // compatible transform (i.e. "__esModule" has not been set), then set
+  // "default" to the CommonJS "module.exports" for node compatibility.
+  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+  mod
+));
+
+// ../../node_modules/diff-match-patch/index.js
+var require_diff_match_patch = __commonJS({
+  "../../node_modules/diff-match-patch/index.js"(exports, module) {
+    var diff_match_patch = function() {
+      this.Diff_Timeout = 1;
+      this.Diff_EditCost = 4;
+      this.Match_Threshold = 0.5;
+      this.Match_Distance = 1e3;
+      this.Patch_DeleteThreshold = 0.5;
+      this.Patch_Margin = 4;
+      this.Match_MaxBits = 32;
+    };
+    var DIFF_DELETE = -1;
+    var DIFF_INSERT = 1;
+    var DIFF_EQUAL = 0;
+    diff_match_patch.Diff = function(op, text) {
+      return [op, text];
+    };
+    diff_match_patch.prototype.diff_main = function(text1, text2, opt_checklines, opt_deadline) {
+      if (typeof opt_deadline == "undefined") {
+        if (this.Diff_Timeout <= 0) {
+          opt_deadline = Number.MAX_VALUE;
+        } else {
+          opt_deadline = (/* @__PURE__ */ new Date()).getTime() + this.Diff_Timeout * 1e3;
+        }
+      }
+      var deadline = opt_deadline;
+      if (text1 == null || text2 == null) {
+        throw new Error("Null input. (diff_main)");
+      }
+      if (text1 == text2) {
+        if (text1) {
+          return [new diff_match_patch.Diff(DIFF_EQUAL, text1)];
+        }
+        return [];
+      }
+      if (typeof opt_checklines == "undefined") {
+        opt_checklines = true;
+      }
+      var checklines = opt_checklines;
+      var commonlength = this.diff_commonPrefix(text1, text2);
+      var commonprefix = text1.substring(0, commonlength);
+      text1 = text1.substring(commonlength);
+      text2 = text2.substring(commonlength);
+      commonlength = this.diff_commonSuffix(text1, text2);
+      var commonsuffix = text1.substring(text1.length - commonlength);
+      text1 = text1.substring(0, text1.length - commonlength);
+      text2 = text2.substring(0, text2.length - commonlength);
+      var diffs = this.diff_compute_(text1, text2, checklines, deadline);
+      if (commonprefix) {
+        diffs.unshift(new diff_match_patch.Diff(DIFF_EQUAL, commonprefix));
+      }
+      if (commonsuffix) {
+        diffs.push(new diff_match_patch.Diff(DIFF_EQUAL, commonsuffix));
+      }
+      this.diff_cleanupMerge(diffs);
+      return diffs;
+    };
+    diff_match_patch.prototype.diff_compute_ = function(text1, text2, checklines, deadline) {
+      var diffs;
+      if (!text1) {
+        return [new diff_match_patch.Diff(DIFF_INSERT, text2)];
+      }
+      if (!text2) {
+        return [new diff_match_patch.Diff(DIFF_DELETE, text1)];
+      }
+      var longtext = text1.length > text2.length ? text1 : text2;
+      var shorttext = text1.length > text2.length ? text2 : text1;
+      var i = longtext.indexOf(shorttext);
+      if (i != -1) {
+        diffs = [
+          new diff_match_patch.Diff(DIFF_INSERT, longtext.substring(0, i)),
+          new diff_match_patch.Diff(DIFF_EQUAL, shorttext),
+          new diff_match_patch.Diff(
+            DIFF_INSERT,
+            longtext.substring(i + shorttext.length)
+          )
+        ];
+        if (text1.length > text2.length) {
+          diffs[0][0] = diffs[2][0] = DIFF_DELETE;
+        }
+        return diffs;
+      }
+      if (shorttext.length == 1) {
+        return [
+          new diff_match_patch.Diff(DIFF_DELETE, text1),
+          new diff_match_patch.Diff(DIFF_INSERT, text2)
+        ];
+      }
+      var hm = this.diff_halfMatch_(text1, text2);
+      if (hm) {
+        var text1_a = hm[0];
+        var text1_b = hm[1];
+        var text2_a = hm[2];
+        var text2_b = hm[3];
+        var mid_common = hm[4];
+        var diffs_a = this.diff_main(text1_a, text2_a, checklines, deadline);
+        var diffs_b = this.diff_main(text1_b, text2_b, checklines, deadline);
+        return diffs_a.concat(
+          [new diff_match_patch.Diff(DIFF_EQUAL, mid_common)],
+          diffs_b
+        );
+      }
+      if (checklines && text1.length > 100 && text2.length > 100) {
+        return this.diff_lineMode_(text1, text2, deadline);
+      }
+      return this.diff_bisect_(text1, text2, deadline);
+    };
+    diff_match_patch.prototype.diff_lineMode_ = function(text1, text2, deadline) {
+      var a = this.diff_linesToChars_(text1, text2);
+      text1 = a.chars1;
+      text2 = a.chars2;
+      var linearray = a.lineArray;
+      var diffs = this.diff_main(text1, text2, false, deadline);
+      this.diff_charsToLines_(diffs, linearray);
+      this.diff_cleanupSemantic(diffs);
+      diffs.push(new diff_match_patch.Diff(DIFF_EQUAL, ""));
+      var pointer = 0;
+      var count_delete = 0;
+      var count_insert = 0;
+      var text_delete = "";
+      var text_insert = "";
+      while (pointer < diffs.length) {
+        switch (diffs[pointer][0]) {
+          case DIFF_INSERT:
+            count_insert++;
+            text_insert += diffs[pointer][1];
+            break;
+          case DIFF_DELETE:
+            count_delete++;
+            text_delete += diffs[pointer][1];
+            break;
+          case DIFF_EQUAL:
+            if (count_delete >= 1 && count_insert >= 1) {
+              diffs.splice(
+                pointer - count_delete - count_insert,
+                count_delete + count_insert
+              );
+              pointer = pointer - count_delete - count_insert;
+              var subDiff = this.diff_main(text_delete, text_insert, false, deadline);
+              for (var j = subDiff.length - 1; j >= 0; j--) {
+                diffs.splice(pointer, 0, subDiff[j]);
+              }
+              pointer = pointer + subDiff.length;
+            }
+            count_insert = 0;
+            count_delete = 0;
+            text_delete = "";
+            text_insert = "";
+            break;
+        }
+        pointer++;
+      }
+      diffs.pop();
+      return diffs;
+    };
+    diff_match_patch.prototype.diff_bisect_ = function(text1, text2, deadline) {
+      var text1_length = text1.length;
+      var text2_length = text2.length;
+      var max_d = Math.ceil((text1_length + text2_length) / 2);
+      var v_offset = max_d;
+      var v_length = 2 * max_d;
+      var v1 = new Array(v_length);
+      var v2 = new Array(v_length);
+      for (var x = 0; x < v_length; x++) {
+        v1[x] = -1;
+        v2[x] = -1;
+      }
+      v1[v_offset + 1] = 0;
+      v2[v_offset + 1] = 0;
+      var delta = text1_length - text2_length;
+      var front = delta % 2 != 0;
+      var k1start = 0;
+      var k1end = 0;
+      var k2start = 0;
+      var k2end = 0;
+      for (var d = 0; d < max_d; d++) {
+        if ((/* @__PURE__ */ new Date()).getTime() > deadline) {
+          break;
+        }
+        for (var k1 = -d + k1start; k1 <= d - k1end; k1 += 2) {
+          var k1_offset = v_offset + k1;
+          var x1;
+          if (k1 == -d || k1 != d && v1[k1_offset - 1] < v1[k1_offset + 1]) {
+            x1 = v1[k1_offset + 1];
+          } else {
+            x1 = v1[k1_offset - 1] + 1;
+          }
+          var y1 = x1 - k1;
+          while (x1 < text1_length && y1 < text2_length && text1.charAt(x1) == text2.charAt(y1)) {
+            x1++;
+            y1++;
+          }
+          v1[k1_offset] = x1;
+          if (x1 > text1_length) {
+            k1end += 2;
+          } else if (y1 > text2_length) {
+            k1start += 2;
+          } else if (front) {
+            var k2_offset = v_offset + delta - k1;
+            if (k2_offset >= 0 && k2_offset < v_length && v2[k2_offset] != -1) {
+              var x2 = text1_length - v2[k2_offset];
+              if (x1 >= x2) {
+                return this.diff_bisectSplit_(text1, text2, x1, y1, deadline);
+              }
+            }
+          }
+        }
+        for (var k2 = -d + k2start; k2 <= d - k2end; k2 += 2) {
+          var k2_offset = v_offset + k2;
+          var x2;
+          if (k2 == -d || k2 != d && v2[k2_offset - 1] < v2[k2_offset + 1]) {
+            x2 = v2[k2_offset + 1];
+          } else {
+            x2 = v2[k2_offset - 1] + 1;
+          }
+          var y2 = x2 - k2;
+          while (x2 < text1_length && y2 < text2_length && text1.charAt(text1_length - x2 - 1) == text2.charAt(text2_length - y2 - 1)) {
+            x2++;
+            y2++;
+          }
+          v2[k2_offset] = x2;
+          if (x2 > text1_length) {
+            k2end += 2;
+          } else if (y2 > text2_length) {
+            k2start += 2;
+          } else if (!front) {
+            var k1_offset = v_offset + delta - k2;
+            if (k1_offset >= 0 && k1_offset < v_length && v1[k1_offset] != -1) {
+              var x1 = v1[k1_offset];
+              var y1 = v_offset + x1 - k1_offset;
+              x2 = text1_length - x2;
+              if (x1 >= x2) {
+                return this.diff_bisectSplit_(text1, text2, x1, y1, deadline);
+              }
+            }
+          }
+        }
+      }
+      return [
+        new diff_match_patch.Diff(DIFF_DELETE, text1),
+        new diff_match_patch.Diff(DIFF_INSERT, text2)
+      ];
+    };
+    diff_match_patch.prototype.diff_bisectSplit_ = function(text1, text2, x, y, deadline) {
+      var text1a = text1.substring(0, x);
+      var text2a = text2.substring(0, y);
+      var text1b = text1.substring(x);
+      var text2b = text2.substring(y);
+      var diffs = this.diff_main(text1a, text2a, false, deadline);
+      var diffsb = this.diff_main(text1b, text2b, false, deadline);
+      return diffs.concat(diffsb);
+    };
+    diff_match_patch.prototype.diff_linesToChars_ = function(text1, text2) {
+      var lineArray = [];
+      var lineHash = {};
+      lineArray[0] = "";
+      function diff_linesToCharsMunge_(text) {
+        var chars = "";
+        var lineStart = 0;
+        var lineEnd = -1;
+        var lineArrayLength = lineArray.length;
+        while (lineEnd < text.length - 1) {
+          lineEnd = text.indexOf("\n", lineStart);
+          if (lineEnd == -1) {
+            lineEnd = text.length - 1;
+          }
+          var line = text.substring(lineStart, lineEnd + 1);
+          if (lineHash.hasOwnProperty ? lineHash.hasOwnProperty(line) : lineHash[line] !== void 0) {
+            chars += String.fromCharCode(lineHash[line]);
+          } else {
+            if (lineArrayLength == maxLines) {
+              line = text.substring(lineStart);
+              lineEnd = text.length;
+            }
+            chars += String.fromCharCode(lineArrayLength);
+            lineHash[line] = lineArrayLength;
+            lineArray[lineArrayLength++] = line;
+          }
+          lineStart = lineEnd + 1;
+        }
+        return chars;
+      }
+      var maxLines = 4e4;
+      var chars1 = diff_linesToCharsMunge_(text1);
+      maxLines = 65535;
+      var chars2 = diff_linesToCharsMunge_(text2);
+      return { chars1, chars2, lineArray };
+    };
+    diff_match_patch.prototype.diff_charsToLines_ = function(diffs, lineArray) {
+      for (var i = 0; i < diffs.length; i++) {
+        var chars = diffs[i][1];
+        var text = [];
+        for (var j = 0; j < chars.length; j++) {
+          text[j] = lineArray[chars.charCodeAt(j)];
+        }
+        diffs[i][1] = text.join("");
+      }
+    };
+    diff_match_patch.prototype.diff_commonPrefix = function(text1, text2) {
+      if (!text1 || !text2 || text1.charAt(0) != text2.charAt(0)) {
+        return 0;
+      }
+      var pointermin = 0;
+      var pointermax = Math.min(text1.length, text2.length);
+      var pointermid = pointermax;
+      var pointerstart = 0;
+      while (pointermin < pointermid) {
+        if (text1.substring(pointerstart, pointermid) == text2.substring(pointerstart, pointermid)) {
+          pointermin = pointermid;
+          pointerstart = pointermin;
+        } else {
+          pointermax = pointermid;
+        }
+        pointermid = Math.floor((pointermax - pointermin) / 2 + pointermin);
+      }
+      return pointermid;
+    };
+    diff_match_patch.prototype.diff_commonSuffix = function(text1, text2) {
+      if (!text1 || !text2 || text1.charAt(text1.length - 1) != text2.charAt(text2.length - 1)) {
+        return 0;
+      }
+      var pointermin = 0;
+      var pointermax = Math.min(text1.length, text2.length);
+      var pointermid = pointermax;
+      var pointerend = 0;
+      while (pointermin < pointermid) {
+        if (text1.substring(text1.length - pointermid, text1.length - pointerend) == text2.substring(text2.length - pointermid, text2.length - pointerend)) {
+          pointermin = pointermid;
+          pointerend = pointermin;
+        } else {
+          pointermax = pointermid;
+        }
+        pointermid = Math.floor((pointermax - pointermin) / 2 + pointermin);
+      }
+      return pointermid;
+    };
+    diff_match_patch.prototype.diff_commonOverlap_ = function(text1, text2) {
+      var text1_length = text1.length;
+      var text2_length = text2.length;
+      if (text1_length == 0 || text2_length == 0) {
+        return 0;
+      }
+      if (text1_length > text2_length) {
+        text1 = text1.substring(text1_length - text2_length);
+      } else if (text1_length < text2_length) {
+        text2 = text2.substring(0, text1_length);
+      }
+      var text_length = Math.min(text1_length, text2_length);
+      if (text1 == text2) {
+        return text_length;
+      }
+      var best = 0;
+      var length = 1;
+      while (true) {
+        var pattern = text1.substring(text_length - length);
+        var found = text2.indexOf(pattern);
+        if (found == -1) {
+          return best;
+        }
+        length += found;
+        if (found == 0 || text1.substring(text_length - length) == text2.substring(0, length)) {
+          best = length;
+          length++;
+        }
+      }
+    };
+    diff_match_patch.prototype.diff_halfMatch_ = function(text1, text2) {
+      if (this.Diff_Timeout <= 0) {
+        return null;
+      }
+      var longtext = text1.length > text2.length ? text1 : text2;
+      var shorttext = text1.length > text2.length ? text2 : text1;
+      if (longtext.length < 4 || shorttext.length * 2 < longtext.length) {
+        return null;
+      }
+      var dmp2 = this;
+      function diff_halfMatchI_(longtext2, shorttext2, i) {
+        var seed = longtext2.substring(i, i + Math.floor(longtext2.length / 4));
+        var j = -1;
+        var best_common = "";
+        var best_longtext_a, best_longtext_b, best_shorttext_a, best_shorttext_b;
+        while ((j = shorttext2.indexOf(seed, j + 1)) != -1) {
+          var prefixLength = dmp2.diff_commonPrefix(
+            longtext2.substring(i),
+            shorttext2.substring(j)
+          );
+          var suffixLength = dmp2.diff_commonSuffix(
+            longtext2.substring(0, i),
+            shorttext2.substring(0, j)
+          );
+          if (best_common.length < suffixLength + prefixLength) {
+            best_common = shorttext2.substring(j - suffixLength, j) + shorttext2.substring(j, j + prefixLength);
+            best_longtext_a = longtext2.substring(0, i - suffixLength);
+            best_longtext_b = longtext2.substring(i + prefixLength);
+            best_shorttext_a = shorttext2.substring(0, j - suffixLength);
+            best_shorttext_b = shorttext2.substring(j + prefixLength);
+          }
+        }
+        if (best_common.length * 2 >= longtext2.length) {
+          return [
+            best_longtext_a,
+            best_longtext_b,
+            best_shorttext_a,
+            best_shorttext_b,
+            best_common
+          ];
+        } else {
+          return null;
+        }
+      }
+      var hm1 = diff_halfMatchI_(
+        longtext,
+        shorttext,
+        Math.ceil(longtext.length / 4)
+      );
+      var hm2 = diff_halfMatchI_(
+        longtext,
+        shorttext,
+        Math.ceil(longtext.length / 2)
+      );
+      var hm;
+      if (!hm1 && !hm2) {
+        return null;
+      } else if (!hm2) {
+        hm = hm1;
+      } else if (!hm1) {
+        hm = hm2;
+      } else {
+        hm = hm1[4].length > hm2[4].length ? hm1 : hm2;
+      }
+      var text1_a, text1_b, text2_a, text2_b;
+      if (text1.length > text2.length) {
+        text1_a = hm[0];
+        text1_b = hm[1];
+        text2_a = hm[2];
+        text2_b = hm[3];
+      } else {
+        text2_a = hm[0];
+        text2_b = hm[1];
+        text1_a = hm[2];
+        text1_b = hm[3];
+      }
+      var mid_common = hm[4];
+      return [text1_a, text1_b, text2_a, text2_b, mid_common];
+    };
+    diff_match_patch.prototype.diff_cleanupSemantic = function(diffs) {
+      var changes = false;
+      var equalities = [];
+      var equalitiesLength = 0;
+      var lastEquality = null;
+      var pointer = 0;
+      var length_insertions1 = 0;
+      var length_deletions1 = 0;
+      var length_insertions2 = 0;
+      var length_deletions2 = 0;
+      while (pointer < diffs.length) {
+        if (diffs[pointer][0] == DIFF_EQUAL) {
+          equalities[equalitiesLength++] = pointer;
+          length_insertions1 = length_insertions2;
+          length_deletions1 = length_deletions2;
+          length_insertions2 = 0;
+          length_deletions2 = 0;
+          lastEquality = diffs[pointer][1];
+        } else {
+          if (diffs[pointer][0] == DIFF_INSERT) {
+            length_insertions2 += diffs[pointer][1].length;
+          } else {
+            length_deletions2 += diffs[pointer][1].length;
+          }
+          if (lastEquality && lastEquality.length <= Math.max(length_insertions1, length_deletions1) && lastEquality.length <= Math.max(
+            length_insertions2,
+            length_deletions2
+          )) {
+            diffs.splice(
+              equalities[equalitiesLength - 1],
+              0,
+              new diff_match_patch.Diff(DIFF_DELETE, lastEquality)
+            );
+            diffs[equalities[equalitiesLength - 1] + 1][0] = DIFF_INSERT;
+            equalitiesLength--;
+            equalitiesLength--;
+            pointer = equalitiesLength > 0 ? equalities[equalitiesLength - 1] : -1;
+            length_insertions1 = 0;
+            length_deletions1 = 0;
+            length_insertions2 = 0;
+            length_deletions2 = 0;
+            lastEquality = null;
+            changes = true;
+          }
+        }
+        pointer++;
+      }
+      if (changes) {
+        this.diff_cleanupMerge(diffs);
+      }
+      this.diff_cleanupSemanticLossless(diffs);
+      pointer = 1;
+      while (pointer < diffs.length) {
+        if (diffs[pointer - 1][0] == DIFF_DELETE && diffs[pointer][0] == DIFF_INSERT) {
+          var deletion = diffs[pointer - 1][1];
+          var insertion = diffs[pointer][1];
+          var overlap_length1 = this.diff_commonOverlap_(deletion, insertion);
+          var overlap_length2 = this.diff_commonOverlap_(insertion, deletion);
+          if (overlap_length1 >= overlap_length2) {
+            if (overlap_length1 >= deletion.length / 2 || overlap_length1 >= insertion.length / 2) {
+              diffs.splice(pointer, 0, new diff_match_patch.Diff(
+                DIFF_EQUAL,
+                insertion.substring(0, overlap_length1)
+              ));
+              diffs[pointer - 1][1] = deletion.substring(0, deletion.length - overlap_length1);
+              diffs[pointer + 1][1] = insertion.substring(overlap_length1);
+              pointer++;
+            }
+          } else {
+            if (overlap_length2 >= deletion.length / 2 || overlap_length2 >= insertion.length / 2) {
+              diffs.splice(pointer, 0, new diff_match_patch.Diff(
+                DIFF_EQUAL,
+                deletion.substring(0, overlap_length2)
+              ));
+              diffs[pointer - 1][0] = DIFF_INSERT;
+              diffs[pointer - 1][1] = insertion.substring(0, insertion.length - overlap_length2);
+              diffs[pointer + 1][0] = DIFF_DELETE;
+              diffs[pointer + 1][1] = deletion.substring(overlap_length2);
+              pointer++;
+            }
+          }
+          pointer++;
+        }
+        pointer++;
+      }
+    };
+    diff_match_patch.prototype.diff_cleanupSemanticLossless = function(diffs) {
+      function diff_cleanupSemanticScore_(one, two) {
+        if (!one || !two) {
+          return 6;
+        }
+        var char1 = one.charAt(one.length - 1);
+        var char2 = two.charAt(0);
+        var nonAlphaNumeric1 = char1.match(diff_match_patch.nonAlphaNumericRegex_);
+        var nonAlphaNumeric2 = char2.match(diff_match_patch.nonAlphaNumericRegex_);
+        var whitespace1 = nonAlphaNumeric1 && char1.match(diff_match_patch.whitespaceRegex_);
+        var whitespace2 = nonAlphaNumeric2 && char2.match(diff_match_patch.whitespaceRegex_);
+        var lineBreak1 = whitespace1 && char1.match(diff_match_patch.linebreakRegex_);
+        var lineBreak2 = whitespace2 && char2.match(diff_match_patch.linebreakRegex_);
+        var blankLine1 = lineBreak1 && one.match(diff_match_patch.blanklineEndRegex_);
+        var blankLine2 = lineBreak2 && two.match(diff_match_patch.blanklineStartRegex_);
+        if (blankLine1 || blankLine2) {
+          return 5;
+        } else if (lineBreak1 || lineBreak2) {
+          return 4;
+        } else if (nonAlphaNumeric1 && !whitespace1 && whitespace2) {
+          return 3;
+        } else if (whitespace1 || whitespace2) {
+          return 2;
+        } else if (nonAlphaNumeric1 || nonAlphaNumeric2) {
+          return 1;
+        }
+        return 0;
+      }
+      var pointer = 1;
+      while (pointer < diffs.length - 1) {
+        if (diffs[pointer - 1][0] == DIFF_EQUAL && diffs[pointer + 1][0] == DIFF_EQUAL) {
+          var equality1 = diffs[pointer - 1][1];
+          var edit = diffs[pointer][1];
+          var equality2 = diffs[pointer + 1][1];
+          var commonOffset = this.diff_commonSuffix(equality1, edit);
+          if (commonOffset) {
+            var commonString = edit.substring(edit.length - commonOffset);
+            equality1 = equality1.substring(0, equality1.length - commonOffset);
+            edit = commonString + edit.substring(0, edit.length - commonOffset);
+            equality2 = commonString + equality2;
+          }
+          var bestEquality1 = equality1;
+          var bestEdit = edit;
+          var bestEquality2 = equality2;
+          var bestScore = diff_cleanupSemanticScore_(equality1, edit) + diff_cleanupSemanticScore_(edit, equality2);
+          while (edit.charAt(0) === equality2.charAt(0)) {
+            equality1 += edit.charAt(0);
+            edit = edit.substring(1) + equality2.charAt(0);
+            equality2 = equality2.substring(1);
+            var score = diff_cleanupSemanticScore_(equality1, edit) + diff_cleanupSemanticScore_(edit, equality2);
+            if (score >= bestScore) {
+              bestScore = score;
+              bestEquality1 = equality1;
+              bestEdit = edit;
+              bestEquality2 = equality2;
+            }
+          }
+          if (diffs[pointer - 1][1] != bestEquality1) {
+            if (bestEquality1) {
+              diffs[pointer - 1][1] = bestEquality1;
+            } else {
+              diffs.splice(pointer - 1, 1);
+              pointer--;
+            }
+            diffs[pointer][1] = bestEdit;
+            if (bestEquality2) {
+              diffs[pointer + 1][1] = bestEquality2;
+            } else {
+              diffs.splice(pointer + 1, 1);
+              pointer--;
+            }
+          }
+        }
+        pointer++;
+      }
+    };
+    diff_match_patch.nonAlphaNumericRegex_ = /[^a-zA-Z0-9]/;
+    diff_match_patch.whitespaceRegex_ = /\s/;
+    diff_match_patch.linebreakRegex_ = /[\r\n]/;
+    diff_match_patch.blanklineEndRegex_ = /\n\r?\n$/;
+    diff_match_patch.blanklineStartRegex_ = /^\r?\n\r?\n/;
+    diff_match_patch.prototype.diff_cleanupEfficiency = function(diffs) {
+      var changes = false;
+      var equalities = [];
+      var equalitiesLength = 0;
+      var lastEquality = null;
+      var pointer = 0;
+      var pre_ins = false;
+      var pre_del = false;
+      var post_ins = false;
+      var post_del = false;
+      while (pointer < diffs.length) {
+        if (diffs[pointer][0] == DIFF_EQUAL) {
+          if (diffs[pointer][1].length < this.Diff_EditCost && (post_ins || post_del)) {
+            equalities[equalitiesLength++] = pointer;
+            pre_ins = post_ins;
+            pre_del = post_del;
+            lastEquality = diffs[pointer][1];
+          } else {
+            equalitiesLength = 0;
+            lastEquality = null;
+          }
+          post_ins = post_del = false;
+        } else {
+          if (diffs[pointer][0] == DIFF_DELETE) {
+            post_del = true;
+          } else {
+            post_ins = true;
+          }
+          if (lastEquality && (pre_ins && pre_del && post_ins && post_del || lastEquality.length < this.Diff_EditCost / 2 && pre_ins + pre_del + post_ins + post_del == 3)) {
+            diffs.splice(
+              equalities[equalitiesLength - 1],
+              0,
+              new diff_match_patch.Diff(DIFF_DELETE, lastEquality)
+            );
+            diffs[equalities[equalitiesLength - 1] + 1][0] = DIFF_INSERT;
+            equalitiesLength--;
+            lastEquality = null;
+            if (pre_ins && pre_del) {
+              post_ins = post_del = true;
+              equalitiesLength = 0;
+            } else {
+              equalitiesLength--;
+              pointer = equalitiesLength > 0 ? equalities[equalitiesLength - 1] : -1;
+              post_ins = post_del = false;
+            }
+            changes = true;
+          }
+        }
+        pointer++;
+      }
+      if (changes) {
+        this.diff_cleanupMerge(diffs);
+      }
+    };
+    diff_match_patch.prototype.diff_cleanupMerge = function(diffs) {
+      diffs.push(new diff_match_patch.Diff(DIFF_EQUAL, ""));
+      var pointer = 0;
+      var count_delete = 0;
+      var count_insert = 0;
+      var text_delete = "";
+      var text_insert = "";
+      var commonlength;
+      while (pointer < diffs.length) {
+        switch (diffs[pointer][0]) {
+          case DIFF_INSERT:
+            count_insert++;
+            text_insert += diffs[pointer][1];
+            pointer++;
+            break;
+          case DIFF_DELETE:
+            count_delete++;
+            text_delete += diffs[pointer][1];
+            pointer++;
+            break;
+          case DIFF_EQUAL:
+            if (count_delete + count_insert > 1) {
+              if (count_delete !== 0 && count_insert !== 0) {
+                commonlength = this.diff_commonPrefix(text_insert, text_delete);
+                if (commonlength !== 0) {
+                  if (pointer - count_delete - count_insert > 0 && diffs[pointer - count_delete - count_insert - 1][0] == DIFF_EQUAL) {
+                    diffs[pointer - count_delete - count_insert - 1][1] += text_insert.substring(0, commonlength);
+                  } else {
+                    diffs.splice(0, 0, new diff_match_patch.Diff(
+                      DIFF_EQUAL,
+                      text_insert.substring(0, commonlength)
+                    ));
+                    pointer++;
+                  }
+                  text_insert = text_insert.substring(commonlength);
+                  text_delete = text_delete.substring(commonlength);
+                }
+                commonlength = this.diff_commonSuffix(text_insert, text_delete);
+                if (commonlength !== 0) {
+                  diffs[pointer][1] = text_insert.substring(text_insert.length - commonlength) + diffs[pointer][1];
+                  text_insert = text_insert.substring(0, text_insert.length - commonlength);
+                  text_delete = text_delete.substring(0, text_delete.length - commonlength);
+                }
+              }
+              pointer -= count_delete + count_insert;
+              diffs.splice(pointer, count_delete + count_insert);
+              if (text_delete.length) {
+                diffs.splice(
+                  pointer,
+                  0,
+                  new diff_match_patch.Diff(DIFF_DELETE, text_delete)
+                );
+                pointer++;
+              }
+              if (text_insert.length) {
+                diffs.splice(
+                  pointer,
+                  0,
+                  new diff_match_patch.Diff(DIFF_INSERT, text_insert)
+                );
+                pointer++;
+              }
+              pointer++;
+            } else if (pointer !== 0 && diffs[pointer - 1][0] == DIFF_EQUAL) {
+              diffs[pointer - 1][1] += diffs[pointer][1];
+              diffs.splice(pointer, 1);
+            } else {
+              pointer++;
+            }
+            count_insert = 0;
+            count_delete = 0;
+            text_delete = "";
+            text_insert = "";
+            break;
+        }
+      }
+      if (diffs[diffs.length - 1][1] === "") {
+        diffs.pop();
+      }
+      var changes = false;
+      pointer = 1;
+      while (pointer < diffs.length - 1) {
+        if (diffs[pointer - 1][0] == DIFF_EQUAL && diffs[pointer + 1][0] == DIFF_EQUAL) {
+          if (diffs[pointer][1].substring(diffs[pointer][1].length - diffs[pointer - 1][1].length) == diffs[pointer - 1][1]) {
+            diffs[pointer][1] = diffs[pointer - 1][1] + diffs[pointer][1].substring(0, diffs[pointer][1].length - diffs[pointer - 1][1].length);
+            diffs[pointer + 1][1] = diffs[pointer - 1][1] + diffs[pointer + 1][1];
+            diffs.splice(pointer - 1, 1);
+            changes = true;
+          } else if (diffs[pointer][1].substring(0, diffs[pointer + 1][1].length) == diffs[pointer + 1][1]) {
+            diffs[pointer - 1][1] += diffs[pointer + 1][1];
+            diffs[pointer][1] = diffs[pointer][1].substring(diffs[pointer + 1][1].length) + diffs[pointer + 1][1];
+            diffs.splice(pointer + 1, 1);
+            changes = true;
+          }
+        }
+        pointer++;
+      }
+      if (changes) {
+        this.diff_cleanupMerge(diffs);
+      }
+    };
+    diff_match_patch.prototype.diff_xIndex = function(diffs, loc) {
+      var chars1 = 0;
+      var chars2 = 0;
+      var last_chars1 = 0;
+      var last_chars2 = 0;
+      var x;
+      for (x = 0; x < diffs.length; x++) {
+        if (diffs[x][0] !== DIFF_INSERT) {
+          chars1 += diffs[x][1].length;
+        }
+        if (diffs[x][0] !== DIFF_DELETE) {
+          chars2 += diffs[x][1].length;
+        }
+        if (chars1 > loc) {
+          break;
+        }
+        last_chars1 = chars1;
+        last_chars2 = chars2;
+      }
+      if (diffs.length != x && diffs[x][0] === DIFF_DELETE) {
+        return last_chars2;
+      }
+      return last_chars2 + (loc - last_chars1);
+    };
+    diff_match_patch.prototype.diff_prettyHtml = function(diffs) {
+      var html = [];
+      var pattern_amp = /&/g;
+      var pattern_lt = /</g;
+      var pattern_gt = />/g;
+      var pattern_para = /\n/g;
+      for (var x = 0; x < diffs.length; x++) {
+        var op = diffs[x][0];
+        var data = diffs[x][1];
+        var text = data.replace(pattern_amp, "&amp;").replace(pattern_lt, "&lt;").replace(pattern_gt, "&gt;").replace(pattern_para, "&para;<br>");
+        switch (op) {
+          case DIFF_INSERT:
+            html[x] = '<ins style="background:#e6ffe6;">' + text + "</ins>";
+            break;
+          case DIFF_DELETE:
+            html[x] = '<del style="background:#ffe6e6;">' + text + "</del>";
+            break;
+          case DIFF_EQUAL:
+            html[x] = "<span>" + text + "</span>";
+            break;
+        }
+      }
+      return html.join("");
+    };
+    diff_match_patch.prototype.diff_text1 = function(diffs) {
+      var text = [];
+      for (var x = 0; x < diffs.length; x++) {
+        if (diffs[x][0] !== DIFF_INSERT) {
+          text[x] = diffs[x][1];
+        }
+      }
+      return text.join("");
+    };
+    diff_match_patch.prototype.diff_text2 = function(diffs) {
+      var text = [];
+      for (var x = 0; x < diffs.length; x++) {
+        if (diffs[x][0] !== DIFF_DELETE) {
+          text[x] = diffs[x][1];
+        }
+      }
+      return text.join("");
+    };
+    diff_match_patch.prototype.diff_levenshtein = function(diffs) {
+      var levenshtein = 0;
+      var insertions = 0;
+      var deletions = 0;
+      for (var x = 0; x < diffs.length; x++) {
+        var op = diffs[x][0];
+        var data = diffs[x][1];
+        switch (op) {
+          case DIFF_INSERT:
+            insertions += data.length;
+            break;
+          case DIFF_DELETE:
+            deletions += data.length;
+            break;
+          case DIFF_EQUAL:
+            levenshtein += Math.max(insertions, deletions);
+            insertions = 0;
+            deletions = 0;
+            break;
+        }
+      }
+      levenshtein += Math.max(insertions, deletions);
+      return levenshtein;
+    };
+    diff_match_patch.prototype.diff_toDelta = function(diffs) {
+      var text = [];
+      for (var x = 0; x < diffs.length; x++) {
+        switch (diffs[x][0]) {
+          case DIFF_INSERT:
+            text[x] = "+" + encodeURI(diffs[x][1]);
+            break;
+          case DIFF_DELETE:
+            text[x] = "-" + diffs[x][1].length;
+            break;
+          case DIFF_EQUAL:
+            text[x] = "=" + diffs[x][1].length;
+            break;
+        }
+      }
+      return text.join("	").replace(/%20/g, " ");
+    };
+    diff_match_patch.prototype.diff_fromDelta = function(text1, delta) {
+      var diffs = [];
+      var diffsLength = 0;
+      var pointer = 0;
+      var tokens = delta.split(/\t/g);
+      for (var x = 0; x < tokens.length; x++) {
+        var param = tokens[x].substring(1);
+        switch (tokens[x].charAt(0)) {
+          case "+":
+            try {
+              diffs[diffsLength++] = new diff_match_patch.Diff(DIFF_INSERT, decodeURI(param));
+            } catch (ex) {
+              throw new Error("Illegal escape in diff_fromDelta: " + param);
+            }
+            break;
+          case "-":
+          // Fall through.
+          case "=":
+            var n = parseInt(param, 10);
+            if (isNaN(n) || n < 0) {
+              throw new Error("Invalid number in diff_fromDelta: " + param);
+            }
+            var text = text1.substring(pointer, pointer += n);
+            if (tokens[x].charAt(0) == "=") {
+              diffs[diffsLength++] = new diff_match_patch.Diff(DIFF_EQUAL, text);
+            } else {
+              diffs[diffsLength++] = new diff_match_patch.Diff(DIFF_DELETE, text);
+            }
+            break;
+          default:
+            if (tokens[x]) {
+              throw new Error("Invalid diff operation in diff_fromDelta: " + tokens[x]);
+            }
+        }
+      }
+      if (pointer != text1.length) {
+        throw new Error("Delta length (" + pointer + ") does not equal source text length (" + text1.length + ").");
+      }
+      return diffs;
+    };
+    diff_match_patch.prototype.match_main = function(text, pattern, loc) {
+      if (text == null || pattern == null || loc == null) {
+        throw new Error("Null input. (match_main)");
+      }
+      loc = Math.max(0, Math.min(loc, text.length));
+      if (text == pattern) {
+        return 0;
+      } else if (!text.length) {
+        return -1;
+      } else if (text.substring(loc, loc + pattern.length) == pattern) {
+        return loc;
+      } else {
+        return this.match_bitap_(text, pattern, loc);
+      }
+    };
+    diff_match_patch.prototype.match_bitap_ = function(text, pattern, loc) {
+      if (pattern.length > this.Match_MaxBits) {
+        throw new Error("Pattern too long for this browser.");
+      }
+      var s = this.match_alphabet_(pattern);
+      var dmp2 = this;
+      function match_bitapScore_(e, x) {
+        var accuracy = e / pattern.length;
+        var proximity = Math.abs(loc - x);
+        if (!dmp2.Match_Distance) {
+          return proximity ? 1 : accuracy;
+        }
+        return accuracy + proximity / dmp2.Match_Distance;
+      }
+      var score_threshold = this.Match_Threshold;
+      var best_loc = text.indexOf(pattern, loc);
+      if (best_loc != -1) {
+        score_threshold = Math.min(match_bitapScore_(0, best_loc), score_threshold);
+        best_loc = text.lastIndexOf(pattern, loc + pattern.length);
+        if (best_loc != -1) {
+          score_threshold = Math.min(match_bitapScore_(0, best_loc), score_threshold);
+        }
+      }
+      var matchmask = 1 << pattern.length - 1;
+      best_loc = -1;
+      var bin_min, bin_mid;
+      var bin_max = pattern.length + text.length;
+      var last_rd;
+      for (var d = 0; d < pattern.length; d++) {
+        bin_min = 0;
+        bin_mid = bin_max;
+        while (bin_min < bin_mid) {
+          if (match_bitapScore_(d, loc + bin_mid) <= score_threshold) {
+            bin_min = bin_mid;
+          } else {
+            bin_max = bin_mid;
+          }
+          bin_mid = Math.floor((bin_max - bin_min) / 2 + bin_min);
+        }
+        bin_max = bin_mid;
+        var start = Math.max(1, loc - bin_mid + 1);
+        var finish = Math.min(loc + bin_mid, text.length) + pattern.length;
+        var rd = Array(finish + 2);
+        rd[finish + 1] = (1 << d) - 1;
+        for (var j = finish; j >= start; j--) {
+          var charMatch = s[text.charAt(j - 1)];
+          if (d === 0) {
+            rd[j] = (rd[j + 1] << 1 | 1) & charMatch;
+          } else {
+            rd[j] = (rd[j + 1] << 1 | 1) & charMatch | ((last_rd[j + 1] | last_rd[j]) << 1 | 1) | last_rd[j + 1];
+          }
+          if (rd[j] & matchmask) {
+            var score = match_bitapScore_(d, j - 1);
+            if (score <= score_threshold) {
+              score_threshold = score;
+              best_loc = j - 1;
+              if (best_loc > loc) {
+                start = Math.max(1, 2 * loc - best_loc);
+              } else {
+                break;
+              }
+            }
+          }
+        }
+        if (match_bitapScore_(d + 1, loc) > score_threshold) {
+          break;
+        }
+        last_rd = rd;
+      }
+      return best_loc;
+    };
+    diff_match_patch.prototype.match_alphabet_ = function(pattern) {
+      var s = {};
+      for (var i = 0; i < pattern.length; i++) {
+        s[pattern.charAt(i)] = 0;
+      }
+      for (var i = 0; i < pattern.length; i++) {
+        s[pattern.charAt(i)] |= 1 << pattern.length - i - 1;
+      }
+      return s;
+    };
+    diff_match_patch.prototype.patch_addContext_ = function(patch, text) {
+      if (text.length == 0) {
+        return;
+      }
+      if (patch.start2 === null) {
+        throw Error("patch not initialized");
+      }
+      var pattern = text.substring(patch.start2, patch.start2 + patch.length1);
+      var padding = 0;
+      while (text.indexOf(pattern) != text.lastIndexOf(pattern) && pattern.length < this.Match_MaxBits - this.Patch_Margin - this.Patch_Margin) {
+        padding += this.Patch_Margin;
+        pattern = text.substring(
+          patch.start2 - padding,
+          patch.start2 + patch.length1 + padding
+        );
+      }
+      padding += this.Patch_Margin;
+      var prefix = text.substring(patch.start2 - padding, patch.start2);
+      if (prefix) {
+        patch.diffs.unshift(new diff_match_patch.Diff(DIFF_EQUAL, prefix));
+      }
+      var suffix = text.substring(
+        patch.start2 + patch.length1,
+        patch.start2 + patch.length1 + padding
+      );
+      if (suffix) {
+        patch.diffs.push(new diff_match_patch.Diff(DIFF_EQUAL, suffix));
+      }
+      patch.start1 -= prefix.length;
+      patch.start2 -= prefix.length;
+      patch.length1 += prefix.length + suffix.length;
+      patch.length2 += prefix.length + suffix.length;
+    };
+    diff_match_patch.prototype.patch_make = function(a, opt_b, opt_c) {
+      var text1, diffs;
+      if (typeof a == "string" && typeof opt_b == "string" && typeof opt_c == "undefined") {
+        text1 = /** @type {string} */
+        a;
+        diffs = this.diff_main(
+          text1,
+          /** @type {string} */
+          opt_b,
+          true
+        );
+        if (diffs.length > 2) {
+          this.diff_cleanupSemantic(diffs);
+          this.diff_cleanupEfficiency(diffs);
+        }
+      } else if (a && typeof a == "object" && typeof opt_b == "undefined" && typeof opt_c == "undefined") {
+        diffs = /** @type {!Array.<!diff_match_patch.Diff>} */
+        a;
+        text1 = this.diff_text1(diffs);
+      } else if (typeof a == "string" && opt_b && typeof opt_b == "object" && typeof opt_c == "undefined") {
+        text1 = /** @type {string} */
+        a;
+        diffs = /** @type {!Array.<!diff_match_patch.Diff>} */
+        opt_b;
+      } else if (typeof a == "string" && typeof opt_b == "string" && opt_c && typeof opt_c == "object") {
+        text1 = /** @type {string} */
+        a;
+        diffs = /** @type {!Array.<!diff_match_patch.Diff>} */
+        opt_c;
+      } else {
+        throw new Error("Unknown call format to patch_make.");
+      }
+      if (diffs.length === 0) {
+        return [];
+      }
+      var patches = [];
+      var patch = new diff_match_patch.patch_obj();
+      var patchDiffLength = 0;
+      var char_count1 = 0;
+      var char_count2 = 0;
+      var prepatch_text = text1;
+      var postpatch_text = text1;
+      for (var x = 0; x < diffs.length; x++) {
+        var diff_type = diffs[x][0];
+        var diff_text = diffs[x][1];
+        if (!patchDiffLength && diff_type !== DIFF_EQUAL) {
+          patch.start1 = char_count1;
+          patch.start2 = char_count2;
+        }
+        switch (diff_type) {
+          case DIFF_INSERT:
+            patch.diffs[patchDiffLength++] = diffs[x];
+            patch.length2 += diff_text.length;
+            postpatch_text = postpatch_text.substring(0, char_count2) + diff_text + postpatch_text.substring(char_count2);
+            break;
+          case DIFF_DELETE:
+            patch.length1 += diff_text.length;
+            patch.diffs[patchDiffLength++] = diffs[x];
+            postpatch_text = postpatch_text.substring(0, char_count2) + postpatch_text.substring(char_count2 + diff_text.length);
+            break;
+          case DIFF_EQUAL:
+            if (diff_text.length <= 2 * this.Patch_Margin && patchDiffLength && diffs.length != x + 1) {
+              patch.diffs[patchDiffLength++] = diffs[x];
+              patch.length1 += diff_text.length;
+              patch.length2 += diff_text.length;
+            } else if (diff_text.length >= 2 * this.Patch_Margin) {
+              if (patchDiffLength) {
+                this.patch_addContext_(patch, prepatch_text);
+                patches.push(patch);
+                patch = new diff_match_patch.patch_obj();
+                patchDiffLength = 0;
+                prepatch_text = postpatch_text;
+                char_count1 = char_count2;
+              }
+            }
+            break;
+        }
+        if (diff_type !== DIFF_INSERT) {
+          char_count1 += diff_text.length;
+        }
+        if (diff_type !== DIFF_DELETE) {
+          char_count2 += diff_text.length;
+        }
+      }
+      if (patchDiffLength) {
+        this.patch_addContext_(patch, prepatch_text);
+        patches.push(patch);
+      }
+      return patches;
+    };
+    diff_match_patch.prototype.patch_deepCopy = function(patches) {
+      var patchesCopy = [];
+      for (var x = 0; x < patches.length; x++) {
+        var patch = patches[x];
+        var patchCopy = new diff_match_patch.patch_obj();
+        patchCopy.diffs = [];
+        for (var y = 0; y < patch.diffs.length; y++) {
+          patchCopy.diffs[y] = new diff_match_patch.Diff(patch.diffs[y][0], patch.diffs[y][1]);
+        }
+        patchCopy.start1 = patch.start1;
+        patchCopy.start2 = patch.start2;
+        patchCopy.length1 = patch.length1;
+        patchCopy.length2 = patch.length2;
+        patchesCopy[x] = patchCopy;
+      }
+      return patchesCopy;
+    };
+    diff_match_patch.prototype.patch_apply = function(patches, text) {
+      if (patches.length == 0) {
+        return [text, []];
+      }
+      patches = this.patch_deepCopy(patches);
+      var nullPadding = this.patch_addPadding(patches);
+      text = nullPadding + text + nullPadding;
+      this.patch_splitMax(patches);
+      var delta = 0;
+      var results = [];
+      for (var x = 0; x < patches.length; x++) {
+        var expected_loc = patches[x].start2 + delta;
+        var text1 = this.diff_text1(patches[x].diffs);
+        var start_loc;
+        var end_loc = -1;
+        if (text1.length > this.Match_MaxBits) {
+          start_loc = this.match_main(
+            text,
+            text1.substring(0, this.Match_MaxBits),
+            expected_loc
+          );
+          if (start_loc != -1) {
+            end_loc = this.match_main(
+              text,
+              text1.substring(text1.length - this.Match_MaxBits),
+              expected_loc + text1.length - this.Match_MaxBits
+            );
+            if (end_loc == -1 || start_loc >= end_loc) {
+              start_loc = -1;
+            }
+          }
+        } else {
+          start_loc = this.match_main(text, text1, expected_loc);
+        }
+        if (start_loc == -1) {
+          results[x] = false;
+          delta -= patches[x].length2 - patches[x].length1;
+        } else {
+          results[x] = true;
+          delta = start_loc - expected_loc;
+          var text2;
+          if (end_loc == -1) {
+            text2 = text.substring(start_loc, start_loc + text1.length);
+          } else {
+            text2 = text.substring(start_loc, end_loc + this.Match_MaxBits);
+          }
+          if (text1 == text2) {
+            text = text.substring(0, start_loc) + this.diff_text2(patches[x].diffs) + text.substring(start_loc + text1.length);
+          } else {
+            var diffs = this.diff_main(text1, text2, false);
+            if (text1.length > this.Match_MaxBits && this.diff_levenshtein(diffs) / text1.length > this.Patch_DeleteThreshold) {
+              results[x] = false;
+            } else {
+              this.diff_cleanupSemanticLossless(diffs);
+              var index1 = 0;
+              var index2;
+              for (var y = 0; y < patches[x].diffs.length; y++) {
+                var mod = patches[x].diffs[y];
+                if (mod[0] !== DIFF_EQUAL) {
+                  index2 = this.diff_xIndex(diffs, index1);
+                }
+                if (mod[0] === DIFF_INSERT) {
+                  text = text.substring(0, start_loc + index2) + mod[1] + text.substring(start_loc + index2);
+                } else if (mod[0] === DIFF_DELETE) {
+                  text = text.substring(0, start_loc + index2) + text.substring(start_loc + this.diff_xIndex(
+                    diffs,
+                    index1 + mod[1].length
+                  ));
+                }
+                if (mod[0] !== DIFF_DELETE) {
+                  index1 += mod[1].length;
+                }
+              }
+            }
+          }
+        }
+      }
+      text = text.substring(nullPadding.length, text.length - nullPadding.length);
+      return [text, results];
+    };
+    diff_match_patch.prototype.patch_addPadding = function(patches) {
+      var paddingLength = this.Patch_Margin;
+      var nullPadding = "";
+      for (var x = 1; x <= paddingLength; x++) {
+        nullPadding += String.fromCharCode(x);
+      }
+      for (var x = 0; x < patches.length; x++) {
+        patches[x].start1 += paddingLength;
+        patches[x].start2 += paddingLength;
+      }
+      var patch = patches[0];
+      var diffs = patch.diffs;
+      if (diffs.length == 0 || diffs[0][0] != DIFF_EQUAL) {
+        diffs.unshift(new diff_match_patch.Diff(DIFF_EQUAL, nullPadding));
+        patch.start1 -= paddingLength;
+        patch.start2 -= paddingLength;
+        patch.length1 += paddingLength;
+        patch.length2 += paddingLength;
+      } else if (paddingLength > diffs[0][1].length) {
+        var extraLength = paddingLength - diffs[0][1].length;
+        diffs[0][1] = nullPadding.substring(diffs[0][1].length) + diffs[0][1];
+        patch.start1 -= extraLength;
+        patch.start2 -= extraLength;
+        patch.length1 += extraLength;
+        patch.length2 += extraLength;
+      }
+      patch = patches[patches.length - 1];
+      diffs = patch.diffs;
+      if (diffs.length == 0 || diffs[diffs.length - 1][0] != DIFF_EQUAL) {
+        diffs.push(new diff_match_patch.Diff(DIFF_EQUAL, nullPadding));
+        patch.length1 += paddingLength;
+        patch.length2 += paddingLength;
+      } else if (paddingLength > diffs[diffs.length - 1][1].length) {
+        var extraLength = paddingLength - diffs[diffs.length - 1][1].length;
+        diffs[diffs.length - 1][1] += nullPadding.substring(0, extraLength);
+        patch.length1 += extraLength;
+        patch.length2 += extraLength;
+      }
+      return nullPadding;
+    };
+    diff_match_patch.prototype.patch_splitMax = function(patches) {
+      var patch_size = this.Match_MaxBits;
+      for (var x = 0; x < patches.length; x++) {
+        if (patches[x].length1 <= patch_size) {
+          continue;
+        }
+        var bigpatch = patches[x];
+        patches.splice(x--, 1);
+        var start1 = bigpatch.start1;
+        var start2 = bigpatch.start2;
+        var precontext = "";
+        while (bigpatch.diffs.length !== 0) {
+          var patch = new diff_match_patch.patch_obj();
+          var empty = true;
+          patch.start1 = start1 - precontext.length;
+          patch.start2 = start2 - precontext.length;
+          if (precontext !== "") {
+            patch.length1 = patch.length2 = precontext.length;
+            patch.diffs.push(new diff_match_patch.Diff(DIFF_EQUAL, precontext));
+          }
+          while (bigpatch.diffs.length !== 0 && patch.length1 < patch_size - this.Patch_Margin) {
+            var diff_type = bigpatch.diffs[0][0];
+            var diff_text = bigpatch.diffs[0][1];
+            if (diff_type === DIFF_INSERT) {
+              patch.length2 += diff_text.length;
+              start2 += diff_text.length;
+              patch.diffs.push(bigpatch.diffs.shift());
+              empty = false;
+            } else if (diff_type === DIFF_DELETE && patch.diffs.length == 1 && patch.diffs[0][0] == DIFF_EQUAL && diff_text.length > 2 * patch_size) {
+              patch.length1 += diff_text.length;
+              start1 += diff_text.length;
+              empty = false;
+              patch.diffs.push(new diff_match_patch.Diff(diff_type, diff_text));
+              bigpatch.diffs.shift();
+            } else {
+              diff_text = diff_text.substring(
+                0,
+                patch_size - patch.length1 - this.Patch_Margin
+              );
+              patch.length1 += diff_text.length;
+              start1 += diff_text.length;
+              if (diff_type === DIFF_EQUAL) {
+                patch.length2 += diff_text.length;
+                start2 += diff_text.length;
+              } else {
+                empty = false;
+              }
+              patch.diffs.push(new diff_match_patch.Diff(diff_type, diff_text));
+              if (diff_text == bigpatch.diffs[0][1]) {
+                bigpatch.diffs.shift();
+              } else {
+                bigpatch.diffs[0][1] = bigpatch.diffs[0][1].substring(diff_text.length);
+              }
+            }
+          }
+          precontext = this.diff_text2(patch.diffs);
+          precontext = precontext.substring(precontext.length - this.Patch_Margin);
+          var postcontext = this.diff_text1(bigpatch.diffs).substring(0, this.Patch_Margin);
+          if (postcontext !== "") {
+            patch.length1 += postcontext.length;
+            patch.length2 += postcontext.length;
+            if (patch.diffs.length !== 0 && patch.diffs[patch.diffs.length - 1][0] === DIFF_EQUAL) {
+              patch.diffs[patch.diffs.length - 1][1] += postcontext;
+            } else {
+              patch.diffs.push(new diff_match_patch.Diff(DIFF_EQUAL, postcontext));
+            }
+          }
+          if (!empty) {
+            patches.splice(++x, 0, patch);
+          }
+        }
+      }
+    };
+    diff_match_patch.prototype.patch_toText = function(patches) {
+      var text = [];
+      for (var x = 0; x < patches.length; x++) {
+        text[x] = patches[x];
+      }
+      return text.join("");
+    };
+    diff_match_patch.prototype.patch_fromText = function(textline) {
+      var patches = [];
+      if (!textline) {
+        return patches;
+      }
+      var text = textline.split("\n");
+      var textPointer = 0;
+      var patchHeader = /^@@ -(\d+),?(\d*) \+(\d+),?(\d*) @@$/;
+      while (textPointer < text.length) {
+        var m = text[textPointer].match(patchHeader);
+        if (!m) {
+          throw new Error("Invalid patch string: " + text[textPointer]);
+        }
+        var patch = new diff_match_patch.patch_obj();
+        patches.push(patch);
+        patch.start1 = parseInt(m[1], 10);
+        if (m[2] === "") {
+          patch.start1--;
+          patch.length1 = 1;
+        } else if (m[2] == "0") {
+          patch.length1 = 0;
+        } else {
+          patch.start1--;
+          patch.length1 = parseInt(m[2], 10);
+        }
+        patch.start2 = parseInt(m[3], 10);
+        if (m[4] === "") {
+          patch.start2--;
+          patch.length2 = 1;
+        } else if (m[4] == "0") {
+          patch.length2 = 0;
+        } else {
+          patch.start2--;
+          patch.length2 = parseInt(m[4], 10);
+        }
+        textPointer++;
+        while (textPointer < text.length) {
+          var sign = text[textPointer].charAt(0);
+          try {
+            var line = decodeURI(text[textPointer].substring(1));
+          } catch (ex) {
+            throw new Error("Illegal escape in patch_fromText: " + line);
+          }
+          if (sign == "-") {
+            patch.diffs.push(new diff_match_patch.Diff(DIFF_DELETE, line));
+          } else if (sign == "+") {
+            patch.diffs.push(new diff_match_patch.Diff(DIFF_INSERT, line));
+          } else if (sign == " ") {
+            patch.diffs.push(new diff_match_patch.Diff(DIFF_EQUAL, line));
+          } else if (sign == "@") {
+            break;
+          } else if (sign === "") {
+          } else {
+            throw new Error('Invalid patch mode "' + sign + '" in: ' + line);
+          }
+          textPointer++;
+        }
+      }
+      return patches;
+    };
+    diff_match_patch.patch_obj = function() {
+      this.diffs = [];
+      this.start1 = null;
+      this.start2 = null;
+      this.length1 = 0;
+      this.length2 = 0;
+    };
+    diff_match_patch.patch_obj.prototype.toString = function() {
+      var coords1, coords2;
+      if (this.length1 === 0) {
+        coords1 = this.start1 + ",0";
+      } else if (this.length1 == 1) {
+        coords1 = this.start1 + 1;
+      } else {
+        coords1 = this.start1 + 1 + "," + this.length1;
+      }
+      if (this.length2 === 0) {
+        coords2 = this.start2 + ",0";
+      } else if (this.length2 == 1) {
+        coords2 = this.start2 + 1;
+      } else {
+        coords2 = this.start2 + 1 + "," + this.length2;
+      }
+      var text = ["@@ -" + coords1 + " +" + coords2 + " @@\n"];
+      var op;
+      for (var x = 0; x < this.diffs.length; x++) {
+        switch (this.diffs[x][0]) {
+          case DIFF_INSERT:
+            op = "+";
+            break;
+          case DIFF_DELETE:
+            op = "-";
+            break;
+          case DIFF_EQUAL:
+            op = " ";
+            break;
+        }
+        text[x + 1] = op + encodeURI(this.diffs[x][1]) + "\n";
+      }
+      return text.join("").replace(/%20/g, " ");
+    };
+    module.exports = diff_match_patch;
+    module.exports["diff_match_patch"] = diff_match_patch;
+    module.exports["DIFF_DELETE"] = DIFF_DELETE;
+    module.exports["DIFF_INSERT"] = DIFF_INSERT;
+    module.exports["DIFF_EQUAL"] = DIFF_EQUAL;
+  }
+});
+
+// src/snapshot.js
+var SKIP_TAGS = /* @__PURE__ */ new Set(["SCRIPT", "STYLE", "NOSCRIPT", "TEMPLATE", "LINK", "META", "HEAD", "IFRAME", "OBJECT"]);
+var DEFAULT_ATTRS = ["src", "href", "alt", "colspan", "rowspan", "type"];
+var DEFAULT_ANCHORS = "p,li,tr,h1,h2,h3,h4,h5,h6,dt,dd,pre,blockquote,figcaption,caption,img,[data-sgc-key]";
+var KEY_ATTRS = ["data-sgc-key", "data-key"];
+function hashStr(str, seed = 0) {
+  let h1 = 3735928559 ^ seed, h2 = 1103547991 ^ seed;
+  for (let i = 0; i < str.length; i++) {
+    const ch = str.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ h1 >>> 16, 2246822507) ^ Math.imul(h2 ^ h2 >>> 13, 3266489909);
+  h2 = Math.imul(h2 ^ h2 >>> 16, 2246822507) ^ Math.imul(h1 ^ h1 >>> 13, 3266489909);
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
+}
+var normText = (s) => s.replace(/\s+/g, " ").trim();
+function snapshot(root, opt = {}) {
+  const it = walk(root, opt);
+  let r = it.next();
+  while (!r.done) r = it.next();
+  return r.value;
+}
+async function snapshotAsync(root, opt = {}, sliceMs = 8) {
+  const it = walk(root, opt);
+  let t = performance.now();
+  for (let r = it.next(); ; r = it.next()) {
+    if (r.done) return r.value;
+    if (performance.now() - t > sliceMs) {
+      await yieldToBrowser();
+      t = performance.now();
+    }
+  }
+}
+var chan = null;
+var waiters = [];
+function yieldToBrowser() {
+  const s = globalThis.scheduler;
+  if (s && typeof s.yield === "function") return s.yield();
+  if (typeof MessageChannel === "undefined") return new Promise((res) => setTimeout(res, 0));
+  if (!chan) {
+    chan = new MessageChannel();
+    chan.port1.onmessage = () => waiters.shift()?.();
+  }
+  return new Promise((res) => {
+    waiters.push(res);
+    chan.port2.postMessage(0);
+  });
+}
+function* walk(root, opt) {
+  const attrs = opt.attrs ?? DEFAULT_ATTRS;
+  const ignoreSel = ["[data-sgc-ignore]", "[hidden]", opt.ignore].filter(Boolean).join(",");
+  const anchorSel = opt.anchors ?? DEFAULT_ANCHORS;
+  const keyAttrs = opt.keyAttrs ?? KEY_ATTRS;
+  const nodes = [];
+  const anchors = [], anchorHashes = [];
+  const flat = [];
+  let count = 0;
+  function open(e, parent) {
+    const i = nodes.length;
+    nodes.push(e);
+    const n = e.localName;
+    const out = { n, c: [], h: "", i };
+    let sig = n;
+    const a = {};
+    let hasA = false;
+    for (const name of attrs) {
+      const v = e.getAttribute(name);
+      if (v !== null) {
+        a[name] = v;
+        hasA = true;
+        sig += `${name}=${v}`;
+      }
+    }
+    const tag = e.tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") {
+      const t = e.type;
+      const v = t === "checkbox" || t === "radio" ? e.checked ? "on" : "off" : tag === "SELECT" ? Array.from(e.selectedOptions ?? [], (o) => o.text).join(", ") : e.value ?? "";
+      a.value = v;
+      hasA = true;
+      sig += `value=${v}`;
+    }
+    if (hasA) out.a = a;
+    for (const ka of keyAttrs) {
+      const k = e.getAttribute(ka);
+      if (k) {
+        out.k = k;
+        sig += `${k}`;
+        break;
+      }
+    }
+    const rec = { n, p: parent, h: "" };
+    if (hasA) rec.a = a;
+    if (out.k) rec.k = out.k;
+    flat[i] = rec;
+    const ai = anchorSel && e.matches(anchorSel) ? anchors.push(i) - 1 : -1;
+    let kids = tag === "TEXTAREA" || tag === "SELECT" ? [] : Array.from(e.childNodes);
+    if (e.shadowRoot && e.shadowRoot.mode === "open") kids = kids.concat(Array.from(e.shadowRoot.children));
+    return { out, sig, kids, x: 0, ai, rec };
+  }
+  const rootEl = resolveRoot(root);
+  const top = open(rootEl, -1);
+  const stack = [top];
+  while (stack.length) {
+    const f = stack[stack.length - 1];
+    if (f.x < f.kids.length) {
+      const ch = f.kids[f.x++];
+      if (++count % 512 === 0) yield;
+      const t = ch.nodeType;
+      if (t === 3) {
+        const v = normText(ch.data);
+        if (!v) continue;
+        const ti = nodes.length;
+        nodes.push(ch);
+        const h2 = hashStr(v);
+        f.out.c.push({ v, h: h2, i: ti });
+        flat[ti] = { v, h: h2, p: f.out.i };
+        f.sig += "" + h2;
+      } else if (t === 1) {
+        if (SKIP_TAGS.has(ch.tagName) || ignoreSel && ch.matches(ignoreSel)) continue;
+        const sub = open(ch, f.out.i);
+        f.out.c.push(sub.out);
+        stack.push(sub);
+      }
+      continue;
+    }
+    f.out.h = f.rec.h = hashStr(f.sig);
+    if (f.ai >= 0) anchorHashes[f.ai] = f.out.h;
+    stack.pop();
+    if (stack.length) stack[stack.length - 1].sig += "" + f.out.h;
+  }
+  return { tree: top.out, nodes, anchors, anchorHashes, flat };
+}
+function resolveRoot(src) {
+  if (!src) throw new Error("[sg-compare] \uBE44\uAD50\uD560 \uD654\uBA74\uC774 \uC5C6\uC2B5\uB2C8\uB2E4");
+  if (src.tagName === "IFRAME") {
+    const d = src.contentDocument;
+    if (!d) throw new Error("[sg-compare] iframe \uC548\uC744 \uC77D\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4 (\uB2E4\uB978 \uB3C4\uBA54\uC778\uC774\uBA74 \uAC19\uC740 \uB3C4\uBA54\uC778 \uC8FC\uC18C\uB85C \uC5F4\uC5B4\uC57C \uD569\uB2C8\uB2E4)");
+    return d.body;
+  }
+  if (src.nodeType === 9) return src.body;
+  return src;
+}
+function locate(tree, raw) {
+  let cur = tree, node = tree;
+  let rest = [];
+  for (let k = 0; k < raw.length; k++) {
+    const seg = raw[k];
+    const next = cur?.[seg];
+    if (next === void 0) {
+      rest = raw.slice(k);
+      break;
+    }
+    cur = next;
+    if (cur && typeof cur === "object" && !Array.isArray(cur) && typeof cur.i === "number") {
+      node = cur;
+      rest = [];
+    } else rest.push(seg);
+  }
+  return { node, rest };
+}
+
+// ../compare-core/src/path.js
+var esc = (s) => String(s).replace(/[\\[\]]/g, (m) => "\\" + m);
+function toPath(segs) {
+  let out = "";
+  for (const s of segs) {
+    if ("i" in s) out += `[${esc(s.i)}]`;
+    else out += (out ? "." : "") + s.k;
+  }
+  return out;
+}
+function toPattern(segs) {
+  return segs.map((s) => "i" in s ? "*" : s.k).join(".");
+}
+function matchParts(pat, pi, parts, xi) {
+  if (pi === pat.length) return xi === parts.length;
+  const p = pat[pi];
+  if (p === "**") {
+    for (let k = xi; k <= parts.length; k++) if (matchParts(pat, pi + 1, parts, k)) return true;
+    return false;
+  }
+  if (xi === parts.length) return false;
+  if (p !== "*" && p !== parts[xi]) return false;
+  return matchParts(pat, pi + 1, parts, xi + 1);
+}
+function makeMatcher(spec) {
+  if (!spec) return () => void 0;
+  const list = typeof spec === "string" ? [[spec, true]] : Array.isArray(spec) ? spec.map((p) => [p, true]) : Object.entries(spec);
+  const rules = list.map(([p, v]) => [p.split("."), v]);
+  const cache = /* @__PURE__ */ new Map();
+  return (pattern) => {
+    if (cache.has(pattern)) return cache.get(pattern);
+    const parts = pattern === "" ? [] : pattern.split(".");
+    let found;
+    for (const [pat, v] of rules) {
+      if (matchParts(pat, 0, parts, 0)) {
+        found = v;
+        break;
+      }
+    }
+    cache.set(pattern, found);
+    return found;
+  };
+}
+function stableHash(v, skip) {
+  return JSON.stringify(sortDeep(v, skip, []));
+}
+function sortDeep(v, skip, segs) {
+  if (Array.isArray(v)) return v.map((x, i) => sortDeep(x, skip, [...segs, { i: String(i) }]));
+  if (v && typeof v === "object") {
+    const out = {};
+    for (const k of Object.keys(v).sort()) {
+      const next = [...segs, { k }];
+      if (skip && skip(toPattern(next))) continue;
+      out[k] = sortDeep(v[k], skip, next);
+    }
+    return out;
+  }
+  return v;
+}
+
+// ../compare-core/src/match.js
+var import_diff_match_patch = __toESM(require_diff_match_patch(), 1);
+var myers = new import_diff_match_patch.default();
+myers.Diff_Timeout = 0;
+function anchorsByMyers(hl, hr, pre, n, m) {
+  const code2 = /* @__PURE__ */ new Map();
+  const enc = (h2) => {
+    let c = code2.get(h2);
+    if (c === void 0) {
+      c = code2.size + 1;
+      if (c >= 55296) c += 2048;
+      code2.set(h2, c);
+    }
+    return c;
+  };
+  const a = [], b = [];
+  for (let i2 = 0; i2 < n; i2++) a.push(enc(hl[pre + i2]));
+  for (let j2 = 0; j2 < m; j2++) b.push(enc(hr[pre + j2]));
+  if (code2.size > 63e3) return null;
+  const d = myers.diff_main(chunked(a), chunked(b), false);
+  const out = [];
+  let i = 0, j = 0;
+  for (const [op, t] of d) {
+    if (op === 0) {
+      for (let k = 0; k < t.length; k++) out.push([pre + i + k, pre + j + k]);
+      i += t.length;
+      j += t.length;
+    } else if (op === -1) i += t.length;
+    else j += t.length;
+  }
+  return out;
+}
+function chunked(arr) {
+  let s = "";
+  for (let i = 0; i < arr.length; i += 8192) s += String.fromCharCode(...arr.slice(i, i + 8192));
+  return s;
+}
+function alignSequences(hl, hr) {
+  const pairs = matchKeyless(hl, hr, (x) => x);
+  const out = [];
+  for (const p of pairs) if (p.hasL && p.hasR && hl[p.li] === hr[p.ri]) out.push([p.li, p.ri]);
+  return out;
+}
+function uniqueIds(arr, keyOf) {
+  const seen = /* @__PURE__ */ new Map();
+  return arr.map((item, idx) => {
+    const base = String(keyOf(item, idx) ?? "");
+    const n = (seen.get(base) ?? 0) + 1;
+    seen.set(base, n);
+    return n === 1 ? base : `${base}#${n}`;
+  });
+}
+function matchKeyed(L, R, keyOf, detectMoves = true) {
+  const lid = uniqueIds(L, keyOf);
+  const rid = uniqueIds(R, keyOf);
+  const lpos = new Map(lid.map((id, i) => [id, i]));
+  const rset = new Set(rid);
+  const moved = /* @__PURE__ */ new Set();
+  if (detectMoves) {
+    const common = rid.filter((id) => lpos.has(id));
+    const keep = lis(common.map((id) => lpos.get(id)));
+    common.forEach((id, i) => {
+      if (!keep.has(i)) moved.add(id);
+    });
+  }
+  const out = [];
+  let li = 0;
+  const flushLeftOnly = (until) => {
+    while (li < L.length && lid[li] !== until) {
+      if (!rset.has(lid[li])) out.push({ id: lid[li], hasL: true, hasR: false, l: L[li], r: void 0, li, ri: -1, moved: false });
+      li++;
+    }
+    if (li < L.length && lid[li] === until) li++;
+  };
+  rid.forEach((id, ri) => {
+    if (lpos.has(id)) {
+      if (!moved.has(id)) flushLeftOnly(id);
+      const i = lpos.get(id);
+      out.push({ id, hasL: true, hasR: true, l: L[i], r: R[ri], li: i, ri, moved: moved.has(id) });
+    } else {
+      out.push({ id, hasL: false, hasR: true, l: void 0, r: R[ri], li: -1, ri, moved: false });
+    }
+  });
+  flushLeftOnly(void 0);
+  return out;
+}
+function lis(seq2) {
+  const tails = [], prev = new Array(seq2.length), idxAt = [];
+  seq2.forEach((v, i) => {
+    let lo = 0, hi = tails.length;
+    while (lo < hi) {
+      const m = lo + hi >> 1;
+      if (tails[m] < v) lo = m + 1;
+      else hi = m;
+    }
+    tails[lo] = v;
+    idxAt[lo] = i;
+    prev[i] = lo > 0 ? idxAt[lo - 1] : -1;
+  });
+  const keep = /* @__PURE__ */ new Set();
+  for (let i = idxAt[tails.length - 1] ?? -1; i >= 0; i = prev[i]) keep.add(i);
+  return keep;
+}
+var LCS_LIMIT = 4e6;
+function matchKeyless(L, R, hashOf, similar = null) {
+  const hl = L.map((x, i) => hashOf(x, "l", i));
+  const hr = R.map((x, i) => hashOf(x, "r", i));
+  let pre = 0;
+  while (pre < L.length && pre < R.length && hl[pre] === hr[pre]) pre++;
+  let suf = 0;
+  while (suf < L.length - pre && suf < R.length - pre && hl[L.length - 1 - suf] === hr[R.length - 1 - suf]) suf++;
+  const n = L.length - pre - suf, m = R.length - pre - suf;
+  const anchors = [];
+  for (let i = 0; i < pre; i++) anchors.push([i, i]);
+  const big = n > 0 && m > 0 && (n + 1) * (m + 1) > LCS_LIMIT ? anchorsByMyers(hl, hr, pre, n, m) : null;
+  if (big) anchors.push(...big);
+  else if (n > 0 && m > 0 && (n + 1) * (m + 1) <= LCS_LIMIT) {
+    const W = m + 1, dp = new Uint32Array((n + 1) * W);
+    for (let i = n - 1; i >= 0; i--) {
+      for (let j = m - 1; j >= 0; j--) {
+        dp[i * W + j] = hl[pre + i] === hr[pre + j] ? dp[(i + 1) * W + j + 1] + 1 : Math.max(dp[(i + 1) * W + j], dp[i * W + j + 1]);
+      }
+    }
+    for (let i = 0, j = 0; i < n && j < m; ) {
+      if (hl[pre + i] === hr[pre + j]) {
+        anchors.push([pre + i, pre + j]);
+        i++;
+        j++;
+      } else if (dp[(i + 1) * W + j] >= dp[i * W + j + 1]) i++;
+      else j++;
+    }
+  }
+  for (let k = suf; k > 0; k--) anchors.push([L.length - k, R.length - k]);
+  anchors.push([L.length, R.length]);
+  const out = [];
+  const add = (li, ri) => out.push({
+    id: ri >= 0 ? `#${ri}` : `#~${li}`,
+    hasL: li >= 0,
+    hasR: ri >= 0,
+    l: li >= 0 ? L[li] : void 0,
+    r: ri >= 0 ? R[ri] : void 0,
+    li,
+    ri,
+    moved: false
+  });
+  let pl = 0, pr = 0;
+  for (const [al, ar] of anchors) {
+    const gl = al - pl, gr = ar - pr;
+    if (similar && gl > 0 && gr > 0 && gl * gr <= GAP_LIMIT) {
+      for (const [a, b] of alignGap(L, R, pl, gl, pr, gr, similar)) add(a, b);
+    } else {
+      const both = Math.min(gl, gr);
+      for (let k = 0; k < both; k++) add(pl + k, pr + k);
+      for (let k = both; k < gl; k++) add(pl + k, -1);
+      for (let k = both; k < gr; k++) add(-1, pr + k);
+    }
+    if (al < L.length) add(al, ar);
+    pl = al + 1;
+    pr = ar + 1;
+  }
+  return out;
+}
+var GAP_LIMIT = 25e4;
+var SIM_MIN = 0.5;
+function alignGap(L, R, pl, gl, pr, gr, similar) {
+  const W = gr + 1;
+  const sim = new Float64Array(gl * gr);
+  for (let i2 = 0; i2 < gl; i2++) for (let j2 = 0; j2 < gr; j2++) {
+    const s = Number(similar(L[pl + i2], R[pr + j2])) || 0;
+    sim[i2 * gr + j2] = s >= SIM_MIN ? s : -1;
+  }
+  const dp = new Float64Array((gl + 1) * W);
+  for (let i2 = gl - 1; i2 >= 0; i2--) for (let j2 = gr - 1; j2 >= 0; j2--) {
+    const s = sim[i2 * gr + j2];
+    dp[i2 * W + j2] = Math.max(dp[(i2 + 1) * W + j2], dp[i2 * W + j2 + 1], s >= 0 ? s + dp[(i2 + 1) * W + j2 + 1] : -1);
+  }
+  const out = [];
+  let i = 0, j = 0;
+  while (i < gl && j < gr) {
+    const s = sim[i * gr + j];
+    if (s >= 0 && dp[i * W + j] === s + dp[(i + 1) * W + j + 1]) {
+      out.push([pl + i, pr + j]);
+      i++;
+      j++;
+    } else if (dp[i * W + j] === dp[(i + 1) * W + j]) {
+      out.push([pl + i, -1]);
+      i++;
+    } else {
+      out.push([-1, pr + j]);
+      j++;
+    }
+  }
+  for (; i < gl; i++) out.push([pl + i, -1]);
+  for (; j < gr; j++) out.push([-1, pr + j]);
+  return out;
+}
+
+// ../compare-core/src/text.js
+var import_diff_match_patch2 = __toESM(require_diff_match_patch(), 1);
+var dmp = new import_diff_match_patch2.default();
+function textDiff(a, b, longMin = 20) {
+  const d = dmp.diff_main(String(a), String(b));
+  if (Math.max(String(a).length, String(b).length) >= longMin) dmp.diff_cleanupSemantic(d);
+  else dmp.diff_cleanupEfficiency(d);
+  return d.map(([op, t]) => [op, t]);
+}
+
+// ../compare-core/src/compare.js
+var isObj = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
+var hasOwn = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+var AUTO_KEYS = ["id", "key", "uuid", "code"];
+var TITLE_FIELDS = ["title", "name", "label", "heading"];
+var RANK = { child: 1, moved: 2, modified: 3, added: 4, deleted: 4 };
+function compare(left, right, rules = {}) {
+  const opt = { textMin: 20, detectMoves: true, numeric: false, whitespace: false, ...rules };
+  const find = {
+    keys: makeMatcher(opt.keys),
+    ignore: makeMatcher(opt.ignore),
+    titles: makeMatcher(opt.titles),
+    labels: makeMatcher(opt.labels),
+    equals: makeMatcher(opt.equals),
+    similar: makeMatcher(opt.similar),
+    identity: makeMatcher(opt.identity),
+    units: makeMatcher(opt.countBy)
+  };
+  const ignored = (pat) => !!find.ignore(pat);
+  const changes = [];
+  const nodes = /* @__PURE__ */ new Map();
+  const paths = /* @__PURE__ */ new WeakMap();
+  const remember = (v, path) => {
+    if (v && typeof v === "object") paths.set(v, path);
+  };
+  const itemIds = /* @__PURE__ */ new WeakMap();
+  const setNode = (path, status, own) => {
+    const cur = nodes.get(path);
+    if (!cur || RANK[status] > RANK[cur.status] || own && !cur.own && RANK[status] >= RANK[cur.status]) nodes.set(path, { status, own });
+  };
+  function keyRule(pat, L, R) {
+    const rule = find.keys(pat);
+    if (rule === false) return null;
+    if (typeof rule === "function") {
+      const ok = [L, R].every((arr) => arr.every((x, i) => {
+        const k = rule(x, i);
+        return k !== null && k !== void 0;
+      }));
+      return ok ? rule : null;
+    }
+    if (typeof rule === "string" || Array.isArray(rule)) {
+      const fields = Array.isArray(rule) ? rule : [rule];
+      return (item, idx) => {
+        if (!isObj(item)) return String(item);
+        for (const f of fields) if (item[f] !== void 0 && item[f] !== null && item[f] !== "") return String(item[f]);
+        return `#${idx}`;
+      };
+    }
+    const all = [...L, ...R];
+    if (!all.length || !all.every(isObj)) return null;
+    for (const f of AUTO_KEYS) {
+      const ok = [L, R].every((arr) => {
+        const seen = /* @__PURE__ */ new Set();
+        return arr.every((x) => x[f] !== void 0 && x[f] !== null && !seen.has(x[f]) && seen.add(x[f]));
+      });
+      if (ok) return (item) => String(item[f]);
+    }
+    return null;
+  }
+  function hashFn(itemPat) {
+    const id = find.identity(itemPat);
+    const full = (x) => stableHash(x, (p) => ignored(`${itemPat}${p ? "." + p : ""}`));
+    if (typeof id !== "function") return full;
+    return (x) => {
+      const h2 = id(x);
+      return h2 === void 0 || h2 === null ? full(x) : "id:" + h2;
+    };
+  }
+  function similarFn(itemPat) {
+    const rule = find.similar(itemPat);
+    return typeof rule === "function" ? rule : null;
+  }
+  function titleOf(item, pat, id) {
+    const rule = find.titles(pat);
+    if (typeof rule === "function") return String(rule(item) ?? id);
+    if (typeof rule === "string" && isObj(item) && item[rule] != null) return String(item[rule]);
+    if (isObj(item)) {
+      for (const f of TITLE_FIELDS) if (typeof item[f] === "string" && item[f]) return item[f];
+    }
+    return isObj(item) || Array.isArray(item) ? id : String(item);
+  }
+  function labelOf(pat, segs, fallback, change) {
+    const rule = find.labels(pat);
+    if (typeof rule === "function") return String(rule(change));
+    if (typeof rule === "string") return rule;
+    const last = segs[segs.length - 1];
+    return fallback ?? (last ? "k" in last ? last.k : last.i : "");
+  }
+  function equalLeaf(a, b, pat) {
+    const rule = find.equals(pat);
+    if (typeof rule === "function") return !!rule(a, b);
+    if (Object.is(a, b)) return true;
+    if (opt.numeric && a !== "" && b !== "" && a !== null && b !== null && !isNaN(Number(a)) && !isNaN(Number(b))) return Number(a) === Number(b);
+    if (opt.whitespace && typeof a === "string" && typeof b === "string") return a.trim().replace(/\s+/g, " ") === b.trim().replace(/\s+/g, " ");
+    return false;
+  }
+  function registerTree(v, segs, status) {
+    const path = toPath(segs);
+    remember(v, path);
+    setNode(path, status, false);
+    const pat = toPattern(segs);
+    if (Array.isArray(v)) {
+      const keyOf = keyRule(pat, v, []) ?? ((_x, i) => status === "deleted" ? `#~${i}` : `#${i}`);
+      const ids = /* @__PURE__ */ new Map(), list = [];
+      v.forEach((x, i) => {
+        let id = String(keyOf(x, i));
+        const n = (ids.get(id) ?? 0) + 1;
+        ids.set(id, n);
+        if (n > 1) id += `#${n}`;
+        list.push(id);
+        registerTree(x, [...segs, { i: id }], status);
+      });
+      itemIds.set(v, list);
+    } else if (isObj(v)) {
+      for (const k of Object.keys(v)) if (!ignored(toPattern([...segs, { k }]))) registerTree(v[k], [...segs, { k }], status);
+    }
+  }
+  function visit(l, r, hasL, hasR, segs, crumbs, anc, lr, rr, gap) {
+    const path = toPath(segs), pattern = toPattern(segs);
+    const base = { path, pattern, crumbs: crumbs.slice(), ancestors: anc.map((a) => a.path), ancestorPatterns: anc.map((a) => a.pattern) };
+    if (opt.raw) base.at = { left: hasL ? lr : null, right: hasR ? rr : null, ...gap ? { gap } : {} };
+    const push = (c) => {
+      const ch = { ...base, ...c };
+      ch.label = labelOf(pattern, segs, c.label, ch);
+      changes.push(ch);
+      setNode(path, ch.type, true);
+    };
+    if (!hasL && !hasR) return void 0;
+    if (!hasL) {
+      registerTree(r, segs, "added");
+      push({ type: "added", kind: kindOf(r), left: void 0, right: r, diffs: null });
+      return r;
+    }
+    if (!hasR) {
+      registerTree(l, segs, "deleted");
+      push({ type: "deleted", kind: kindOf(l), left: l, right: void 0, diffs: null });
+      return l;
+    }
+    remember(l, path);
+    remember(r, path);
+    const idf = find.identity(pattern);
+    if (typeof idf === "function" && l && r && typeof l === "object" && typeof r === "object") {
+      const a = idf(l);
+      if (a !== void 0 && a !== null && a === idf(r)) return r;
+    }
+    if (Array.isArray(l) && Array.isArray(r)) {
+      const keyOf = keyRule(pattern, l, r);
+      const pairs = keyOf ? matchKeyed(l, r, keyOf, opt.detectMoves) : matchKeyless(l, r, hashFn(pattern ? `${pattern}.*` : "*"), similarFn(pattern ? `${pattern}.*` : "*"));
+      const merged2 = [];
+      const itemPat = pattern ? `${pattern}.*` : "*";
+      const lIds = new Array(l.length), rIds = new Array(r.length), mIds = [];
+      const nextR = new Array(pairs.length), nextL = new Array(pairs.length);
+      if (opt.raw) {
+        for (let k = pairs.length - 1, n = r.length; k >= 0; k--) {
+          nextR[k] = n;
+          if (pairs[k].hasR) n = pairs[k].ri;
+        }
+        for (let k = pairs.length - 1, n = l.length; k >= 0; k--) {
+          nextL[k] = n;
+          if (pairs[k].hasL && !pairs[k].moved) n = pairs[k].li;
+        }
+      }
+      let pk = -1;
+      for (const p of pairs) {
+        pk++;
+        if (p.hasL) lIds[p.li] = p.id;
+        if (p.hasR) rIds[p.ri] = p.id;
+        mIds.push(p.id);
+        const item = p.hasR ? p.r : p.l;
+        const seg = { i: p.id };
+        const nextSegs = [...segs, seg];
+        const title = titleOf(item, itemPat, p.id);
+        const nextAnc = [...anc, { path, pattern }];
+        if (p.moved) {
+          const ipath = toPath(nextSegs);
+          const mc = {
+            path: ipath,
+            pattern: itemPat,
+            crumbs: [...crumbs, title],
+            ancestors: nextAnc.map((a) => a.path),
+            ancestorPatterns: nextAnc.map((a) => a.pattern),
+            type: "moved",
+            kind: "node",
+            label: title,
+            left: p.li + 1,
+            right: p.ri + 1,
+            diffs: null
+          };
+          if (opt.raw) mc.at = { left: [...lr, p.li], right: [...rr, p.ri] };
+          changes.push(mc);
+          setNode(ipath, "moved", true);
+        }
+        const m = visit(
+          p.l,
+          p.r,
+          p.hasL,
+          p.hasR,
+          nextSegs,
+          [...crumbs, title],
+          nextAnc,
+          opt.raw && p.hasL ? [...lr, p.li] : null,
+          opt.raw && p.hasR ? [...rr, p.ri] : null,
+          !opt.raw ? null : !p.hasR ? { side: "right", parent: rr, index: nextR[pk] } : !p.hasL ? { side: "left", parent: lr, index: nextL[pk] } : null
+        );
+        if (m && typeof m === "object") remember(m, toPath(nextSegs));
+        merged2.push(m);
+      }
+      itemIds.set(l, lIds);
+      itemIds.set(r, rIds);
+      itemIds.set(merged2, mIds);
+      return merged2;
+    }
+    if (isObj(l) && isObj(r)) {
+      const merged2 = {};
+      const keys = [...Object.keys(r), ...Object.keys(l).filter((k) => !hasOwn(r, k))];
+      for (const k of keys) {
+        const nextSegs = [...segs, { k }];
+        if (ignored(toPattern(nextSegs))) {
+          merged2[k] = hasOwn(r, k) ? r[k] : l[k];
+          continue;
+        }
+        const m = visit(
+          l[k],
+          r[k],
+          hasOwn(l, k),
+          hasOwn(r, k),
+          nextSegs,
+          crumbs,
+          [...anc, { path, pattern }],
+          opt.raw ? [...lr, k] : null,
+          opt.raw ? [...rr, k] : null,
+          null
+        );
+        if (m && typeof m === "object") remember(m, toPath(nextSegs));
+        merged2[k] = m;
+      }
+      return merged2;
+    }
+    if (equalLeaf(l, r, pattern)) return r;
+    const prim = (v) => v === null || ["string", "number", "boolean"].includes(typeof v);
+    const diffs = prim(l) && prim(r) && l !== null && r !== null ? textDiff(String(l), String(r), opt.textMin) : null;
+    push({ type: "modified", kind: prim(l) && prim(r) ? "value" : "node", left: l, right: r, diffs });
+    return r;
+  }
+  const merged = visit(left, right, left !== void 0, right !== void 0, [], [], [], [], [], null);
+  for (const c of changes) for (const a of c.ancestors) setNode(a, "child", false);
+  const result = {
+    stats: countChanges(changes, find.units),
+    changes,
+    nodes: Object.fromEntries(nodes),
+    merged,
+    pathOf: (target, field) => {
+      const p = typeof target === "string" ? target : paths.get(target);
+      if (p === void 0) return null;
+      if (field === void 0) return p;
+      if (typeof field === "number") {
+        const id = Array.isArray(target) ? itemIds.get(target)?.[field] : void 0;
+        return id === void 0 ? null : `${p}[${String(id).replace(/[\\[\]]/g, (m) => "\\" + m)}]`;
+      }
+      return `${p}${p ? "." : ""}${field}`;
+    },
+    statusOf: (target, field) => {
+      const p = result.pathOf(target, field);
+      const n = p === null ? void 0 : nodes.get(p);
+      return n ? n.status : null;
+    },
+    changesAt: (target, field) => {
+      const p = result.pathOf(target, field);
+      return p === null ? [] : changes.filter((c) => c.path === p);
+    }
+  };
+  return result;
+}
+function kindOf(v) {
+  return v !== null && typeof v === "object" ? "node" : "value";
+}
+function countChanges(changes, unitOf) {
+  const stats = { added: 0, modified: 0, deleted: 0, moved: 0 };
+  const units = /* @__PURE__ */ new Map();
+  for (const c of changes) {
+    let unit = c.path, isSelf = true;
+    if (unitOf(c.pattern) === void 0) {
+      unit = null;
+      for (let i = c.ancestors.length - 1; i >= 0; i--) {
+        if (unitOf(c.ancestorPatterns[i]) !== void 0) {
+          unit = c.ancestors[i];
+          isSelf = false;
+          break;
+        }
+      }
+      if (unit === null) {
+        unit = c.path;
+        isSelf = true;
+      }
+    }
+    const t = isSelf ? c.type : "modified";
+    const prev = units.get(unit);
+    if (!prev || RANK[t] > RANK[prev]) units.set(unit, t);
+  }
+  for (const t of units.values()) stats[t]++;
+  return stats;
+}
+
+// src/engine.js
+var bigramCache = /* @__PURE__ */ new WeakMap();
+var textCache = /* @__PURE__ */ new WeakMap();
+function textOf(n) {
+  if (n.v !== void 0) return n.v;
+  let t = textCache.get(n);
+  if (t === void 0) {
+    t = "";
+    for (const c of n.c) {
+      t += (t ? " " : "") + textOf(c);
+      if (t.length > 2e3) break;
+    }
+    textCache.set(n, t);
+  }
+  return t;
+}
+function bigrams(n) {
+  let b = bigramCache.get(n);
+  if (!b) {
+    const t = textOf(n).slice(0, 600);
+    b = /* @__PURE__ */ new Map();
+    for (let i = 0; i < t.length - 1; i++) {
+      const g = t.substr(i, 2);
+      b.set(g, (b.get(g) ?? 0) + 1);
+    }
+    bigramCache.set(n, b);
+  }
+  return b;
+}
+function similarity(a, b) {
+  const ta = a.v !== void 0, tb = b.v !== void 0;
+  if (ta !== tb) return 0;
+  if (!ta && a.n !== b.n) return 0;
+  if (!ta && a.k && b.k) return a.k === b.k ? 1 : 0;
+  const lead = !ta && a.c.length > 1 && b.c.length > 1 && a.c[0].h === b.c[0].h ? 0.75 : 0;
+  const A = bigrams(a), B = bigrams(b);
+  if (!A.size && !B.size) return ta ? a.v === b.v ? 1 : 0.55 : 0.75;
+  if (!A.size || !B.size) return Math.max(lead, 0.55);
+  let inter = 0, na = 0, nb = 0;
+  for (const v of A.values()) na += v;
+  for (const v of B.values()) nb += v;
+  for (const [g, v] of A) {
+    const w = B.get(g);
+    if (w) inter += Math.min(v, w);
+  }
+  const dice = 2 * inter / (na + nb);
+  const short = textOf(a).length <= 24 && textOf(b).length <= 24 ? 0.55 : 0;
+  if (ta) return Math.max(dice, short);
+  return Math.max(0.3 + 0.7 * dice, short, lead);
+}
+var DOM_RULES = {
+  identity: { "**": (n) => n && typeof n === "object" && !Array.isArray(n) ? n.h : void 0 },
+  ignore: ["**.h", "**.i", "**.k"],
+  keys: { "**.c": (n) => n && n.k ? n.n + "#" + n.k : null },
+  similar: { "**.c.*": similarity },
+  raw: true,
+  textMin: 12,
+  detectMoves: true
+};
+function diffTrees(job) {
+  const t0 = now();
+  const r = compare(job.left, job.right, { ...DOM_RULES, ...job.options ?? {} });
+  const changes = r.changes.map((c) => ({
+    type: c.type,
+    kind: c.kind,
+    path: c.path,
+    at: c.at,
+    diffs: c.diffs,
+    // 덩어리 값은 화면 쪽에서 DOM 으로 다시 읽으므로 보내지 않는다 (큰 문서에서 전송량 절약)
+    left: c.left !== null && typeof c.left === "object" ? null : c.left,
+    right: c.right !== null && typeof c.right === "object" ? null : c.right
+  }));
+  const t1 = now();
+  const pairs = job.leftAnchors && job.rightAnchors ? alignSequences(job.leftAnchors, job.rightAnchors) : [];
+  const anchorPairs = new Int32Array(pairs.length * 2);
+  pairs.forEach(([a, b], k) => {
+    anchorPairs[2 * k] = a;
+    anchorPairs[2 * k + 1] = b;
+  });
+  return { changes, stats: r.stats, anchorPairs, ms: { compare: t1 - t0, anchors: now() - t1 } };
+}
+function now() {
+  return (typeof performance !== "undefined" ? performance : Date).now();
+}
+
+// blob-spawn:/home/user/silvergate-homepage/packages/compare-dom/src/spawn.js
+var code = '(()=>{var He=Object.create;var Ee=Object.defineProperty;var We=Object.getOwnPropertyDescriptor;var Ge=Object.getOwnPropertyNames;var Je=Object.getPrototypeOf,Ve=Object.prototype.hasOwnProperty;var Xe=(e,n)=>()=>{try{return n||e((n={exports:{}}).exports,n),n.exports}catch(t){throw n=0,t}};var Ye=(e,n,t,s)=>{if(n&&typeof n=="object"||typeof n=="function")for(let r of Ge(n))!Ve.call(e,r)&&r!==t&&Ee(e,r,{get:()=>n[r],enumerable:!(s=We(n,r))||s.enumerable});return e};var Te=(e,n,t)=>(t=e!=null?He(Je(e)):{},Ye(n||!e||!e.__esModule?Ee(t,"default",{value:e,enumerable:!0}):t,e));var ce=Xe((hn,Z)=>{var g=function(){this.Diff_Timeout=1,this.Diff_EditCost=4,this.Match_Threshold=.5,this.Match_Distance=1e3,this.Patch_DeleteThreshold=.5,this.Patch_Margin=4,this.Match_MaxBits=32},O=-1,N=1,D=0;g.Diff=function(e,n){return[e,n]};g.prototype.diff_main=function(e,n,t,s){typeof s=="undefined"&&(this.Diff_Timeout<=0?s=Number.MAX_VALUE:s=new Date().getTime()+this.Diff_Timeout*1e3);var r=s;if(e==null||n==null)throw new Error("Null input. (diff_main)");if(e==n)return e?[new g.Diff(D,e)]:[];typeof t=="undefined"&&(t=!0);var i=t,a=this.diff_commonPrefix(e,n),l=e.substring(0,a);e=e.substring(a),n=n.substring(a),a=this.diff_commonSuffix(e,n);var o=e.substring(e.length-a);e=e.substring(0,e.length-a),n=n.substring(0,n.length-a);var f=this.diff_compute_(e,n,i,r);return l&&f.unshift(new g.Diff(D,l)),o&&f.push(new g.Diff(D,o)),this.diff_cleanupMerge(f),f};g.prototype.diff_compute_=function(e,n,t,s){var r;if(!e)return[new g.Diff(N,n)];if(!n)return[new g.Diff(O,e)];var i=e.length>n.length?e:n,a=e.length>n.length?n:e,l=i.indexOf(a);if(l!=-1)return r=[new g.Diff(N,i.substring(0,l)),new g.Diff(D,a),new g.Diff(N,i.substring(l+a.length))],e.length>n.length&&(r[0][0]=r[2][0]=O),r;if(a.length==1)return[new g.Diff(O,e),new g.Diff(N,n)];var o=this.diff_halfMatch_(e,n);if(o){var f=o[0],h=o[1],d=o[2],p=o[3],v=o[4],m=this.diff_main(f,d,t,s),A=this.diff_main(h,p,t,s);return m.concat([new g.Diff(D,v)],A)}return t&&e.length>100&&n.length>100?this.diff_lineMode_(e,n,s):this.diff_bisect_(e,n,s)};g.prototype.diff_lineMode_=function(e,n,t){var s=this.diff_linesToChars_(e,n);e=s.chars1,n=s.chars2;var r=s.lineArray,i=this.diff_main(e,n,!1,t);this.diff_charsToLines_(i,r),this.diff_cleanupSemantic(i),i.push(new g.Diff(D,""));for(var a=0,l=0,o=0,f="",h="";a<i.length;){switch(i[a][0]){case N:o++,h+=i[a][1];break;case O:l++,f+=i[a][1];break;case D:if(l>=1&&o>=1){i.splice(a-l-o,l+o),a=a-l-o;for(var d=this.diff_main(f,h,!1,t),p=d.length-1;p>=0;p--)i.splice(a,0,d[p]);a=a+d.length}o=0,l=0,f="",h="";break}a++}return i.pop(),i};g.prototype.diff_bisect_=function(e,n,t){for(var s=e.length,r=n.length,i=Math.ceil((s+r)/2),a=i,l=2*i,o=new Array(l),f=new Array(l),h=0;h<l;h++)o[h]=-1,f[h]=-1;o[a+1]=0,f[a+1]=0;for(var d=s-r,p=d%2!=0,v=0,m=0,A=0,b=0,w=0;w<i&&!(new Date().getTime()>t);w++){for(var M=-w+v;M<=w-m;M+=2){var k=a+M,T;M==-w||M!=w&&o[k-1]<o[k+1]?T=o[k+1]:T=o[k-1]+1;for(var E=T-M;T<s&&E<r&&e.charAt(T)==n.charAt(E);)T++,E++;if(o[k]=T,T>s)m+=2;else if(E>r)v+=2;else if(p){var u=a+d-M;if(u>=0&&u<l&&f[u]!=-1){var c=s-f[u];if(T>=c)return this.diff_bisectSplit_(e,n,T,E,t)}}}for(var y=-w+A;y<=w-b;y+=2){var u=a+y,c;y==-w||y!=w&&f[u-1]<f[u+1]?c=f[u+1]:c=f[u-1]+1;for(var _=c-y;c<s&&_<r&&e.charAt(s-c-1)==n.charAt(r-_-1);)c++,_++;if(f[u]=c,c>s)b+=2;else if(_>r)A+=2;else if(!p){var k=a+d-y;if(k>=0&&k<l&&o[k]!=-1){var T=o[k],E=a+T-k;if(c=s-c,T>=c)return this.diff_bisectSplit_(e,n,T,E,t)}}}}return[new g.Diff(O,e),new g.Diff(N,n)]};g.prototype.diff_bisectSplit_=function(e,n,t,s,r){var i=e.substring(0,t),a=n.substring(0,s),l=e.substring(t),o=n.substring(s),f=this.diff_main(i,a,!1,r),h=this.diff_main(l,o,!1,r);return f.concat(h)};g.prototype.diff_linesToChars_=function(e,n){var t=[],s={};t[0]="";function r(o){for(var f="",h=0,d=-1,p=t.length;d<o.length-1;){d=o.indexOf(`\n`,h),d==-1&&(d=o.length-1);var v=o.substring(h,d+1);(s.hasOwnProperty?s.hasOwnProperty(v):s[v]!==void 0)?f+=String.fromCharCode(s[v]):(p==i&&(v=o.substring(h),d=o.length),f+=String.fromCharCode(p),s[v]=p,t[p++]=v),h=d+1}return f}var i=4e4,a=r(e);i=65535;var l=r(n);return{chars1:a,chars2:l,lineArray:t}};g.prototype.diff_charsToLines_=function(e,n){for(var t=0;t<e.length;t++){for(var s=e[t][1],r=[],i=0;i<s.length;i++)r[i]=n[s.charCodeAt(i)];e[t][1]=r.join("")}};g.prototype.diff_commonPrefix=function(e,n){if(!e||!n||e.charAt(0)!=n.charAt(0))return 0;for(var t=0,s=Math.min(e.length,n.length),r=s,i=0;t<r;)e.substring(i,r)==n.substring(i,r)?(t=r,i=t):s=r,r=Math.floor((s-t)/2+t);return r};g.prototype.diff_commonSuffix=function(e,n){if(!e||!n||e.charAt(e.length-1)!=n.charAt(n.length-1))return 0;for(var t=0,s=Math.min(e.length,n.length),r=s,i=0;t<r;)e.substring(e.length-r,e.length-i)==n.substring(n.length-r,n.length-i)?(t=r,i=t):s=r,r=Math.floor((s-t)/2+t);return r};g.prototype.diff_commonOverlap_=function(e,n){var t=e.length,s=n.length;if(t==0||s==0)return 0;t>s?e=e.substring(t-s):t<s&&(n=n.substring(0,t));var r=Math.min(t,s);if(e==n)return r;for(var i=0,a=1;;){var l=e.substring(r-a),o=n.indexOf(l);if(o==-1)return i;a+=o,(o==0||e.substring(r-a)==n.substring(0,a))&&(i=a,a++)}};g.prototype.diff_halfMatch_=function(e,n){if(this.Diff_Timeout<=0)return null;var t=e.length>n.length?e:n,s=e.length>n.length?n:e;if(t.length<4||s.length*2<t.length)return null;var r=this;function i(m,A,b){for(var w=m.substring(b,b+Math.floor(m.length/4)),M=-1,k="",T,E,u,c;(M=A.indexOf(w,M+1))!=-1;){var y=r.diff_commonPrefix(m.substring(b),A.substring(M)),_=r.diff_commonSuffix(m.substring(0,b),A.substring(0,M));k.length<_+y&&(k=A.substring(M-_,M)+A.substring(M,M+y),T=m.substring(0,b-_),E=m.substring(b+y),u=A.substring(0,M-_),c=A.substring(M+y))}return k.length*2>=m.length?[T,E,u,c,k]:null}var a=i(t,s,Math.ceil(t.length/4)),l=i(t,s,Math.ceil(t.length/2)),o;if(!a&&!l)return null;l?a?o=a[4].length>l[4].length?a:l:o=l:o=a;var f,h,d,p;e.length>n.length?(f=o[0],h=o[1],d=o[2],p=o[3]):(d=o[0],p=o[1],f=o[2],h=o[3]);var v=o[4];return[f,h,d,p,v]};g.prototype.diff_cleanupSemantic=function(e){for(var n=!1,t=[],s=0,r=null,i=0,a=0,l=0,o=0,f=0;i<e.length;)e[i][0]==D?(t[s++]=i,a=o,l=f,o=0,f=0,r=e[i][1]):(e[i][0]==N?o+=e[i][1].length:f+=e[i][1].length,r&&r.length<=Math.max(a,l)&&r.length<=Math.max(o,f)&&(e.splice(t[s-1],0,new g.Diff(O,r)),e[t[s-1]+1][0]=N,s--,s--,i=s>0?t[s-1]:-1,a=0,l=0,o=0,f=0,r=null,n=!0)),i++;for(n&&this.diff_cleanupMerge(e),this.diff_cleanupSemanticLossless(e),i=1;i<e.length;){if(e[i-1][0]==O&&e[i][0]==N){var h=e[i-1][1],d=e[i][1],p=this.diff_commonOverlap_(h,d),v=this.diff_commonOverlap_(d,h);p>=v?(p>=h.length/2||p>=d.length/2)&&(e.splice(i,0,new g.Diff(D,d.substring(0,p))),e[i-1][1]=h.substring(0,h.length-p),e[i+1][1]=d.substring(p),i++):(v>=h.length/2||v>=d.length/2)&&(e.splice(i,0,new g.Diff(D,h.substring(0,v))),e[i-1][0]=N,e[i-1][1]=d.substring(0,d.length-v),e[i+1][0]=O,e[i+1][1]=h.substring(v),i++),i++}i++}};g.prototype.diff_cleanupSemanticLossless=function(e){function n(v,m){if(!v||!m)return 6;var A=v.charAt(v.length-1),b=m.charAt(0),w=A.match(g.nonAlphaNumericRegex_),M=b.match(g.nonAlphaNumericRegex_),k=w&&A.match(g.whitespaceRegex_),T=M&&b.match(g.whitespaceRegex_),E=k&&A.match(g.linebreakRegex_),u=T&&b.match(g.linebreakRegex_),c=E&&v.match(g.blanklineEndRegex_),y=u&&m.match(g.blanklineStartRegex_);return c||y?5:E||u?4:w&&!k&&T?3:k||T?2:w||M?1:0}for(var t=1;t<e.length-1;){if(e[t-1][0]==D&&e[t+1][0]==D){var s=e[t-1][1],r=e[t][1],i=e[t+1][1],a=this.diff_commonSuffix(s,r);if(a){var l=r.substring(r.length-a);s=s.substring(0,s.length-a),r=l+r.substring(0,r.length-a),i=l+i}for(var o=s,f=r,h=i,d=n(s,r)+n(r,i);r.charAt(0)===i.charAt(0);){s+=r.charAt(0),r=r.substring(1)+i.charAt(0),i=i.substring(1);var p=n(s,r)+n(r,i);p>=d&&(d=p,o=s,f=r,h=i)}e[t-1][1]!=o&&(o?e[t-1][1]=o:(e.splice(t-1,1),t--),e[t][1]=f,h?e[t+1][1]=h:(e.splice(t+1,1),t--))}t++}};g.nonAlphaNumericRegex_=/[^a-zA-Z0-9]/;g.whitespaceRegex_=/\\s/;g.linebreakRegex_=/[\\r\\n]/;g.blanklineEndRegex_=/\\n\\r?\\n$/;g.blanklineStartRegex_=/^\\r?\\n\\r?\\n/;g.prototype.diff_cleanupEfficiency=function(e){for(var n=!1,t=[],s=0,r=null,i=0,a=!1,l=!1,o=!1,f=!1;i<e.length;)e[i][0]==D?(e[i][1].length<this.Diff_EditCost&&(o||f)?(t[s++]=i,a=o,l=f,r=e[i][1]):(s=0,r=null),o=f=!1):(e[i][0]==O?f=!0:o=!0,r&&(a&&l&&o&&f||r.length<this.Diff_EditCost/2&&a+l+o+f==3)&&(e.splice(t[s-1],0,new g.Diff(O,r)),e[t[s-1]+1][0]=N,s--,r=null,a&&l?(o=f=!0,s=0):(s--,i=s>0?t[s-1]:-1,o=f=!1),n=!0)),i++;n&&this.diff_cleanupMerge(e)};g.prototype.diff_cleanupMerge=function(e){e.push(new g.Diff(D,""));for(var n=0,t=0,s=0,r="",i="",a;n<e.length;)switch(e[n][0]){case N:s++,i+=e[n][1],n++;break;case O:t++,r+=e[n][1],n++;break;case D:t+s>1?(t!==0&&s!==0&&(a=this.diff_commonPrefix(i,r),a!==0&&(n-t-s>0&&e[n-t-s-1][0]==D?e[n-t-s-1][1]+=i.substring(0,a):(e.splice(0,0,new g.Diff(D,i.substring(0,a))),n++),i=i.substring(a),r=r.substring(a)),a=this.diff_commonSuffix(i,r),a!==0&&(e[n][1]=i.substring(i.length-a)+e[n][1],i=i.substring(0,i.length-a),r=r.substring(0,r.length-a))),n-=t+s,e.splice(n,t+s),r.length&&(e.splice(n,0,new g.Diff(O,r)),n++),i.length&&(e.splice(n,0,new g.Diff(N,i)),n++),n++):n!==0&&e[n-1][0]==D?(e[n-1][1]+=e[n][1],e.splice(n,1)):n++,s=0,t=0,r="",i="";break}e[e.length-1][1]===""&&e.pop();var l=!1;for(n=1;n<e.length-1;)e[n-1][0]==D&&e[n+1][0]==D&&(e[n][1].substring(e[n][1].length-e[n-1][1].length)==e[n-1][1]?(e[n][1]=e[n-1][1]+e[n][1].substring(0,e[n][1].length-e[n-1][1].length),e[n+1][1]=e[n-1][1]+e[n+1][1],e.splice(n-1,1),l=!0):e[n][1].substring(0,e[n+1][1].length)==e[n+1][1]&&(e[n-1][1]+=e[n+1][1],e[n][1]=e[n][1].substring(e[n+1][1].length)+e[n+1][1],e.splice(n+1,1),l=!0)),n++;l&&this.diff_cleanupMerge(e)};g.prototype.diff_xIndex=function(e,n){var t=0,s=0,r=0,i=0,a;for(a=0;a<e.length&&(e[a][0]!==N&&(t+=e[a][1].length),e[a][0]!==O&&(s+=e[a][1].length),!(t>n));a++)r=t,i=s;return e.length!=a&&e[a][0]===O?i:i+(n-r)};g.prototype.diff_prettyHtml=function(e){for(var n=[],t=/&/g,s=/</g,r=/>/g,i=/\\n/g,a=0;a<e.length;a++){var l=e[a][0],o=e[a][1],f=o.replace(t,"&amp;").replace(s,"&lt;").replace(r,"&gt;").replace(i,"&para;<br>");switch(l){case N:n[a]=\'<ins style="background:#e6ffe6;">\'+f+"</ins>";break;case O:n[a]=\'<del style="background:#ffe6e6;">\'+f+"</del>";break;case D:n[a]="<span>"+f+"</span>";break}}return n.join("")};g.prototype.diff_text1=function(e){for(var n=[],t=0;t<e.length;t++)e[t][0]!==N&&(n[t]=e[t][1]);return n.join("")};g.prototype.diff_text2=function(e){for(var n=[],t=0;t<e.length;t++)e[t][0]!==O&&(n[t]=e[t][1]);return n.join("")};g.prototype.diff_levenshtein=function(e){for(var n=0,t=0,s=0,r=0;r<e.length;r++){var i=e[r][0],a=e[r][1];switch(i){case N:t+=a.length;break;case O:s+=a.length;break;case D:n+=Math.max(t,s),t=0,s=0;break}}return n+=Math.max(t,s),n};g.prototype.diff_toDelta=function(e){for(var n=[],t=0;t<e.length;t++)switch(e[t][0]){case N:n[t]="+"+encodeURI(e[t][1]);break;case O:n[t]="-"+e[t][1].length;break;case D:n[t]="="+e[t][1].length;break}return n.join("	").replace(/%20/g," ")};g.prototype.diff_fromDelta=function(e,n){for(var t=[],s=0,r=0,i=n.split(/\\t/g),a=0;a<i.length;a++){var l=i[a].substring(1);switch(i[a].charAt(0)){case"+":try{t[s++]=new g.Diff(N,decodeURI(l))}catch{throw new Error("Illegal escape in diff_fromDelta: "+l)}break;case"-":case"=":var o=parseInt(l,10);if(isNaN(o)||o<0)throw new Error("Invalid number in diff_fromDelta: "+l);var f=e.substring(r,r+=o);i[a].charAt(0)=="="?t[s++]=new g.Diff(D,f):t[s++]=new g.Diff(O,f);break;default:if(i[a])throw new Error("Invalid diff operation in diff_fromDelta: "+i[a])}}if(r!=e.length)throw new Error("Delta length ("+r+") does not equal source text length ("+e.length+").");return t};g.prototype.match_main=function(e,n,t){if(e==null||n==null||t==null)throw new Error("Null input. (match_main)");return t=Math.max(0,Math.min(t,e.length)),e==n?0:e.length?e.substring(t,t+n.length)==n?t:this.match_bitap_(e,n,t):-1};g.prototype.match_bitap_=function(e,n,t){if(n.length>this.Match_MaxBits)throw new Error("Pattern too long for this browser.");var s=this.match_alphabet_(n),r=this;function i(T,E){var u=T/n.length,c=Math.abs(t-E);return r.Match_Distance?u+c/r.Match_Distance:c?1:u}var a=this.Match_Threshold,l=e.indexOf(n,t);l!=-1&&(a=Math.min(i(0,l),a),l=e.lastIndexOf(n,t+n.length),l!=-1&&(a=Math.min(i(0,l),a)));var o=1<<n.length-1;l=-1;for(var f,h,d=n.length+e.length,p,v=0;v<n.length;v++){for(f=0,h=d;f<h;)i(v,t+h)<=a?f=h:d=h,h=Math.floor((d-f)/2+f);d=h;var m=Math.max(1,t-h+1),A=Math.min(t+h,e.length)+n.length,b=Array(A+2);b[A+1]=(1<<v)-1;for(var w=A;w>=m;w--){var M=s[e.charAt(w-1)];if(v===0?b[w]=(b[w+1]<<1|1)&M:b[w]=(b[w+1]<<1|1)&M|((p[w+1]|p[w])<<1|1)|p[w+1],b[w]&o){var k=i(v,w-1);if(k<=a)if(a=k,l=w-1,l>t)m=Math.max(1,2*t-l);else break}}if(i(v+1,t)>a)break;p=b}return l};g.prototype.match_alphabet_=function(e){for(var n={},t=0;t<e.length;t++)n[e.charAt(t)]=0;for(var t=0;t<e.length;t++)n[e.charAt(t)]|=1<<e.length-t-1;return n};g.prototype.patch_addContext_=function(e,n){if(n.length!=0){if(e.start2===null)throw Error("patch not initialized");for(var t=n.substring(e.start2,e.start2+e.length1),s=0;n.indexOf(t)!=n.lastIndexOf(t)&&t.length<this.Match_MaxBits-this.Patch_Margin-this.Patch_Margin;)s+=this.Patch_Margin,t=n.substring(e.start2-s,e.start2+e.length1+s);s+=this.Patch_Margin;var r=n.substring(e.start2-s,e.start2);r&&e.diffs.unshift(new g.Diff(D,r));var i=n.substring(e.start2+e.length1,e.start2+e.length1+s);i&&e.diffs.push(new g.Diff(D,i)),e.start1-=r.length,e.start2-=r.length,e.length1+=r.length+i.length,e.length2+=r.length+i.length}};g.prototype.patch_make=function(e,n,t){var s,r;if(typeof e=="string"&&typeof n=="string"&&typeof t=="undefined")s=e,r=this.diff_main(s,n,!0),r.length>2&&(this.diff_cleanupSemantic(r),this.diff_cleanupEfficiency(r));else if(e&&typeof e=="object"&&typeof n=="undefined"&&typeof t=="undefined")r=e,s=this.diff_text1(r);else if(typeof e=="string"&&n&&typeof n=="object"&&typeof t=="undefined")s=e,r=n;else if(typeof e=="string"&&typeof n=="string"&&t&&typeof t=="object")s=e,r=t;else throw new Error("Unknown call format to patch_make.");if(r.length===0)return[];for(var i=[],a=new g.patch_obj,l=0,o=0,f=0,h=s,d=s,p=0;p<r.length;p++){var v=r[p][0],m=r[p][1];switch(!l&&v!==D&&(a.start1=o,a.start2=f),v){case N:a.diffs[l++]=r[p],a.length2+=m.length,d=d.substring(0,f)+m+d.substring(f);break;case O:a.length1+=m.length,a.diffs[l++]=r[p],d=d.substring(0,f)+d.substring(f+m.length);break;case D:m.length<=2*this.Patch_Margin&&l&&r.length!=p+1?(a.diffs[l++]=r[p],a.length1+=m.length,a.length2+=m.length):m.length>=2*this.Patch_Margin&&l&&(this.patch_addContext_(a,h),i.push(a),a=new g.patch_obj,l=0,h=d,o=f);break}v!==N&&(o+=m.length),v!==O&&(f+=m.length)}return l&&(this.patch_addContext_(a,h),i.push(a)),i};g.prototype.patch_deepCopy=function(e){for(var n=[],t=0;t<e.length;t++){var s=e[t],r=new g.patch_obj;r.diffs=[];for(var i=0;i<s.diffs.length;i++)r.diffs[i]=new g.Diff(s.diffs[i][0],s.diffs[i][1]);r.start1=s.start1,r.start2=s.start2,r.length1=s.length1,r.length2=s.length2,n[t]=r}return n};g.prototype.patch_apply=function(e,n){if(e.length==0)return[n,[]];e=this.patch_deepCopy(e);var t=this.patch_addPadding(e);n=t+n+t,this.patch_splitMax(e);for(var s=0,r=[],i=0;i<e.length;i++){var a=e[i].start2+s,l=this.diff_text1(e[i].diffs),o,f=-1;if(l.length>this.Match_MaxBits?(o=this.match_main(n,l.substring(0,this.Match_MaxBits),a),o!=-1&&(f=this.match_main(n,l.substring(l.length-this.Match_MaxBits),a+l.length-this.Match_MaxBits),(f==-1||o>=f)&&(o=-1))):o=this.match_main(n,l,a),o==-1)r[i]=!1,s-=e[i].length2-e[i].length1;else{r[i]=!0,s=o-a;var h;if(f==-1?h=n.substring(o,o+l.length):h=n.substring(o,f+this.Match_MaxBits),l==h)n=n.substring(0,o)+this.diff_text2(e[i].diffs)+n.substring(o+l.length);else{var d=this.diff_main(l,h,!1);if(l.length>this.Match_MaxBits&&this.diff_levenshtein(d)/l.length>this.Patch_DeleteThreshold)r[i]=!1;else{this.diff_cleanupSemanticLossless(d);for(var p=0,v,m=0;m<e[i].diffs.length;m++){var A=e[i].diffs[m];A[0]!==D&&(v=this.diff_xIndex(d,p)),A[0]===N?n=n.substring(0,o+v)+A[1]+n.substring(o+v):A[0]===O&&(n=n.substring(0,o+v)+n.substring(o+this.diff_xIndex(d,p+A[1].length))),A[0]!==O&&(p+=A[1].length)}}}}}return n=n.substring(t.length,n.length-t.length),[n,r]};g.prototype.patch_addPadding=function(e){for(var n=this.Patch_Margin,t="",s=1;s<=n;s++)t+=String.fromCharCode(s);for(var s=0;s<e.length;s++)e[s].start1+=n,e[s].start2+=n;var r=e[0],i=r.diffs;if(i.length==0||i[0][0]!=D)i.unshift(new g.Diff(D,t)),r.start1-=n,r.start2-=n,r.length1+=n,r.length2+=n;else if(n>i[0][1].length){var a=n-i[0][1].length;i[0][1]=t.substring(i[0][1].length)+i[0][1],r.start1-=a,r.start2-=a,r.length1+=a,r.length2+=a}if(r=e[e.length-1],i=r.diffs,i.length==0||i[i.length-1][0]!=D)i.push(new g.Diff(D,t)),r.length1+=n,r.length2+=n;else if(n>i[i.length-1][1].length){var a=n-i[i.length-1][1].length;i[i.length-1][1]+=t.substring(0,a),r.length1+=a,r.length2+=a}return t};g.prototype.patch_splitMax=function(e){for(var n=this.Match_MaxBits,t=0;t<e.length;t++)if(!(e[t].length1<=n)){var s=e[t];e.splice(t--,1);for(var r=s.start1,i=s.start2,a="";s.diffs.length!==0;){var l=new g.patch_obj,o=!0;for(l.start1=r-a.length,l.start2=i-a.length,a!==""&&(l.length1=l.length2=a.length,l.diffs.push(new g.Diff(D,a)));s.diffs.length!==0&&l.length1<n-this.Patch_Margin;){var f=s.diffs[0][0],h=s.diffs[0][1];f===N?(l.length2+=h.length,i+=h.length,l.diffs.push(s.diffs.shift()),o=!1):f===O&&l.diffs.length==1&&l.diffs[0][0]==D&&h.length>2*n?(l.length1+=h.length,r+=h.length,o=!1,l.diffs.push(new g.Diff(f,h)),s.diffs.shift()):(h=h.substring(0,n-l.length1-this.Patch_Margin),l.length1+=h.length,r+=h.length,f===D?(l.length2+=h.length,i+=h.length):o=!1,l.diffs.push(new g.Diff(f,h)),h==s.diffs[0][1]?s.diffs.shift():s.diffs[0][1]=s.diffs[0][1].substring(h.length))}a=this.diff_text2(l.diffs),a=a.substring(a.length-this.Patch_Margin);var d=this.diff_text1(s.diffs).substring(0,this.Patch_Margin);d!==""&&(l.length1+=d.length,l.length2+=d.length,l.diffs.length!==0&&l.diffs[l.diffs.length-1][0]===D?l.diffs[l.diffs.length-1][1]+=d:l.diffs.push(new g.Diff(D,d))),o||e.splice(++t,0,l)}}};g.prototype.patch_toText=function(e){for(var n=[],t=0;t<e.length;t++)n[t]=e[t];return n.join("")};g.prototype.patch_fromText=function(e){var n=[];if(!e)return n;for(var t=e.split(`\n`),s=0,r=/^@@ -(\\d+),?(\\d*) \\+(\\d+),?(\\d*) @@$/;s<t.length;){var i=t[s].match(r);if(!i)throw new Error("Invalid patch string: "+t[s]);var a=new g.patch_obj;for(n.push(a),a.start1=parseInt(i[1],10),i[2]===""?(a.start1--,a.length1=1):i[2]=="0"?a.length1=0:(a.start1--,a.length1=parseInt(i[2],10)),a.start2=parseInt(i[3],10),i[4]===""?(a.start2--,a.length2=1):i[4]=="0"?a.length2=0:(a.start2--,a.length2=parseInt(i[4],10)),s++;s<t.length;){var l=t[s].charAt(0);try{var o=decodeURI(t[s].substring(1))}catch{throw new Error("Illegal escape in patch_fromText: "+o)}if(l=="-")a.diffs.push(new g.Diff(O,o));else if(l=="+")a.diffs.push(new g.Diff(N,o));else if(l==" ")a.diffs.push(new g.Diff(D,o));else{if(l=="@")break;if(l!=="")throw new Error(\'Invalid patch mode "\'+l+\'" in: \'+o)}s++}}return n};g.patch_obj=function(){this.diffs=[],this.start1=null,this.start2=null,this.length1=0,this.length2=0};g.patch_obj.prototype.toString=function(){var e,n;this.length1===0?e=this.start1+",0":this.length1==1?e=this.start1+1:e=this.start1+1+","+this.length1,this.length2===0?n=this.start2+",0":this.length2==1?n=this.start2+1:n=this.start2+1+","+this.length2;for(var t=["@@ -"+e+" +"+n+` @@\n`],s,r=0;r<this.diffs.length;r++){switch(this.diffs[r][0]){case N:s="+";break;case O:s="-";break;case D:s=" ";break}t[r+1]=s+encodeURI(this.diffs[r][1])+`\n`}return t.join("").replace(/%20/g," ")};Z.exports=g;Z.exports.diff_match_patch=g;Z.exports.DIFF_DELETE=O;Z.exports.DIFF_INSERT=N;Z.exports.DIFF_EQUAL=D});var Qe=e=>String(e).replace(/[\\\\[\\]]/g,n=>"\\\\"+n);function J(e){let n="";for(let t of e)"i"in t?n+=`[${Qe(t.i)}]`:n+=(n?".":"")+t.k;return n}function V(e){return e.map(n=>"i"in n?"*":n.k).join(".")}function he(e,n,t,s){if(n===e.length)return s===t.length;let r=e[n];if(r==="**"){for(let i=s;i<=t.length;i++)if(he(e,n+1,t,i))return!0;return!1}return s===t.length||r!=="*"&&r!==t[s]?!1:he(e,n+1,t,s+1)}function K(e){if(!e)return()=>{};let t=(typeof e=="string"?[[e,!0]]:Array.isArray(e)?e.map(r=>[r,!0]):Object.entries(e)).map(([r,i])=>[r.split("."),i]),s=new Map;return r=>{if(s.has(r))return s.get(r);let i=r===""?[]:r.split("."),a;for(let[l,o]of t)if(he(l,0,i,0)){a=o;break}return s.set(r,a),a}}function Ie(e,n){return JSON.stringify(ue(e,n,[]))}function ue(e,n,t){if(Array.isArray(e))return e.map((s,r)=>ue(s,n,[...t,{i:String(r)}]));if(e&&typeof e=="object"){let s={};for(let r of Object.keys(e).sort()){let i=[...t,{k:r}];n&&n(V(i))||(s[r]=ue(e[r],n,i))}return s}return e}var je=Te(ce(),1),Re=new je.default;Re.Diff_Timeout=0;function Ze(e,n,t,s,r){let i=new Map,a=v=>{let m=i.get(v);return m===void 0&&(m=i.size+1,m>=55296&&(m+=2048),i.set(v,m)),m},l=[],o=[];for(let v=0;v<s;v++)l.push(a(e[t+v]));for(let v=0;v<r;v++)o.push(a(n[t+v]));if(i.size>63e3)return null;let f=Re.diff_main(Pe(l),Pe(o),!1),h=[],d=0,p=0;for(let[v,m]of f)if(v===0){for(let A=0;A<m.length;A++)h.push([t+d+A,t+p+A]);d+=m.length,p+=m.length}else v===-1?d+=m.length:p+=m.length;return h}function Pe(e){let n="";for(let t=0;t<e.length;t+=8192)n+=String.fromCharCode(...e.slice(t,t+8192));return n}function ge(e,n){let t=ve(e,n,r=>r),s=[];for(let r of t)r.hasL&&r.hasR&&e[r.li]===n[r.ri]&&s.push([r.li,r.ri]);return s}function Oe(e,n){let t=new Map;return e.map((s,r)=>{var l,o;let i=String((l=n(s,r))!=null?l:""),a=((o=t.get(i))!=null?o:0)+1;return t.set(i,a),a===1?i:`${i}#${a}`})}function Ce(e,n,t,s=!0){let r=Oe(e,t),i=Oe(n,t),a=new Map(r.map((p,v)=>[p,v])),l=new Set(i),o=new Set;if(s){let p=i.filter(m=>a.has(m)),v=qe(p.map(m=>a.get(m)));p.forEach((m,A)=>{v.has(A)||o.add(m)})}let f=[],h=0,d=p=>{for(;h<e.length&&r[h]!==p;)l.has(r[h])||f.push({id:r[h],hasL:!0,hasR:!1,l:e[h],r:void 0,li:h,ri:-1,moved:!1}),h++;h<e.length&&r[h]===p&&h++};return i.forEach((p,v)=>{if(a.has(p)){o.has(p)||d(p);let m=a.get(p);f.push({id:p,hasL:!0,hasR:!0,l:e[m],r:n[v],li:m,ri:v,moved:o.has(p)})}else f.push({id:p,hasL:!1,hasR:!0,l:void 0,r:n[v],li:-1,ri:v,moved:!1})}),d(void 0),f}function qe(e){var i;let n=[],t=new Array(e.length),s=[];e.forEach((a,l)=>{let o=0,f=n.length;for(;o<f;){let h=o+f>>1;n[h]<a?o=h+1:f=h}n[o]=a,s[o]=l,t[l]=o>0?s[o-1]:-1});let r=new Set;for(let a=(i=s[n.length-1])!=null?i:-1;a>=0;a=t[a])r.add(a);return r}var Ne=4e6;function ve(e,n,t,s=null){let r=e.map((b,w)=>t(b,"l",w)),i=n.map((b,w)=>t(b,"r",w)),a=0;for(;a<e.length&&a<n.length&&r[a]===i[a];)a++;let l=0;for(;l<e.length-a&&l<n.length-a&&r[e.length-1-l]===i[n.length-1-l];)l++;let o=e.length-a-l,f=n.length-a-l,h=[];for(let b=0;b<a;b++)h.push([b,b]);let d=o>0&&f>0&&(o+1)*(f+1)>Ne?Ze(r,i,a,o,f):null;if(d)h.push(...d);else if(o>0&&f>0&&(o+1)*(f+1)<=Ne){let b=f+1,w=new Uint32Array((o+1)*b);for(let M=o-1;M>=0;M--)for(let k=f-1;k>=0;k--)w[M*b+k]=r[a+M]===i[a+k]?w[(M+1)*b+k+1]+1:Math.max(w[(M+1)*b+k],w[M*b+k+1]);for(let M=0,k=0;M<o&&k<f;)r[a+M]===i[a+k]?(h.push([a+M,a+k]),M++,k++):w[(M+1)*b+k]>=w[M*b+k+1]?M++:k++}for(let b=l;b>0;b--)h.push([e.length-b,n.length-b]);h.push([e.length,n.length]);let p=[],v=(b,w)=>p.push({id:w>=0?`#${w}`:`#~${b}`,hasL:b>=0,hasR:w>=0,l:b>=0?e[b]:void 0,r:w>=0?n[w]:void 0,li:b,ri:w,moved:!1}),m=0,A=0;for(let[b,w]of h){let M=b-m,k=w-A;if(s&&M>0&&k>0&&M*k<=xe)for(let[T,E]of nn(e,n,m,M,A,k,s))v(T,E);else{let T=Math.min(M,k);for(let E=0;E<T;E++)v(m+E,A+E);for(let E=T;E<M;E++)v(m+E,-1);for(let E=T;E<k;E++)v(-1,A+E)}b<e.length&&v(b,w),m=b+1,A=w+1}return p}var xe=25e4,en=.5;function nn(e,n,t,s,r,i,a){let l=i+1,o=new Float64Array(s*i);for(let v=0;v<s;v++)for(let m=0;m<i;m++){let A=Number(a(e[t+v],n[r+m]))||0;o[v*i+m]=A>=en?A:-1}let f=new Float64Array((s+1)*l);for(let v=s-1;v>=0;v--)for(let m=i-1;m>=0;m--){let A=o[v*i+m];f[v*l+m]=Math.max(f[(v+1)*l+m],f[v*l+m+1],A>=0?A+f[(v+1)*l+m+1]:-1)}let h=[],d=0,p=0;for(;d<s&&p<i;){let v=o[d*i+p];v>=0&&f[d*l+p]===v+f[(d+1)*l+p+1]?(h.push([t+d,r+p]),d++,p++):f[d*l+p]===f[(d+1)*l+p]?(h.push([t+d,-1]),d++):(h.push([-1,r+p]),p++)}for(;d<s;d++)h.push([t+d,-1]);for(;p<i;p++)h.push([-1,r+p]);return h}var $e=Te(ce(),1),pe=new $e.default;function de(e,n,t=20){let s=pe.diff_main(String(e),String(n));return Math.max(String(e).length,String(n).length)>=t?pe.diff_cleanupSemantic(s):pe.diff_cleanupEfficiency(s),s.map(([r,i])=>[r,i])}var H=e=>e!==null&&typeof e=="object"&&!Array.isArray(e),te=(e,n)=>Object.prototype.hasOwnProperty.call(e,n),tn=["id","key","uuid","code"],rn=["title","name","label","heading"],q={child:1,moved:2,modified:3,added:4,deleted:4};function me(e,n,t={}){let s={textMin:20,detectMoves:!0,numeric:!1,whitespace:!1,...t},r={keys:K(s.keys),ignore:K(s.ignore),titles:K(s.titles),labels:K(s.labels),equals:K(s.equals),similar:K(s.similar),identity:K(s.identity),units:K(s.countBy)},i=u=>!!r.ignore(u),a=[],l=new Map,o=new WeakMap,f=(u,c)=>{u&&typeof u=="object"&&o.set(u,c)},h=new WeakMap,d=(u,c,y)=>{let _=l.get(u);(!_||q[c]>q[_.status]||y&&!_.own&&q[c]>=q[_.status])&&l.set(u,{status:c,own:y})};function p(u,c,y){let _=r.keys(u);if(_===!1)return null;if(typeof _=="function")return[c,y].every(j=>j.every((B,$)=>{let U=_(B,$);return U!=null}))?_:null;if(typeof _=="string"||Array.isArray(_)){let P=Array.isArray(_)?_:[_];return(j,B)=>{if(!H(j))return String(j);for(let $ of P)if(j[$]!==void 0&&j[$]!==null&&j[$]!=="")return String(j[$]);return`#${B}`}}let I=[...c,...y];if(!I.length||!I.every(H))return null;for(let P of tn)if([c,y].every(B=>{let $=new Set;return B.every(U=>U[P]!==void 0&&U[P]!==null&&!$.has(U[P])&&$.add(U[P]))}))return B=>String(B[P]);return null}function v(u){let c=r.identity(u),y=_=>Ie(_,I=>i(`${u}${I?"."+I:""}`));return typeof c!="function"?y:_=>{let I=c(_);return I==null?y(_):"id:"+I}}function m(u){let c=r.similar(u);return typeof c=="function"?c:null}function A(u,c,y){var I;let _=r.titles(c);if(typeof _=="function")return String((I=_(u))!=null?I:y);if(typeof _=="string"&&H(u)&&u[_]!=null)return String(u[_]);if(H(u)){for(let P of rn)if(typeof u[P]=="string"&&u[P])return u[P]}return H(u)||Array.isArray(u)?y:String(u)}function b(u,c,y,_){let I=r.labels(u);if(typeof I=="function")return String(I(_));if(typeof I=="string")return I;let P=c[c.length-1];return y!=null?y:P?"k"in P?P.k:P.i:""}function w(u,c,y){let _=r.equals(y);return typeof _=="function"?!!_(u,c):Object.is(u,c)?!0:s.numeric&&u!==""&&c!==""&&u!==null&&c!==null&&!isNaN(Number(u))&&!isNaN(Number(c))?Number(u)===Number(c):s.whitespace&&typeof u=="string"&&typeof c=="string"?u.trim().replace(/\\s+/g," ")===c.trim().replace(/\\s+/g," "):!1}function M(u,c,y){var P;let _=J(c);f(u,_),d(_,y,!1);let I=V(c);if(Array.isArray(u)){let j=(P=p(I,u,[]))!=null?P:((U,z)=>y==="deleted"?`#~${z}`:`#${z}`),B=new Map,$=[];u.forEach((U,z)=>{var Y;let C=String(j(U,z)),X=((Y=B.get(C))!=null?Y:0)+1;B.set(C,X),X>1&&(C+=`#${X}`),$.push(C),M(U,[...c,{i:C}],y)}),h.set(u,$)}else if(H(u))for(let j of Object.keys(u))i(V([...c,{k:j}]))||M(u[j],[...c,{k:j}],y)}function k(u,c,y,_,I,P,j,B,$,U){let z=J(I),C=V(I),X={path:z,pattern:C,crumbs:P.slice(),ancestors:j.map(R=>R.path),ancestorPatterns:j.map(R=>R.pattern)};s.raw&&(X.at={left:y?B:null,right:_?$:null,...U?{gap:U}:{}});let Y=R=>{let L={...X,...R};L.label=b(C,I,R.label,L),a.push(L),d(z,L.type,!0)};if(!y&&!_)return;if(!y)return M(c,I,"added"),Y({type:"added",kind:Fe(c),left:void 0,right:c,diffs:null}),c;if(!_)return M(u,I,"deleted"),Y({type:"deleted",kind:Fe(u),left:u,right:void 0,diffs:null}),u;f(u,z),f(c,z);let ie=r.identity(C);if(typeof ie=="function"&&u&&c&&typeof u=="object"&&typeof c=="object"){let R=ie(u);if(R!=null&&R===ie(c))return c}if(Array.isArray(u)&&Array.isArray(c)){let R=p(C,u,c),L=R?Ce(u,c,R,s.detectMoves):ve(u,c,v(C?`${C}.*`:"*"),m(C?`${C}.*`:"*")),F=[],Q=C?`${C}.*`:"*",W=new Array(u.length),ye=new Array(c.length),Me=[],Ae=new Array(L.length),ke=new Array(L.length);if(s.raw){for(let S=L.length-1,G=c.length;S>=0;S--)Ae[S]=G,L[S].hasR&&(G=L[S].ri);for(let S=L.length-1,G=u.length;S>=0;S--)ke[S]=G,L[S].hasL&&!L[S].moved&&(G=L[S].li)}let se=-1;for(let S of L){se++,S.hasL&&(W[S.li]=S.id),S.hasR&&(ye[S.ri]=S.id),Me.push(S.id);let G=S.hasR?S.r:S.l,Ke={i:S.id},ae=[...I,Ke],oe=A(G,Q,S.id),le=[...j,{path:z,pattern:C}];if(S.moved){let De=J(ae),Se={path:De,pattern:Q,crumbs:[...P,oe],ancestors:le.map(fe=>fe.path),ancestorPatterns:le.map(fe=>fe.pattern),type:"moved",kind:"node",label:oe,left:S.li+1,right:S.ri+1,diffs:null};s.raw&&(Se.at={left:[...B,S.li],right:[...$,S.ri]}),a.push(Se),d(De,"moved",!0)}let ne=k(S.l,S.r,S.hasL,S.hasR,ae,[...P,oe],le,s.raw&&S.hasL?[...B,S.li]:null,s.raw&&S.hasR?[...$,S.ri]:null,s.raw?S.hasR?S.hasL?null:{side:"left",parent:B,index:ke[se]}:{side:"right",parent:$,index:Ae[se]}:null);ne&&typeof ne=="object"&&f(ne,J(ae)),F.push(ne)}return h.set(u,W),h.set(c,ye),h.set(F,Me),F}if(H(u)&&H(c)){let R={},L=[...Object.keys(c),...Object.keys(u).filter(F=>!te(c,F))];for(let F of L){let Q=[...I,{k:F}];if(i(V(Q))){R[F]=te(c,F)?c[F]:u[F];continue}let W=k(u[F],c[F],te(u,F),te(c,F),Q,P,[...j,{path:z,pattern:C}],s.raw?[...B,F]:null,s.raw?[...$,F]:null,null);W&&typeof W=="object"&&f(W,J(Q)),R[F]=W}return R}if(w(u,c,C))return c;let ee=R=>R===null||["string","number","boolean"].includes(typeof R),ze=ee(u)&&ee(c)&&u!==null&&c!==null?de(String(u),String(c),s.textMin):null;return Y({type:"modified",kind:ee(u)&&ee(c)?"value":"node",left:u,right:c,diffs:ze}),c}let T=k(e,n,e!==void 0,n!==void 0,[],[],[],[],[],null);for(let u of a)for(let c of u.ancestors)d(c,"child",!1);let E={stats:sn(a,r.units),changes:a,nodes:Object.fromEntries(l),merged:T,pathOf:(u,c)=>{var _;let y=typeof u=="string"?u:o.get(u);if(y===void 0)return null;if(c===void 0)return y;if(typeof c=="number"){let I=Array.isArray(u)?(_=h.get(u))==null?void 0:_[c]:void 0;return I===void 0?null:`${y}[${String(I).replace(/[\\\\[\\]]/g,P=>"\\\\"+P)}]`}return`${y}${y?".":""}${c}`},statusOf:(u,c)=>{let y=E.pathOf(u,c),_=y===null?void 0:l.get(y);return _?_.status:null},changesAt:(u,c)=>{let y=E.pathOf(u,c);return y===null?[]:a.filter(_=>_.path===y)}};return E}function Fe(e){return e!==null&&typeof e=="object"?"node":"value"}function sn(e,n){let t={added:0,modified:0,deleted:0,moved:0},s=new Map;for(let r of e){let i=r.path,a=!0;if(n(r.pattern)===void 0){i=null;for(let f=r.ancestors.length-1;f>=0;f--)if(n(r.ancestorPatterns[f])!==void 0){i=r.ancestors[f],a=!1;break}i===null&&(i=r.path,a=!0)}let l=a?r.type:"modified",o=s.get(i);(!o||q[l]>q[o])&&s.set(i,l)}for(let r of s.values())t[r]++;return t}var Le=new WeakMap,Be=new WeakMap;function re(e){if(e.v!==void 0)return e.v;let n=Be.get(e);if(n===void 0){n="";for(let t of e.c)if(n+=(n?" ":"")+re(t),n.length>2e3)break;Be.set(e,n)}return n}function Ue(e){var t;let n=Le.get(e);if(!n){let s=re(e).slice(0,600);n=new Map;for(let r=0;r<s.length-1;r++){let i=s.substr(r,2);n.set(i,((t=n.get(i))!=null?t:0)+1)}Le.set(e,n)}return n}function an(e,n){let t=e.v!==void 0,s=n.v!==void 0;if(t!==s||!t&&e.n!==n.n)return 0;if(!t&&e.k&&n.k)return e.k===n.k?1:0;let r=!t&&e.c.length>1&&n.c.length>1&&e.c[0].h===n.c[0].h?.75:0,i=Ue(e),a=Ue(n);if(!i.size&&!a.size)return t?e.v===n.v?1:.55:.75;if(!i.size||!a.size)return Math.max(r,.55);let l=0,o=0,f=0;for(let p of i.values())o+=p;for(let p of a.values())f+=p;for(let[p,v]of i){let m=a.get(p);m&&(l+=Math.min(v,m))}let h=2*l/(o+f),d=re(e).length<=24&&re(n).length<=24?.55:0;return t?Math.max(h,d):Math.max(.3+.7*h,d,r)}var on={identity:{"**":e=>e&&typeof e=="object"&&!Array.isArray(e)?e.h:void 0},ignore:["**.h","**.i","**.k"],keys:{"**.c":e=>e&&e.k?e.n+"#"+e.k:null},similar:{"**.c.*":an},raw:!0,textMin:12,detectMoves:!0};function _e(e){var l;let n=be(),t=me(e.left,e.right,{...on,...(l=e.options)!=null?l:{}}),s=t.changes.map(o=>({type:o.type,kind:o.kind,path:o.path,at:o.at,diffs:o.diffs,left:o.left!==null&&typeof o.left=="object"?null:o.left,right:o.right!==null&&typeof o.right=="object"?null:o.right})),r=be(),i=e.leftAnchors&&e.rightAnchors?ge(e.leftAnchors,e.rightAnchors):[],a=new Int32Array(i.length*2);return i.forEach(([o,f],h)=>{a[2*h]=o,a[2*h+1]=f}),{changes:s,stats:t.stats,anchorPairs:a,ms:{compare:r-n,anchors:be()-r}}}function be(){return(typeof performance!="undefined"?performance:Date).now()}function we(e){let n=new Array(e.length);for(let t=0;t<e.length;t++){let s=e[t],r=s.v!==void 0?{v:s.v,h:s.h,i:t}:{n:s.n,c:[],h:s.h,i:t};s.a&&(r.a=s.a),s.k&&(r.k=s.k),n[t]=r,s.p>=0&&n[s.p].c.push(r)}return n[0]}var x=new Map;self.onmessage=e=>{var t,s;let n=e.data;try{if(n.part){let r=x.get(n.id);r||(r={left:[],right:[]},x.set(n.id,r));let i=r[n.part];for(let a=0;a<n.recs.length;a++)i[n.at+a]=n.recs[a];return}if(n.go){let r=(t=x.get(n.id))!=null?t:{left:[],right:[]};x.delete(n.id);let i=_e({left:we(r.left),right:we(r.right),leftAnchors:n.leftAnchors,rightAnchors:n.rightAnchors,options:n.options});self.postMessage({id:n.id,ok:!0,out:i},[i.anchorPairs.buffer]);return}n.job&&self.postMessage({id:n.id,ok:!0,out:_e(n.job)})}catch(r){x.delete(n.id),self.postMessage({id:n.id,ok:!1,error:String((s=r==null?void 0:r.stack)!=null?s:r)})}};})();\n';
+var url = null;
+function spawnWorker() {
+  if (!url) url = URL.createObjectURL(new Blob([code], { type: "text/javascript" }));
+  return new Worker(url);
+}
+
+// src/marks.js
+function normIndexMap(s) {
+  const map = [];
+  let i = 0;
+  while (i < s.length && /\s/.test(s[i])) i++;
+  let ws = false;
+  for (; i < s.length; i++) {
+    if (/\s/.test(s[i])) {
+      if (!ws) {
+        map.push(i);
+        ws = true;
+      }
+    } else {
+      map.push(i);
+      ws = false;
+    }
+  }
+  if (ws) map.pop();
+  return map;
+}
+function sideSpans(diffs, side) {
+  const want = side === "left" ? -1 : 1;
+  const out = [];
+  let pos = 0;
+  for (const [op, t] of diffs) {
+    if (op === 0) pos += t.length;
+    else if (op === want) {
+      out.push([pos, pos + t.length]);
+      pos += t.length;
+    }
+  }
+  return out;
+}
+var BLOCK = "p,li,td,th,dt,dd,h1,h2,h3,h4,h5,h6,pre,blockquote,figcaption,caption,label,button,summary";
+function blockOf(node) {
+  const el = node.nodeType === 1 ? node : node.parentElement;
+  return el?.closest(BLOCK) ?? el;
+}
+var hasHighlightApi = (win) => !!(win && win.CSS && win.CSS.highlights && win.Highlight);
+var SideMarks = class {
+  constructor(name) {
+    this.name = name;
+    this.attrs = [];
+    this.ranges = { ins: [], del: [], focus: [] };
+    this.wins = /* @__PURE__ */ new Set();
+  }
+  attr(el, name, value) {
+    if (!el || el.nodeType !== 1) return;
+    const cur = el.getAttribute(name);
+    if (cur && rank(cur) >= rank(value)) return;
+    el.setAttribute(name, value);
+    this.attrs.push([el, name]);
+  }
+  textRange(textNode, start, end, kind) {
+    const doc = textNode.ownerDocument;
+    const r = doc.createRange();
+    const map = normIndexMap(textNode.data);
+    if (!map.length) return null;
+    const s = map[Math.min(start, map.length - 1)];
+    const e = end > start ? map[Math.min(end, map.length) - 1] + 1 : s;
+    r.setStart(textNode, s);
+    r.setEnd(textNode, Math.min(e, textNode.data.length));
+    this.ranges[kind].push(r);
+    this.wins.add(doc.defaultView);
+    return r;
+  }
+  wholeText(textNode, kind) {
+    const r = textNode.ownerDocument.createRange();
+    r.selectNodeContents(textNode);
+    this.ranges[kind].push(r);
+    this.wins.add(textNode.ownerDocument.defaultView);
+  }
+  flush() {
+    for (const win of this.wins) {
+      if (!hasHighlightApi(win)) continue;
+      for (const kind of ["ins", "del", "focus"]) {
+        const key = `${this.name}-${kind}`;
+        const list = this.ranges[kind].filter((r) => r.startContainer.ownerDocument.defaultView === win);
+        if (list.length) win.CSS.highlights.set(key, new win.Highlight(...list));
+        else win.CSS.highlights.delete(key);
+      }
+    }
+  }
+  setFocus(ranges) {
+    this.ranges.focus = ranges;
+    for (const r of ranges) this.wins.add(r.startContainer.ownerDocument.defaultView);
+    this.flush();
+  }
+  clear() {
+    for (const [el, name] of this.attrs) el.removeAttribute(name);
+    this.attrs = [];
+    this.ranges = { ins: [], del: [], focus: [] };
+    for (const win of this.wins) {
+      if (!hasHighlightApi(win)) continue;
+      for (const kind of ["ins", "del", "focus"]) win.CSS.highlights.delete(`${this.name}-${kind}`);
+    }
+  }
+};
+var RANKS = { added: 4, deleted: 4, modified: 3, moved: 2, before: 1, end: 1 };
+var rank = (v) => RANKS[v] ?? 0;
+function ensureMarkStyle(doc, name) {
+  if (!doc) return;
+  let st = doc.getElementById("sgc-mark-style");
+  if (!st) {
+    st = doc.createElement("style");
+    st.id = "sgc-mark-style";
+    st.textContent = MARK_CSS;
+    (doc.head ?? doc.documentElement).appendChild(st);
+  }
+  if (!st.dataset[name]) {
+    st.dataset[name] = "1";
+    st.textContent += highlightCss(name);
+  }
+}
+var highlightCss = (n) => `
+::highlight(${n}-ins){background-color:var(--sgc-ins-bg,rgba(34,197,94,.34));color:inherit;text-decoration:underline;text-decoration-color:var(--sgc-ins-line,#16a34a);text-decoration-thickness:2px}
+::highlight(${n}-del){background-color:var(--sgc-del-bg,rgba(239,68,68,.28));color:inherit;text-decoration:line-through;text-decoration-color:var(--sgc-del-line,#dc2626);text-decoration-thickness:2px}
+::highlight(${n}-focus){background-color:var(--sgc-focus-bg,rgba(37,99,235,.32))}
+`;
+var MARK_CSS = `
+[data-sgc-line]{box-shadow:-7px 0 0 -4px var(--sgc-line-color,#ca8a04)}
+[data-sgc-line="added"]{--sgc-line-color:var(--sgc-ins-line,#16a34a)}
+[data-sgc-line="deleted"]{--sgc-line-color:var(--sgc-del-line,#dc2626)}
+[data-sgc-line="modified"]{--sgc-line-color:var(--sgc-mod-line,#ca8a04)}
+[data-sgc]{border-radius:2px}
+[data-sgc="added"]{background-color:var(--sgc-add-block,rgba(34,197,94,.13))!important;box-shadow:inset 0 0 0 1.5px var(--sgc-ins-line,#16a34a)!important}
+[data-sgc="deleted"]{background-color:var(--sgc-del-block,rgba(239,68,68,.11))!important;box-shadow:inset 0 0 0 1.5px var(--sgc-del-line,#dc2626)!important;text-decoration:line-through;text-decoration-color:rgba(220,38,38,.75)}
+[data-sgc="modified"]{background-color:var(--sgc-mod-block,rgba(250,204,21,.16))!important;box-shadow:inset 0 0 0 1.5px var(--sgc-mod-line,#ca8a04)!important}
+[data-sgc="moved"]{background-color:var(--sgc-mov-block,rgba(99,102,241,.09))!important;box-shadow:inset 0 0 0 1.5px var(--sgc-mov-line,#6366f1)!important}
+[data-sgc-gap="before"]{box-shadow:0 -3px 0 0 var(--sgc-gap-line,rgba(220,38,38,.85))}
+[data-sgc-gap="end"]{box-shadow:0 3px 0 0 var(--sgc-gap-line,rgba(220,38,38,.85))}
+[data-sgc-gap][data-sgc-side="left"]{--sgc-gap-line:rgba(22,163,74,.9)}
+[data-sgc-focus]{outline:2.5px solid var(--sgc-focus,#2563eb)!important;outline-offset:3px;animation:sgc-pulse 1.4s ease-out 1}
+@keyframes sgc-pulse{0%{outline-color:rgba(37,99,235,1);outline-offset:8px}100%{outline-offset:3px}}
+ins.sgc-ins{background:rgba(34,197,94,.3);text-decoration:underline;text-decoration-color:#16a34a;text-decoration-thickness:2px;color:inherit}
+del.sgc-del{background:rgba(239,68,68,.24);text-decoration:line-through;text-decoration-color:#dc2626;text-decoration-thickness:2px;color:inherit}
+@media print{[data-sgc-focus]{outline:none!important}}
+`;
+
+// src/scroll.js
+function makeScroller(root, given) {
+  const doc = root.ownerDocument;
+  const win = doc.defaultView;
+  let el = given ?? null;
+  if (!el) {
+    for (let p = root; p && p.nodeType === 1; p = p.parentElement) {
+      const oy = win.getComputedStyle(p).overflowY;
+      if ((oy === "auto" || oy === "scroll" || oy === "overlay") && p !== doc.body && p !== doc.documentElement) {
+        el = p;
+        break;
+      }
+    }
+  }
+  if (el && el !== win && el !== doc.scrollingElement) {
+    return {
+      target: el,
+      doc,
+      get top() {
+        return el.scrollTop;
+      },
+      set top(v) {
+        el.scrollTop = v;
+      },
+      viewTop: () => el.getBoundingClientRect().top,
+      height: () => el.clientHeight,
+      max: () => el.scrollHeight - el.clientHeight
+    };
+  }
+  const se = () => doc.scrollingElement ?? doc.documentElement;
+  return {
+    target: win,
+    doc,
+    get top() {
+      return se().scrollTop;
+    },
+    set top(v) {
+      se().scrollTop = v;
+    },
+    viewTop: () => 0,
+    height: () => win.innerHeight,
+    max: () => se().scrollHeight - win.innerHeight
+  };
+}
+function scrollIntoScroller(sc, el, ratio = 0.3, smooth = true) {
+  const r = el.getBoundingClientRect();
+  const top = sc.top + (r.top - sc.viewTop()) - sc.height() * ratio;
+  const t = sc.target;
+  const v = Math.max(0, Math.min(top, sc.max()));
+  if (t.scrollTo) t.scrollTo({ top: v, behavior: smooth ? "smooth" : "auto" });
+  else sc.top = v;
+}
+function linkScroll(A, B, getAnchors) {
+  if (A.target === B.target) return { destroy() {
+  }, enabled: true, pause() {
+  } };
+  const lockUntil = /* @__PURE__ */ new Map();
+  let enabled = true, pausedUntil = 0;
+  const now2 = () => performance.now();
+  function search(list, top, lo, hi) {
+    let ans = -1;
+    while (lo <= hi) {
+      const m = lo + hi >> 1;
+      const r = list[m].getBoundingClientRect();
+      if (r.bottom > top) {
+        ans = m;
+        hi = m - 1;
+      } else lo = m + 1;
+    }
+    return ans;
+  }
+  function firstVisible(side, sc) {
+    const top = sc.viewTop() + 1;
+    const list = side.els;
+    if (side.pages && side.pages.length && side.start) {
+      const p = search(side.pages, top, 0, side.pages.length - 1);
+      if (p >= 0) {
+        const a = side.start[p], b = side.start[p + 1] - 1;
+        if (b >= a) {
+          const k = search(list, top, a, b);
+          return k >= 0 ? k : Math.min(b + 1, list.length - 1);
+        }
+        return Math.min(a, list.length - 1);
+      }
+    }
+    return search(list, top, 0, list.length - 1);
+  }
+  function syncPages(from, to, fromSide, toSide) {
+    const top = from.viewTop() + 1;
+    const p = search(fromSide.pages, top, 0, fromSide.pages.length - 1);
+    if (p < 0) return proportional(from, to);
+    const q = fromSide.pagePair[p];
+    const a = fromSide.pages[p].getBoundingClientRect();
+    const b = toSide.pages[q].getBoundingClientRect();
+    const frac = a.height ? (from.viewTop() - a.top) / a.height : 0;
+    const want = b.top + frac * b.height - to.viewTop() - (a.top + frac * a.height - from.viewTop());
+    move(to, to.top + want);
+  }
+  function sync(from, to, fromSide, toSide, pair) {
+    if (fromSide.pagePair && toSide.pages?.length) return syncPages(from, to, fromSide, toSide);
+    const fromList = fromSide.els, toList = toSide.els;
+    if (!fromList.length) return proportional(from, to);
+    let k = firstVisible(fromSide, from);
+    if (k < 0) k = fromList.length - 1;
+    let j = k;
+    while (j >= 0 && pair[j] < 0 && k - j < 400) j--;
+    if (j < 0 || pair[j] < 0) {
+      j = k;
+      while (j < fromList.length && pair[j] < 0 && j - k < 400) j++;
+    }
+    if (j >= fromList.length || pair[j] < 0) return proportional(from, to);
+    const a = fromList[j], b = toList[pair[j]];
+    const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
+    if (!ra.height && !rb.height) return proportional(from, to);
+    const into = ra.height ? Math.max(0, Math.min(1, (from.viewTop() - ra.top) / ra.height)) : 0;
+    const pointA = ra.top + into * ra.height - from.viewTop();
+    const pointB = rb.top + into * rb.height - to.viewTop();
+    const want = pointB - pointA;
+    move(to, to.top + want);
+  }
+  function proportional(from, to) {
+    const fm = from.max(), tm = to.max();
+    move(to, fm > 0 ? from.top / fm * tm : 0);
+  }
+  function move(sc, v) {
+    v = Math.max(0, Math.min(Math.round(v), sc.max()));
+    if (Math.abs(v - sc.top) < 1) return;
+    lockUntil.set(sc.target, now2() + 80);
+    const t = sc.target;
+    if (t.scrollTo) t.scrollTo({ top: v, behavior: "instant" });
+    else sc.top = v;
+  }
+  function onScroll(from) {
+    return () => {
+      if (!enabled || now2() < pausedUntil) return;
+      if ((lockUntil.get(from.target) ?? 0) > now2()) return;
+      const a = getAnchors();
+      if (from === A) sync(A, B, a.left, a.right, a.pairL);
+      else sync(B, A, a.right, a.left, a.pairR);
+    };
+  }
+  const ha = onScroll(A), hb = onScroll(B);
+  A.target.addEventListener("scroll", ha, { passive: true });
+  B.target.addEventListener("scroll", hb, { passive: true });
+  return {
+    get enabled() {
+      return enabled;
+    },
+    set enabled(v) {
+      enabled = !!v;
+    },
+    /** 변경 위치로 이동하는 동안은 맞춤을 잠시 끈다 */
+    pause(ms = 900) {
+      pausedUntil = now2() + ms;
+    },
+    destroy() {
+      A.target.removeEventListener("scroll", ha);
+      B.target.removeEventListener("scroll", hb);
+    }
+  };
+}
+
+// src/controller.js
+var seq = 0;
+var sharedWorker = null;
+var workerBroken = false;
+var jobSeq = 0;
+var waiting = /* @__PURE__ */ new Map();
+function getWorker() {
+  if (workerBroken) return null;
+  if (sharedWorker) return sharedWorker;
+  try {
+    sharedWorker = spawnWorker();
+    sharedWorker.onmessage = (e) => {
+      const w = waiting.get(e.data.id);
+      if (!w) return;
+      waiting.delete(e.data.id);
+      e.data.ok ? w.resolve(e.data.out) : w.reject(new Error(e.data.error));
+    };
+    sharedWorker.onerror = (e) => {
+      workerBroken = true;
+      sharedWorker = null;
+      for (const w of waiting.values()) w.fallback();
+      waiting.clear();
+      e.preventDefault?.();
+    };
+    return sharedWorker;
+  } catch {
+    workerBroken = true;
+    return null;
+  }
+}
+async function runJob(sl, sr, extra, useWorker) {
+  const w = useWorker ? getWorker() : null;
+  const local = () => diffTrees({ left: sl.tree, right: sr.tree, leftAnchors: sl.anchorHashes, rightAnchors: sr.anchorHashes, options: extra });
+  if (!w) return local();
+  const id = ++jobSeq;
+  const done = new Promise((resolve, reject) => waiting.set(id, { resolve, reject, fallback: () => resolve(local()) }));
+  const CHUNK = 15e3;
+  for (const [side, s] of [["left", sl], ["right", sr]]) {
+    for (let k = 0; k < s.flat.length; k += CHUNK) {
+      w.postMessage({ id, part: side, at: k, recs: s.flat.slice(k, k + CHUNK) });
+      await yieldToBrowser();
+    }
+  }
+  w.postMessage({ id, go: true, leftAnchors: sl.anchorHashes, rightAnchors: sr.anchorHashes, options: extra });
+  return done;
+}
+function createCompare(options) {
+  const opt = {
+    attrs: DEFAULT_ATTRS,
+    worker: "auto",
+    watch: false,
+    debounce: 300,
+    syncScroll: true,
+    page: null,
+    ...options
+  };
+  const name = `sgc${++seq}`;
+  const marks = { left: new SideMarks(name + "l"), right: new SideMarks(name + "r") };
+  const listeners = /* @__PURE__ */ new Map();
+  const emit = (ev, data) => {
+    for (const f of listeners.get(ev) ?? []) f(data);
+  };
+  const state = {
+    changes: [],
+    stats: { added: 0, modified: 0, deleted: 0, moved: 0 },
+    timing: null,
+    current: -1,
+    filter: null,
+    running: false,
+    error: null,
+    pages: { left: 0, right: 0 }
+  };
+  let snaps = null, anchors = { left: { els: [] }, right: { els: [] }, pairL: new Int32Array(0), pairR: new Int32Array(0) };
+  let runId = 0, link = null, observers = [], debounceTimer = 0, destroyed = false;
+  const scrollers = {};
+  const root = (side) => resolveRoot(side === "left" ? opt.left : opt.right);
+  function setupScroll() {
+    scrollers.left = makeScroller(root("left"), opt.leftScroller);
+    scrollers.right = makeScroller(root("right"), opt.rightScroller);
+    link?.destroy();
+    link = opt.syncScroll === false ? null : linkScroll(scrollers.left, scrollers.right, () => anchors);
+  }
+  async function run() {
+    if (destroyed) return;
+    const id = ++runId;
+    state.running = true;
+    state.error = null;
+    emit("start");
+    try {
+      const L = root("left"), R = root("right");
+      ensureMarkStyle(L.ownerDocument, name + "l");
+      ensureMarkStyle(R.ownerDocument, name + "r");
+      const t0 = performance.now();
+      const sopt = { attrs: opt.attrs, ignore: opt.ignore, anchors: opt.anchors, keyAttrs: opt.keyAttrs };
+      const big = L.getElementsByTagName("*").length + R.getElementsByTagName("*").length > 6e3;
+      const sl = big ? await snapshotAsync(L, sopt) : snapshot(L, sopt);
+      if (id !== runId || destroyed) return;
+      const sr = big ? await snapshotAsync(R, sopt) : snapshot(R, sopt);
+      if (id !== runId || destroyed) return;
+      const t1 = performance.now();
+      const size = sl.nodes.length + sr.nodes.length;
+      const useWorker = opt.worker === true || opt.worker === "auto" && size > 4e3;
+      const out = await runJob(sl, sr, opt.rules, useWorker);
+      if (id !== runId || destroyed) return;
+      const t2 = performance.now();
+      snaps = { left: sl, right: sr };
+      await apply(out, id);
+      if (id !== runId || destroyed) return;
+      snaps = { right: { nodes: sr.nodes } };
+      sl.tree = sr.tree = sl.flat = sr.flat = null;
+      const t3 = performance.now();
+      state.timing = { snapshot: t1 - t0, compare: t2 - t1, paint: t3 - t2, total: t3 - t0, nodes: size, worker: useWorker && !workerBroken, engine: out.ms };
+      if (!scrollers.left) setupScroll();
+      state.running = false;
+      emit("update", api);
+    } catch (err) {
+      if (id !== runId) return;
+      state.running = false;
+      state.error = err;
+      emit("error", err);
+      if (!listeners.get("error")?.length) console.error(err);
+    }
+  }
+  function nodeOf(side, raw) {
+    if (!raw) return { node: null, rest: [] };
+    const s = snaps[side];
+    const { node, rest } = locate(s.tree, raw);
+    return { obj: node, node: s.nodes[node.i], rest };
+  }
+  function pageIndex(side) {
+    if (!opt.page) return null;
+    const list = Array.from(root(side).querySelectorAll(opt.page));
+    state.pages[side] = list.length;
+    const m = new Map(list.map((el, i) => [el, i + 1]));
+    return (node) => {
+      const el = node?.nodeType === 1 ? node : node?.parentElement;
+      const p = el?.closest(opt.page);
+      return p ? m.get(p) ?? null : null;
+    };
+  }
+  function slicer(id) {
+    let t = performance.now();
+    return async () => {
+      if (performance.now() - t < 8) return true;
+      await yieldToBrowser();
+      t = performance.now();
+      return id === runId && !destroyed;
+    };
+  }
+  async function apply(out, id) {
+    const tick = slicer(id);
+    const list = [];
+    const pgL = pageIndex("left"), pgR = pageIndex("right");
+    for (const c of out.changes) {
+      if (!await tick()) return;
+      const L = nodeOf("left", c.at?.left), R = nodeOf("right", c.at?.right);
+      const ch = {
+        index: list.length,
+        type: c.type,
+        path: c.path,
+        diffs: c.diffs,
+        left: L.node,
+        right: R.node,
+        what: "node",
+        gap: null,
+        before: c.left,
+        after: c.right
+      };
+      const field = (L.node ? L.rest : R.rest)[0];
+      if (c.type === "moved") ch.what = "moved";
+      else if (field === "v") ch.what = "text";
+      else if (field === "a" || field === "n" || field === "k") {
+        ch.what = "attr";
+        ch.attr = (L.node ? L.rest : R.rest).slice(1).join(".") || field;
+      } else ch.what = "node";
+      if (c.at?.gap && (c.type === "added" || c.type === "deleted")) {
+        const gside = c.at.gap.side;
+        const p = nodeOf(gside, c.at.gap.parent);
+        const kids = p.obj?.c;
+        if (kids) {
+          const ref = kids[c.at.gap.index];
+          const refNode = ref ? snaps[gside].nodes[ref.i] : p.node;
+          ch.gap = { side: gside, node: refNode, end: !ref };
+        }
+      }
+      if (ch.what === "attr" || ch.what === "moved") {
+        ch.left = L.node;
+        ch.right = R.node;
+      }
+      ch.page = {
+        left: pgL && ch.left ? pgL(ch.left) : pgL && ch.gap?.side === "left" ? pgL(ch.gap.node) : null,
+        right: pgR && ch.right ? pgR(ch.right) : pgR && ch.gap?.side === "right" ? pgR(ch.gap.node) : null
+      };
+      ch.text = describe(ch);
+      list.push(ch);
+    }
+    marks.left.clear();
+    marks.right.clear();
+    for (const ch of list) paint(ch);
+    marks.left.flush();
+    marks.right.flush();
+    state.changes = list;
+    state.stats = out.stats;
+    state.current = list.length ? Math.min(Math.max(state.current, -1), list.length - 1) : -1;
+    const side = (sd) => {
+      const els = snaps[sd].anchors.map((i) => snaps[sd].nodes[i]);
+      if (!opt.page) return { els };
+      const pages = Array.from(root(sd).querySelectorAll(opt.page));
+      const idx = new Map(pages.map((p, i) => [p, i]));
+      const pageOf = new Int32Array(els.length).fill(-1);
+      const start = new Int32Array(pages.length + 1);
+      let cur = -1;
+      els.forEach((el, k) => {
+        const pg = el.closest(opt.page);
+        const p = pg ? idx.get(pg) ?? cur : cur;
+        pageOf[k] = p;
+        if (p > cur) {
+          for (let q = cur + 1; q <= p; q++) start[q] = k;
+          cur = p;
+        }
+      });
+      for (let q = cur + 1; q <= pages.length; q++) start[q] = els.length;
+      return { els, pages, start, pageOf };
+    };
+    const pairL = new Int32Array(snaps.left.anchors.length).fill(-1), pairR = new Int32Array(snaps.right.anchors.length).fill(-1);
+    const ap = out.anchorPairs;
+    for (let k = 0; k < ap.length; k += 2) {
+      pairL[ap[k]] = ap[k + 1];
+      pairR[ap[k + 1]] = ap[k];
+    }
+    const A = side("left"), B = side("right");
+    const pagePair = (X, Y, pair) => {
+      if (!X.pages || !Y.pages) return null;
+      const pp = new Int32Array(X.pages.length).fill(-1);
+      for (let p = 0; p < X.pages.length; p++) {
+        for (let k = X.start[p]; k < X.start[p + 1]; k++) {
+          if (pair[k] >= 0) {
+            pp[p] = Y.pageOf[pair[k]];
+            break;
+          }
+        }
+      }
+      for (let p = 0; p < pp.length; p++) if (pp[p] < 0) pp[p] = Math.min(p, Y.pages.length - 1);
+      return pp;
+    };
+    A.pagePair = pagePair(A, B, pairL);
+    B.pagePair = pagePair(B, A, pairR);
+    anchors = { left: A, right: B, pairL, pairR };
+  }
+  function paint(ch) {
+    const t = ch.type;
+    if (ch.what === "text" && t === "modified" && ch.diffs) {
+      for (const side of ["left", "right"]) {
+        const tn = ch[side];
+        if (!tn) continue;
+        for (const [s, e] of sideSpans(ch.diffs, side)) marks[side].textRange(tn, s, e, side === "left" ? "del" : "ins");
+        marks[side].attr(blockOf(tn), "data-sgc-line", "modified");
+        if (!hasHighlightApi(tn.ownerDocument.defaultView)) marks[side].attr(blockOf(tn), "data-sgc", "modified");
+      }
+      return;
+    }
+    if (ch.what !== "attr" && (t === "added" || t === "deleted")) {
+      const side = t === "added" ? "right" : "left";
+      const n = ch[side];
+      if (n) {
+        if (n.nodeType === 3) {
+          marks[side].wholeText(n, t === "added" ? "ins" : "del");
+          marks[side].attr(blockOf(n), "data-sgc-line", t);
+          if (!hasHighlightApi(n.ownerDocument.defaultView)) marks[side].attr(n.parentElement, "data-sgc", t);
+        } else {
+          marks[side].attr(n, "data-sgc", t);
+        }
+      }
+      if (ch.gap?.node) {
+        const g = ch.gap.node.nodeType === 1 ? ch.gap.node : ch.gap.node.parentElement;
+        marks[ch.gap.side].attr(g, "data-sgc-gap", ch.gap.end ? "end" : "before");
+        marks[ch.gap.side].attr(g, "data-sgc-side", ch.gap.side);
+      }
+      return;
+    }
+    const status = t === "moved" ? "moved" : "modified";
+    for (const side of ["left", "right"]) {
+      const n = ch[side];
+      if (!n) continue;
+      marks[side].attr(n.nodeType === 1 ? n : n.parentElement, "data-sgc", status);
+    }
+  }
+  function snippet(node, max = 90) {
+    if (!node) return "";
+    if (node.nodeType === 3) return clip(normText(node.data), max);
+    if (node.localName === "img") return `[${node.getAttribute("alt") || node.getAttribute("src") || "img"}]`;
+    return clip(textOfNode(node, max * 2), max) || `<${node.localName}>`;
+  }
+  function describe(ch) {
+    if (ch.what === "text" && ch.diffs) return { diffs: trimDiffs(ch.diffs) };
+    if (ch.what === "attr") return { attr: ch.attr, before: ch.before, after: ch.after, context: snippet(ch.right ?? ch.left, 60) };
+    if (ch.what === "moved") return { context: snippet(ch.right ?? ch.left) };
+    return { context: snippet(ch.type === "deleted" ? ch.left : ch.right) };
+  }
+  function elOf(n) {
+    return n ? n.nodeType === 1 ? n : n.parentElement : null;
+  }
+  let focusTimer = 0;
+  const focused = [];
+  function goTo(i, { smooth = true } = {}) {
+    if (!state.changes.length) return;
+    i = (i % state.changes.length + state.changes.length) % state.changes.length;
+    state.current = i;
+    const ch = state.changes[i];
+    if (!scrollers.left) setupScroll();
+    link?.pause(smooth ? 900 : 200);
+    for (const el of focused) el.removeAttribute("data-sgc-focus");
+    focused.length = 0;
+    for (const side of ["left", "right"]) {
+      let el = elOf(ch[side]);
+      if (!el && ch.gap?.side === side) el = elOf(ch.gap.node);
+      if (!el) continue;
+      const block = ch.what === "text" ? blockOf(ch[side]) ?? el : el;
+      scrollIntoScroller(scrollers[side], block, 0.3, smooth);
+      block.setAttribute("data-sgc-focus", "");
+      focused.push(block);
+      const fr = [];
+      if (ch[side]?.nodeType === 3) {
+        const r = ch[side].ownerDocument.createRange();
+        r.selectNodeContents(ch[side]);
+        fr.push(r);
+      }
+      marks[side].setFocus(fr);
+    }
+    clearTimeout(focusTimer);
+    focusTimer = setTimeout(() => {
+      for (const el of focused) el.removeAttribute("data-sgc-focus");
+      focused.length = 0;
+      marks.left.setFocus([]);
+      marks.right.setFocus([]);
+    }, 1800);
+    emit("focus", ch);
+  }
+  function step(d) {
+    const vis = visible();
+    if (!vis.length) return;
+    const pos = vis.findIndex((c) => c.index === state.current);
+    const next = pos < 0 ? d > 0 ? vis[0] : vis[vis.length - 1] : vis[(pos + d + vis.length) % vis.length];
+    goTo(next.index);
+  }
+  const visible = () => state.filter ? state.changes.filter((c) => c.type === state.filter) : state.changes;
+  function watch() {
+    unwatch();
+    const kick = () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(run, opt.debounce);
+    };
+    for (const side of ["left", "right"]) {
+      const r = root(side);
+      const mo = new r.ownerDocument.defaultView.MutationObserver(kick);
+      mo.observe(r, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: [...opt.attrs, "data-sgc-key", "data-key", "hidden", "data-sgc-ignore"] });
+      r.addEventListener("input", kick, true);
+      r.addEventListener("change", kick, true);
+      observers.push(() => {
+        mo.disconnect();
+        r.removeEventListener("input", kick, true);
+        r.removeEventListener("change", kick, true);
+      });
+    }
+  }
+  function unwatch() {
+    for (const f of observers) f();
+    observers = [];
+  }
+  function renderRedline(target) {
+    if (!snaps) throw new Error("[sg-compare] run() \uC774 \uB05D\uB09C \uB4A4\uC5D0 \uBD80\uB974\uC138\uC694");
+    const R = root("right");
+    const doc = target.ownerDocument;
+    ensureMarkStyle(doc, name + "x");
+    const clone = doc.importNode(R, true);
+    const cs = snapshot(clone, { attrs: opt.attrs, ignore: opt.ignore, anchors: "", keyAttrs: opt.keyAttrs });
+    if (cs.nodes.length !== snaps.right.nodes.length) console.warn("[sg-compare] \uD55C \uC7A5 \uBCF4\uAE30: \uBCF5\uC0AC\uBCF8 \uAD6C\uC870\uAC00 \uB2EC\uB77C \uC77C\uBD80 \uD45C\uC2DC\uAC00 \uC5B4\uAE0B\uB0A0 \uC218 \uC788\uC2B5\uB2C8\uB2E4");
+    const inserts = [];
+    const idx = new Map(snaps.right.nodes.map((n, i) => [n, i]));
+    for (const ch of state.changes) {
+      if (ch.what === "text" && ch.type === "modified" && ch.diffs && ch.right) {
+        const i = idx.get(ch.right);
+        const tn = cs.nodes[i];
+        if (!tn?.parentNode) continue;
+        const frag = doc.createDocumentFragment();
+        for (const [op, t] of ch.diffs) {
+          if (op === 0) frag.append(t);
+          else {
+            const e = doc.createElement(op < 0 ? "del" : "ins");
+            e.className = op < 0 ? "sgc-del" : "sgc-ins";
+            e.textContent = t;
+            frag.append(e);
+          }
+        }
+        const lead = /^\s/.test(tn.data) ? " " : "", trail = /\s$/.test(tn.data) ? " " : "";
+        if (lead) frag.prepend(lead);
+        if (trail) frag.append(trail);
+        tn.replaceWith(frag);
+      } else if (ch.what === "attr" || ch.type === "moved") {
+        const n = ch.right ? cs.nodes[idx.get(ch.right)] : null;
+        const el = n?.nodeType === 1 ? n : n?.parentElement;
+        el?.setAttribute("data-sgc", ch.type === "moved" ? "moved" : "modified");
+      } else if (ch.type === "added" && ch.right) {
+        const n = cs.nodes[idx.get(ch.right)];
+        if (!n) continue;
+        if (n.nodeType === 3) {
+          const e = doc.createElement("ins");
+          e.className = "sgc-ins";
+          n.replaceWith(e);
+          e.append(n);
+        } else n.setAttribute("data-sgc", "added");
+      } else if (ch.type === "deleted" && ch.left && ch.gap) {
+        let n = doc.importNode(ch.left, true);
+        if (n.nodeType === 3) {
+          const e = doc.createElement("del");
+          e.className = "sgc-del";
+          e.append(n);
+          n = e;
+        } else n.setAttribute("data-sgc", "deleted");
+        const gi = idx.get(ch.gap.node);
+        inserts.push({ ref: cs.nodes[gi], end: ch.gap.end, n });
+      }
+    }
+    for (const { ref, end, n } of inserts) {
+      if (!ref) continue;
+      if (end) ref.appendChild(n);
+      else ref.parentNode?.insertBefore(n, ref);
+    }
+    let out = clone;
+    if (clone.localName === "body") {
+      out = doc.createElement("div");
+      out.className = clone.className;
+      out.append(...clone.childNodes);
+    }
+    out.setAttribute("data-sgc-redline", "");
+    target.replaceChildren(out);
+    return out;
+  }
+  const api = {
+    get changes() {
+      return state.changes;
+    },
+    get visibleChanges() {
+      return visible();
+    },
+    get stats() {
+      return state.stats;
+    },
+    get timing() {
+      return state.timing;
+    },
+    get current() {
+      return state.current;
+    },
+    get running() {
+      return state.running;
+    },
+    get error() {
+      return state.error;
+    },
+    get filter() {
+      return state.filter;
+    },
+    get pages() {
+      return state.pages;
+    },
+    get syncScroll() {
+      return link ? link.enabled : false;
+    },
+    set syncScroll(v) {
+      if (link) link.enabled = v;
+      emit("sync", !!v);
+    },
+    setFilter(type) {
+      state.filter = type && state.filter !== type ? type : null;
+      emit("filter", state.filter);
+    },
+    run,
+    goTo,
+    next: () => step(1),
+    prev: () => step(-1),
+    renderRedline,
+    on(ev, f) {
+      if (!listeners.has(ev)) listeners.set(ev, []);
+      listeners.get(ev).push(f);
+      return () => api.off(ev, f);
+    },
+    off(ev, f) {
+      const l = listeners.get(ev);
+      if (l) l.splice(l.indexOf(f) >>> 0, 1);
+    },
+    clear() {
+      marks.left.clear();
+      marks.right.clear();
+      state.changes = [];
+      emit("update", api);
+    },
+    destroy() {
+      destroyed = true;
+      runId++;
+      clearTimeout(debounceTimer);
+      clearTimeout(focusTimer);
+      unwatch();
+      link?.destroy();
+      marks.left.clear();
+      marks.right.clear();
+      listeners.clear();
+    }
+  };
+  if (opt.watch) watch();
+  if (opt.auto !== false) queueMicrotask(run);
+  return api;
+}
+function textOfNode(node, max) {
+  const w = node.ownerDocument.createTreeWalker(node, 4);
+  let out = "";
+  for (let t = w.nextNode(); t && out.length < max; t = w.nextNode()) {
+    const p = t.parentElement;
+    if (p && p.closest("script,style,[data-sgc-ignore]")) continue;
+    const v = normText(t.data);
+    if (v) out += (out ? " " : "") + v;
+  }
+  return out;
+}
+var clip = (s, n) => s.length > n ? s.slice(0, n - 1) + "\u2026" : s;
+function trimDiffs(diffs, ctx = 28) {
+  return diffs.map(([op, t], k) => {
+    if (op !== 0) return [op, clip(t, 120)];
+    if (k === 0) return [0, t.length > ctx ? "\u2026" + t.slice(-ctx) : t];
+    if (k === diffs.length - 1) return [0, t.length > ctx ? t.slice(0, ctx) + "\u2026" : t];
+    return [0, t.length > ctx * 2 ? t.slice(0, ctx) + " \u2026 " + t.slice(-ctx) : t];
+  });
+}
+
+// src/messages.js
+var messages = {
+  ko: {
+    added: "\uCD94\uAC00",
+    modified: "\uC218\uC815",
+    deleted: "\uC0AD\uC81C",
+    moved: "\uC774\uB3D9",
+    changes: "\uBCC0\uACBD \uBAA9\uB85D",
+    noChanges: "\uBC14\uB010 \uACF3 \uC5C6\uC74C",
+    running: "\uBE44\uAD50\uD558\uB294 \uC911\u2026",
+    empty: "(\uBE48 \uCE78)",
+    before: "\uC774\uC804",
+    after: "\uC0C8 \uBC84\uC804",
+    side: "\uB098\uB780\uD788",
+    redline: "\uD55C \uC7A5 \uBCF4\uAE30",
+    sync: "\uC2A4\uD06C\uB864 \uB9DE\uCDA4",
+    prev: "\uC774\uC804 \uBCC0\uACBD",
+    next: "\uB2E4\uC74C \uBCC0\uACBD",
+    filterHint: "\uB20C\uB7EC\uC11C \uC774 \uC885\uB958\uB9CC \uBCF4\uAE30",
+    nodes: "\uC77D\uC740 \uC694\uC18C",
+    took: (s) => `\uBE44\uAD50 ${s}\uCD08`,
+    page: (p) => `${p}\uCABD`,
+    more: (n) => `${n.toLocaleString()}\uAC74 \uB354 \uBCF4\uAE30`
+  },
+  en: {
+    added: "Added",
+    modified: "Modified",
+    deleted: "Deleted",
+    moved: "Moved",
+    changes: "Changes",
+    noChanges: "No differences",
+    running: "Comparing\u2026",
+    empty: "(empty)",
+    before: "Before",
+    after: "After",
+    side: "Side by side",
+    redline: "Redline",
+    sync: "Sync scroll",
+    prev: "Previous change",
+    next: "Next change",
+    filterHint: "Show only this type",
+    nodes: "Nodes",
+    took: (s) => `${s}s`,
+    page: (p) => `p.${p}`,
+    more: (n) => `Show ${n.toLocaleString()} more`
+  }
+};
+function getMessages(locale, overrides) {
+  const base = messages[locale] ?? messages[String(locale ?? "").slice(0, 2)] ?? messages.ko;
+  return overrides ? { ...base, ...overrides } : base;
+}
+
+// src/ui.js
+var TYPES = ["added", "modified", "deleted", "moved"];
+function ensureUiStyle(doc = document) {
+  if (doc.getElementById("sgc-ui-style")) return;
+  const st = doc.createElement("style");
+  st.id = "sgc-ui-style";
+  st.textContent = UI_CSS;
+  (doc.head ?? doc.documentElement).appendChild(st);
+}
+var h = (doc, tag, attrs = {}, ...kids) => {
+  const e = doc.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (v === void 0 || v === null || v === false) continue;
+    if (k.startsWith("on")) e.addEventListener(k.slice(2), v);
+    else if (k === "class") e.className = v;
+    else e.setAttribute(k, v === true ? "" : v);
+  }
+  for (const k of kids.flat()) if (k !== null && k !== void 0 && k !== false) e.append(k);
+  return e;
+};
+var fmt = (n, locale) => n.toLocaleString(locale === "ko" ? "ko-KR" : "en-US");
+function mountToolbar(el, ctrl, o = {}) {
+  const doc = el.ownerDocument;
+  ensureUiStyle(doc);
+  const m = getMessages(o.locale, o.labels);
+  let mode = o.mode ?? "side";
+  el.classList.add("sgc-toolbar");
+  function render() {
+    const s = ctrl.stats, t = ctrl.timing, vis = ctrl.visibleChanges;
+    const pos = vis.findIndex((c) => c.index === ctrl.current);
+    el.replaceChildren(
+      h(
+        doc,
+        "div",
+        { class: "sgc-tb-stats", role: "group", "aria-label": m.changes },
+        TYPES.map((tp) => h(doc, "button", {
+          type: "button",
+          class: `sgc-chip sgc-chip-${tp}`,
+          "aria-pressed": ctrl.filter === tp ? "true" : "false",
+          title: m.filterHint,
+          disabled: !s[tp] && ctrl.filter !== tp,
+          onclick: () => ctrl.setFilter(tp)
+        }, h(doc, "span", { class: "sgc-dot", "aria-hidden": "true" }), m[tp], h(doc, "b", {}, fmt(s[tp], o.locale))))
+      ),
+      h(
+        doc,
+        "div",
+        { class: "sgc-tb-nav" },
+        h(doc, "button", { type: "button", class: "sgc-btn", onclick: () => ctrl.prev(), disabled: !vis.length, "aria-label": m.prev, title: `${m.prev} (Shift+F7)` }, "\u2191"),
+        h(
+          doc,
+          "span",
+          { class: "sgc-pos", "aria-live": "polite" },
+          vis.length ? `${pos >= 0 ? fmt(pos + 1, o.locale) : "\u2013"} / ${fmt(vis.length, o.locale)}` : ctrl.running ? m.running : m.noChanges
+        ),
+        h(doc, "button", { type: "button", class: "sgc-btn", onclick: () => ctrl.next(), disabled: !vis.length, "aria-label": m.next, title: `${m.next} (F7)` }, "\u2193")
+      ),
+      h(
+        doc,
+        "div",
+        { class: "sgc-tb-right" },
+        o.modes ? h(
+          doc,
+          "div",
+          { class: "sgc-seg", role: "group" },
+          ["side", "redline"].map((md) => h(doc, "button", {
+            type: "button",
+            "aria-pressed": mode === md ? "true" : "false",
+            onclick: () => {
+              mode = md;
+              o.onMode?.(md);
+              render();
+            }
+          }, m[md]))
+        ) : null,
+        mode === "side" ? h(
+          doc,
+          "label",
+          { class: "sgc-switch" },
+          h(doc, "input", { type: "checkbox", checked: ctrl.syncScroll, onchange: (e) => {
+            ctrl.syncScroll = e.target.checked;
+          } }),
+          h(doc, "span", {}, m.sync)
+        ) : null,
+        t ? h(doc, "span", { class: "sgc-time", title: timingTitle(t, m) }, m.took((t.total / 1e3).toFixed(2))) : null
+      )
+    );
+  }
+  const offs = ["update", "filter", "focus", "start", "sync"].map((ev) => ctrl.on(ev, render));
+  const key = (e) => {
+    if (e.key === "F7") {
+      e.preventDefault();
+      e.shiftKey ? ctrl.prev() : ctrl.next();
+    }
+  };
+  doc.addEventListener("keydown", key);
+  render();
+  return {
+    setMode(md) {
+      mode = md;
+      render();
+    },
+    destroy() {
+      offs.forEach((f) => f());
+      doc.removeEventListener("keydown", key);
+      el.replaceChildren();
+      el.classList.remove("sgc-toolbar");
+    }
+  };
+}
+function timingTitle(t, m) {
+  return `${m.nodes}: ${t.nodes.toLocaleString()} \xB7 snapshot ${t.snapshot.toFixed(0)}ms \xB7 compare ${t.compare.toFixed(0)}ms${t.worker ? " (worker)" : ""} \xB7 paint ${t.paint.toFixed(0)}ms`;
+}
+function mountChangeList(el, ctrl, o = {}) {
+  const doc = el.ownerDocument;
+  ensureUiStyle(doc);
+  const m = getMessages(o.locale, o.labels);
+  el.classList.add("sgc-list");
+  const PAGE = o.max ?? 300;
+  let shown = PAGE;
+  const head = h(doc, "div", { class: "sgc-list-head" });
+  const ul = h(doc, "ol", { class: "sgc-list-items" });
+  el.replaceChildren(head, ul);
+  function item(c) {
+    const where = [];
+    if (c.page.left || c.page.right) {
+      const p = c.page.right ?? c.page.left;
+      where.push(m.page(p));
+    }
+    const body = [];
+    if (c.text.diffs) {
+      body.push(h(doc, "span", { class: "sgc-li-diff" }, c.text.diffs.map(([op, t]) => op === 0 ? t : h(doc, op < 0 ? "del" : "ins", {}, t))));
+    } else if (c.what === "attr") {
+      body.push(h(doc, "span", { class: "sgc-li-ctx" }, c.text.context || ""));
+      body.push(h(doc, "span", { class: "sgc-li-attr" }, `${c.text.attr}: `, h(doc, "del", {}, String(c.text.before ?? "")), " \u2192 ", h(doc, "ins", {}, String(c.text.after ?? ""))));
+    } else {
+      body.push(h(doc, "span", { class: "sgc-li-ctx" }, c.text.context || m.empty));
+    }
+    return h(
+      doc,
+      "li",
+      {},
+      h(
+        doc,
+        "button",
+        {
+          type: "button",
+          class: "sgc-li",
+          "data-type": c.type,
+          "aria-current": c.index === ctrl.current ? "true" : null,
+          onclick: () => ctrl.goTo(c.index)
+        },
+        h(
+          doc,
+          "span",
+          { class: "sgc-li-top" },
+          h(doc, "span", { class: `sgc-tag sgc-tag-${c.type}` }, m[c.type]),
+          where.length ? h(doc, "span", { class: "sgc-li-where" }, where.join(" \xB7 ")) : null,
+          h(doc, "span", { class: "sgc-li-no" }, `#${c.index + 1}`)
+        ),
+        h(doc, "span", { class: "sgc-li-body" }, body)
+      )
+    );
+  }
+  function render() {
+    const vis = ctrl.visibleChanges;
+    head.replaceChildren(
+      h(doc, "strong", {}, m.changes),
+      h(doc, "span", { class: "sgc-muted" }, ctrl.running ? m.running : `${fmt(vis.length, o.locale)}${ctrl.filter ? ` \xB7 ${m[ctrl.filter]}` : ""}`)
+    );
+    if (!vis.length) {
+      ul.replaceChildren(h(doc, "li", { class: "sgc-empty" }, ctrl.running ? m.running : ctrl.error ? String(ctrl.error.message ?? ctrl.error) : m.noChanges));
+      return;
+    }
+    const items = vis.slice(0, shown).map(item);
+    if (vis.length > shown) {
+      items.push(h(doc, "li", { class: "sgc-more" }, h(doc, "button", { type: "button", class: "sgc-btn sgc-btn-wide", onclick: () => {
+        shown += PAGE * 3;
+        render();
+      } }, m.more(vis.length - shown))));
+    }
+    ul.replaceChildren(...items);
+  }
+  function onFocus(c) {
+    for (const b of ul.querySelectorAll("[aria-current]")) b.removeAttribute("aria-current");
+    const vis = ctrl.visibleChanges;
+    const pos = vis.findIndex((x) => x.index === c.index);
+    if (pos >= shown) {
+      shown = pos + PAGE;
+      render();
+    }
+    const btn = ul.children[pos]?.querySelector("button");
+    if (btn) {
+      btn.setAttribute("aria-current", "true");
+      btn.scrollIntoView({ block: "nearest" });
+    }
+  }
+  const offs = [ctrl.on("update", () => {
+    shown = PAGE;
+    render();
+  }), ctrl.on("filter", () => {
+    shown = PAGE;
+    render();
+  }), ctrl.on("start", render), ctrl.on("focus", onFocus)];
+  render();
+  return { destroy() {
+    offs.forEach((f) => f());
+    el.replaceChildren();
+    el.classList.remove("sgc-list");
+  } };
+}
+function mountViewer(host, o) {
+  const doc = host.ownerDocument;
+  ensureUiStyle(doc);
+  const m = getMessages(o.locale, o.labels);
+  const frame = (src) => {
+    const f = h(doc, "iframe", { class: "sgc-frame", title: src.label ?? "" });
+    if (src.url) f.src = src.url;
+    else f.srcdoc = src.html ?? "";
+    return f;
+  };
+  const fl = frame(o.left), fr = frame(o.right);
+  const fx = h(doc, "iframe", { class: "sgc-frame", title: m.redline });
+  const bar = h(doc, "div");
+  const list = h(doc, "aside");
+  const paneL = h(doc, "section", { class: "sgc-pane" }, h(doc, "header", { class: "sgc-pane-head" }, h(doc, "span", { class: "sgc-badge sgc-badge-old" }, m.before), o.left.label ?? ""), fl);
+  const paneR = h(doc, "section", { class: "sgc-pane" }, h(doc, "header", { class: "sgc-pane-head" }, h(doc, "span", { class: "sgc-badge sgc-badge-new" }, m.after), o.right.label ?? ""), fr);
+  const paneX = h(doc, "section", { class: "sgc-pane sgc-pane-redline", hidden: true }, h(doc, "header", { class: "sgc-pane-head" }, m.redline, ` \xB7 ${o.left.label ?? ""} \u2192 ${o.right.label ?? ""}`), fx);
+  const panes = h(doc, "div", { class: "sgc-panes" }, paneL, paneR, paneX);
+  const root = h(doc, "div", { class: "sgc-viewer" }, bar, h(doc, "div", { class: "sgc-body" }, panes, list));
+  if (o.height) root.style.setProperty("--sgc-height", o.height);
+  host.replaceChildren(root);
+  const loaded = (f) => new Promise((res) => {
+    const ok = () => f.contentDocument && f.contentDocument.readyState === "complete" && f.contentDocument.body;
+    if (ok() && (f.src || f.srcdoc) && f.contentDocument.URL !== "about:blank") return res();
+    f.addEventListener("load", () => res(), { once: true });
+  });
+  let ctrl = null, tb = null, cl = null, redlineDirty = true;
+  const ready = Promise.all([loaded(fl), loaded(fr)]).then(() => {
+    ctrl = createCompare({ ...o, left: fl, right: fr, auto: false, watch: o.watch ?? false });
+    tb = mountToolbar(bar, ctrl, { locale: o.locale, labels: o.labels, modes: true, onMode: setMode });
+    cl = mountChangeList(list, ctrl, { locale: o.locale, labels: o.labels });
+    ctrl.on("update", () => {
+      redlineDirty = true;
+      if (!paneX.hidden) drawRedline();
+    });
+    return ctrl.run().then(() => ctrl);
+  });
+  function drawRedline() {
+    const src = fr.contentDocument;
+    const head = src.head ? src.head.innerHTML : "";
+    const base = src.baseURI ? `<base href="${src.baseURI.replace(/"/g, "&quot;")}">` : "";
+    fx.srcdoc = `<!doctype html><html lang="${src.documentElement.lang || ""}"><head>${base}${head}</head><body class="${src.body.className}"></body></html>`;
+    fx.addEventListener("load", () => {
+      ctrl.renderRedline(fx.contentDocument.body);
+      redlineDirty = false;
+    }, { once: true });
+  }
+  function setMode(md) {
+    const red = md === "redline";
+    paneL.hidden = red;
+    paneR.hidden = red;
+    paneX.hidden = !red;
+    root.dataset.mode = md;
+    if (red && redlineDirty && ctrl) drawRedline();
+  }
+  return {
+    ready,
+    get controller() {
+      return ctrl;
+    },
+    setMode(md) {
+      tb?.setMode(md);
+      setMode(md);
+    },
+    destroy() {
+      tb?.destroy();
+      cl?.destroy();
+      ctrl?.destroy();
+      host.replaceChildren();
+    }
+  };
+}
+var UI_CSS = `
+.sgc-viewer,.sgc-toolbar,.sgc-list{
+  --sgc-bg:#ffffff;--sgc-bg2:#f6f7f9;--sgc-bd:#e3e6eb;--sgc-fg:#14171c;--sgc-mut:#667085;--sgc-acc:#2563eb;
+  --sgc-c-added:#16a34a;--sgc-c-modified:#ca8a04;--sgc-c-deleted:#dc2626;--sgc-c-moved:#6366f1;
+  font:13px/1.5 Pretendard,"Pretendard Variable",-apple-system,BlinkMacSystemFont,"Segoe UI","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif;
+  color:var(--sgc-fg);box-sizing:border-box}
+.sgc-viewer *,.sgc-toolbar *,.sgc-list *{box-sizing:border-box}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) :is(.sgc-viewer,.sgc-toolbar,.sgc-list){
+  --sgc-bg:#15181d;--sgc-bg2:#1c2027;--sgc-bd:#2b313b;--sgc-fg:#e8ebf0;--sgc-mut:#9aa3b2;--sgc-acc:#60a5fa;
+  --sgc-c-added:#4ade80;--sgc-c-modified:#facc15;--sgc-c-deleted:#f87171;--sgc-c-moved:#a5b4fc}}
+:root[data-theme="dark"] :is(.sgc-viewer,.sgc-toolbar,.sgc-list),:is(.sgc-viewer,.sgc-toolbar,.sgc-list).sgc-dark{
+  --sgc-bg:#15181d;--sgc-bg2:#1c2027;--sgc-bd:#2b313b;--sgc-fg:#e8ebf0;--sgc-mut:#9aa3b2;--sgc-acc:#60a5fa;
+  --sgc-c-added:#4ade80;--sgc-c-modified:#facc15;--sgc-c-deleted:#f87171;--sgc-c-moved:#a5b4fc}
+.sgc-viewer{display:flex;flex-direction:column;height:var(--sgc-height,80vh);min-height:420px;background:var(--sgc-bg2);border:1px solid var(--sgc-bd);border-radius:12px;overflow:hidden}
+.sgc-body{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 300px}
+.sgc-panes{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--sgc-bd);min-height:0}
+.sgc-viewer[data-mode="redline"] .sgc-panes{grid-template-columns:1fr}
+.sgc-pane{display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--sgc-bg2)}
+.sgc-pane[hidden]{display:none}
+.sgc-pane-head{display:flex;align-items:center;gap:8px;padding:8px 14px;font-weight:600;background:var(--sgc-bg);border-bottom:1px solid var(--sgc-bd);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sgc-frame{flex:1;width:100%;border:0;background:#fff;min-height:0}
+.sgc-badge{font-size:11px;font-weight:700;letter-spacing:.02em;padding:2px 8px;border-radius:999px}
+.sgc-badge-old{background:color-mix(in srgb,var(--sgc-c-deleted) 14%,transparent);color:var(--sgc-c-deleted)}
+.sgc-badge-new{background:color-mix(in srgb,var(--sgc-c-added) 16%,transparent);color:var(--sgc-c-added)}
+.sgc-viewer>.sgc-toolbar{border-bottom:1px solid var(--sgc-bd)}
+.sgc-viewer .sgc-list{border-left:1px solid var(--sgc-bd)}
+.sgc-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;padding:10px 14px;background:var(--sgc-bg)}
+.sgc-tb-stats{display:flex;flex-wrap:wrap;gap:6px}
+.sgc-chip{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 11px;border:1px solid var(--sgc-bd);border-radius:999px;background:var(--sgc-bg);color:var(--sgc-fg);font:inherit;cursor:pointer;transition:background .15s,border-color .15s}
+.sgc-chip b{font-variant-numeric:tabular-nums;font-weight:700}
+.sgc-chip:hover:not(:disabled){background:var(--sgc-bg2)}
+.sgc-chip:disabled{opacity:.45;cursor:default}
+.sgc-chip[aria-pressed="true"]{border-color:var(--c);background:color-mix(in srgb,var(--c) 12%,var(--sgc-bg))}
+.sgc-chip-added{--c:var(--sgc-c-added)}.sgc-chip-modified{--c:var(--sgc-c-modified)}.sgc-chip-deleted{--c:var(--sgc-c-deleted)}.sgc-chip-moved{--c:var(--sgc-c-moved)}
+.sgc-dot{width:8px;height:8px;border-radius:50%;background:var(--c)}
+.sgc-tb-nav{display:flex;align-items:center;gap:6px}
+.sgc-pos{min-width:76px;text-align:center;font-variant-numeric:tabular-nums;color:var(--sgc-mut)}
+.sgc-btn{height:30px;min-width:30px;padding:0 10px;border:1px solid var(--sgc-bd);border-radius:8px;background:var(--sgc-bg);color:var(--sgc-fg);font:inherit;cursor:pointer}
+.sgc-btn:hover:not(:disabled){background:var(--sgc-bg2)}
+.sgc-btn:disabled{opacity:.4;cursor:default}
+.sgc-btn-wide{width:100%}
+.sgc-tb-right{display:flex;align-items:center;gap:14px;margin-left:auto}
+.sgc-seg{display:inline-flex;padding:2px;border:1px solid var(--sgc-bd);border-radius:9px;background:var(--sgc-bg2)}
+.sgc-seg button{height:26px;padding:0 12px;border:0;border-radius:7px;background:transparent;color:var(--sgc-mut);font:inherit;font-weight:600;cursor:pointer}
+.sgc-seg button[aria-pressed="true"]{background:var(--sgc-bg);color:var(--sgc-fg);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.sgc-switch{display:inline-flex;align-items:center;gap:6px;color:var(--sgc-mut);cursor:pointer;user-select:none}
+.sgc-switch input{accent-color:var(--sgc-acc);width:15px;height:15px;margin:0}
+.sgc-time{color:var(--sgc-mut);font-variant-numeric:tabular-nums;font-size:12px}
+.sgc-list{display:flex;flex-direction:column;min-height:0;background:var(--sgc-bg)}
+.sgc-list-head{display:flex;justify-content:space-between;align-items:baseline;padding:12px 14px 8px;border-bottom:1px solid var(--sgc-bd)}
+.sgc-muted{color:var(--sgc-mut);font-size:12px}
+.sgc-list-items{list-style:none;margin:0;padding:6px;overflow:auto;flex:1;min-height:0}
+.sgc-li{display:block;width:100%;text-align:left;padding:9px 10px;margin:0 0 2px;border:1px solid transparent;border-radius:8px;background:transparent;color:inherit;font:inherit;cursor:pointer}
+.sgc-li:hover{background:var(--sgc-bg2)}
+.sgc-li[aria-current="true"]{border-color:var(--sgc-acc);background:color-mix(in srgb,var(--sgc-acc) 8%,var(--sgc-bg))}
+.sgc-li-top{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.sgc-li-where{color:var(--sgc-mut);font-size:12px}
+.sgc-li-no{margin-left:auto;color:var(--sgc-mut);font-size:11px;font-variant-numeric:tabular-nums}
+.sgc-tag{font-size:11px;font-weight:700;padding:1px 7px;border-radius:5px;color:var(--c);background:color-mix(in srgb,var(--c) 13%,transparent)}
+.sgc-tag-added{--c:var(--sgc-c-added)}.sgc-tag-modified{--c:var(--sgc-c-modified)}.sgc-tag-deleted{--c:var(--sgc-c-deleted)}.sgc-tag-moved{--c:var(--sgc-c-moved)}
+.sgc-li-body{display:block;font-size:12.5px;line-height:1.55;overflow-wrap:anywhere;color:var(--sgc-fg)}
+.sgc-li-body del{background:color-mix(in srgb,var(--sgc-c-deleted) 18%,transparent);text-decoration-color:var(--sgc-c-deleted)}
+.sgc-li-body ins{background:color-mix(in srgb,var(--sgc-c-added) 20%,transparent);text-decoration:none}
+.sgc-li-ctx{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;color:var(--sgc-mut)}
+.sgc-li-attr{display:block;margin-top:2px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px}
+.sgc-empty{padding:24px 12px;text-align:center;color:var(--sgc-mut)}
+.sgc-more{padding:6px 4px}
+@media (max-width:900px){
+  .sgc-body{grid-template-columns:1fr;grid-template-rows:minmax(0,1fr) 34%}
+  .sgc-viewer .sgc-list{border-left:0;border-top:1px solid var(--sgc-bd)}
+  .sgc-tb-right{margin-left:0}
+}
+@media (max-width:560px){.sgc-chip{height:28px;padding:0 9px}.sgc-pane-head{padding:6px 10px}}
+`;
+export {
+  DOM_RULES,
+  createCompare,
+  diffTrees,
+  ensureUiStyle,
+  getMessages,
+  messages,
+  mountChangeList,
+  mountToolbar,
+  mountViewer,
+  snapshot
+};

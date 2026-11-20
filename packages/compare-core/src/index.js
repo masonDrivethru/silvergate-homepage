@@ -3,3 +3,4 @@ export { compare } from './compare.js';
 export { textDiff } from './text.js';
 export { toPath, toPattern, makeMatcher } from './path.js';
 export { formatValue } from './format.js';
+export { alignSequences } from './match.js';

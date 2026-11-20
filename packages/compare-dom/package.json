@@ -1,0 +1,26 @@
+{
+  "name": "@silvergate/compare-dom",
+  "version": "0.1.0",
+  "description": "브라우저에 그려진 화면(JSP·Vue·React·일반 HTML 무엇이든) 두 개를 원본 그대로 두고 바뀐 곳만 표시",
+  "type": "module",
+  "main": "./src/index.js",
+  "types": "./src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "default": "./src/index.js"
+    },
+    "./engine": "./src/engine.js",
+    "./dist/sg-compare.js": "./dist/sg-compare.js"
+  },
+  "files": ["src", "dist", "README.md"],
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "@silvergate/compare-core": "0.1.0"
+  },
+  "license": "UNLICENSED",
+  "private": true
+}

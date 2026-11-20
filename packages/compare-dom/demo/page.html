@@ -1,0 +1,301 @@
+<title>Compare 화면 비교 테스트</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;600&family=Noto+Serif+KR:wght@400;700&display=swap">
+<style>
+/* 레이아웃: 위 소개 → 탭 → 탭마다 실제 비교 화면 (왼쪽 이전 / 오른쪽 새 버전 / 오른쪽 끝 변경 목록) */
+:root{
+  --bg:#f3f5f8; --surface:#ffffff; --line:#dde2ea; --ink:#141a24; --ink-2:#5a6577;
+  --accent:#0f5f74; --accent-ink:#ffffff; --desk:#e7eaf0;
+  --f-ui:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f1319; --surface:#161b23; --line:#283040; --ink:#e7ebf2; --ink-2:#97a2b4;
+  --accent:#5cc3d9; --accent-ink:#06222a; --desk:#1b212b; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1319; --surface:#161b23; --line:#283040; --ink:#e7ebf2; --ink-2:#97a2b4;
+  --accent:#5cc3d9; --accent-ink:#06222a; --desk:#1b212b; color-scheme:dark}
+body{background:var(--bg);color:var(--ink);font:15px/1.6 var(--f-ui)}
+.wrap{max-width:1680px;margin:0 auto;padding-block:28px 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:20px}
+.intro{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 32px}
+.intro h1{font-size:clamp(22px,2.6vw,30px);line-height:1.25;margin:0;font-weight:700;letter-spacing:-.01em;text-wrap:balance}
+.intro p{margin:6px 0 0;color:var(--ink-2);max-width:68ch}
+.legend{display:flex;flex-wrap:wrap;gap:8px 16px;font-size:13px;color:var(--ink-2)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.sw{width:22px;height:12px;border-radius:3px;display:inline-block}
+.sw-ins{background:rgba(34,197,94,.34);box-shadow:inset 0 -2px 0 #16a34a}
+.sw-del{background:rgba(239,68,68,.28);box-shadow:inset 0 -2px 0 #dc2626}
+.sw-mod{background:rgba(250,204,21,.25);box-shadow:inset 0 0 0 1.5px #ca8a04}
+.sw-gap{background:transparent;box-shadow:inset 0 2px 0 #dc2626}
+.tabs{display:flex;flex-wrap:wrap;gap:4px;border-bottom:1px solid var(--line)}
+.tab{appearance:none;border:0;background:transparent;color:var(--ink-2);font:600 14px/1 var(--f-ui);padding:12px 14px;border-bottom:2px solid transparent;margin-bottom:-1px;cursor:pointer;display:inline-flex;gap:8px;align-items:center}
+.tab:hover{color:var(--ink)}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.tab small{font:500 11px var(--f-mono);color:var(--ink-2);background:var(--desk);padding:3px 6px;border-radius:4px}
+.tab:focus-visible,.btn:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.panel{display:flex;flex-direction:column;gap:12px;min-width:0}
+.panel-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 20px}
+.panel-head p{margin:0;color:var(--ink-2);font-size:14px;max-width:90ch}
+.panel-head code{font:500 12.5px var(--f-mono);background:var(--desk);padding:2px 6px;border-radius:4px;color:var(--ink)}
+.actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.btn{appearance:none;border:1px solid var(--line);background:var(--surface);color:var(--ink);font:600 13.5px var(--f-ui);height:36px;padding:0 14px;border-radius:8px;cursor:pointer}
+.btn:hover{border-color:var(--ink-2)}
+.btn-primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn-primary:hover{filter:brightness(1.08);border-color:var(--accent)}
+.btn:disabled{opacity:.5;cursor:default}
+select{height:36px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);font:500 13.5px var(--f-ui);padding:0 10px}
+.note{font-size:13px;color:var(--ink-2)}
+.toast{font:500 12.5px var(--f-mono);color:var(--accent)}
+/* 비교 화면: 라이브러리 .sgc-viewer 모양을 그대로 쓰고, 문서 칸만 직접 */
+.stage{--sgc-height:min(78vh,900px)}
+.doc-scroll{flex:1;min-height:0;overflow:auto;background:var(--desk);padding:16px 8px}
+.doc-zoom{zoom:var(--z,1)}
+.perf{width:100%;border-collapse:collapse;font:13px/1.4 var(--f-ui);font-variant-numeric:tabular-nums}
+.perf-wrap{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:10px}
+.perf th,.perf td{padding:9px 12px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+.perf th:first-child,.perf td:first-child{text-align:left}
+.perf th{font-weight:600;color:var(--ink-2);font-size:12px;letter-spacing:.02em}
+.perf tr:last-child td{border-bottom:0}
+.perf td.total{font-weight:700;color:var(--accent)}
+.perf .mono{font-family:var(--f-mono)}
+.err{color:#dc2626;font-size:13px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;scroll-behavior:auto!important}}
+</style>
+
+<div class="wrap">
+  <header class="intro">
+    <div>
+      <h1>화면 비교 모듈 테스트</h1>
+      <p>같은 가상 SOP 문서(v3 → v4)를 일반 HTML(JSP 방식), Vue 3, React로 각각 그린 뒤 같은 모듈로 비교합니다. 왼쪽·오른쪽 화면은 원래 그려진 그대로 두고, 바뀐 곳에만 색을 입힙니다.</p>
+    </div>
+    <div class="legend" aria-label="표시 방법">
+      <span><i class="sw sw-ins"></i>넣은 글자·추가</span>
+      <span><i class="sw sw-del"></i>지운 글자·삭제</span>
+      <span><i class="sw sw-mod"></i>속성·값 변경</span>
+      <span><i class="sw sw-gap"></i>반대쪽 빈자리</span>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab" role="tab" id="t-html" aria-controls="p-html" aria-selected="true">일반 HTML <small>JSP 방식</small></button>
+    <button class="tab" role="tab" id="t-vue" aria-controls="p-vue" aria-selected="false">Vue 3</button>
+    <button class="tab" role="tab" id="t-react" aria-controls="p-react" aria-selected="false">React 18</button>
+    <button class="tab" role="tab" id="t-perf" aria-controls="p-perf" aria-selected="false">대용량 성능</button>
+  </nav>
+
+  <section class="panel" id="p-html" role="tabpanel" aria-labelledby="t-html">
+    <div class="panel-head">
+      <p>서버가 그린 완성된 HTML 페이지 두 장을 그대로 띄워 비교합니다. 실제 JSP에서는 <code>left: { url: '/sop/view.jsp?ver=3' }</code> 처럼 주소만 넘기면 됩니다. 위쪽에서 <b>한 장 보기</b>를 누르면 삭제된 내용까지 한 문서에 겹쳐 보입니다.</p>
+    </div>
+    <div id="html-host" class="stage"></div>
+  </section>
+
+  <section class="panel" id="p-vue" role="tabpanel" aria-labelledby="t-vue" hidden>
+    <div class="panel-head">
+      <p>Vue 3 컴포넌트가 그린 화면입니다. 모듈은 Vue를 모르고 그려진 결과만 봅니다. 새 버전을 고치면 Vue가 다시 그리고, 비교도 자동으로 다시 합니다.</p>
+      <div class="actions"><button class="btn btn-primary" id="vue-edit" type="button">새 버전 고쳐 보기</button><span class="toast" id="vue-toast" aria-live="polite"></span></div>
+    </div>
+    <div id="vue-stage" class="stage"></div>
+  </section>
+
+  <section class="panel" id="p-react" role="tabpanel" aria-labelledby="t-react" hidden>
+    <div class="panel-head">
+      <p>React 18 컴포넌트가 그린 화면입니다. 표시는 화면 구조를 바꾸지 않으므로 React가 다시 그려도 충돌하지 않습니다.</p>
+      <div class="actions"><button class="btn btn-primary" id="react-edit" type="button">새 버전 고쳐 보기</button><span class="toast" id="react-toast" aria-live="polite"></span></div>
+    </div>
+    <div id="react-stage" class="stage"></div>
+  </section>
+
+  <section class="panel" id="p-perf" role="tabpanel" aria-labelledby="t-perf" hidden>
+    <div class="panel-head">
+      <p>쪽 수를 골라 실제로 그린 다음 비교 시간을 잽니다. 비교 계산은 백그라운드(Web Worker)에서 해서 화면이 멈추지 않습니다. 쪽마다 문단·표·목록이 있고, 바뀐 곳은 골고루 흩어져 있습니다.</p>
+      <div class="actions">
+        <label class="note" for="perf-pages">쪽 수</label>
+        <select id="perf-pages"><option>100</option><option>500</option><option selected>1000</option><option>2000</option><option>3000</option></select>
+        <button class="btn btn-primary" id="perf-run" type="button">그리고 비교하기</button>
+      </div>
+    </div>
+    <div class="perf-wrap">
+      <table class="perf" aria-label="측정 결과">
+        <thead><tr><th>쪽 수 (양쪽 각각)</th><th>읽은 요소</th><th>문서 그리기</th><th>화면 읽기</th><th>비교 계산</th><th>색 입히기</th><th>모듈 합계</th><th>변경</th></tr></thead>
+        <tbody id="perf-rows"><tr><td colspan="8" class="note" style="text-align:left">아래에서 1,000쪽으로 한 번 측정한 결과가 곧 표시됩니다.</td></tr></tbody>
+      </table>
+    </div>
+    <div id="perf-stage" class="stage"></div>
+  </section>
+</div>
+
+<!--SCRIPTS-->
+<script>
+(function () {
+  'use strict';
+  var D = window.SgDemoDocs, C = window.SgCompare;
+
+  // 문서 CSS (고객사 화면 CSS 역할)
+  var st = document.createElement('style'); st.textContent = D.CSS; document.head.appendChild(st);
+
+  // ---------- 탭 ----------
+  var tabs = Array.prototype.slice.call(document.querySelectorAll('.tab'));
+  var started = {};
+  function show(id) {
+    tabs.forEach(function (t) {
+      var on = t.id === id;
+      t.setAttribute('aria-selected', on ? 'true' : 'false');
+      document.getElementById(t.getAttribute('aria-controls')).hidden = !on;
+    });
+    if (!started[id]) { started[id] = true; START[id](); }
+    try { localStorage.setItem('sgc-demo-tab', id); } catch (e) {}
+  }
+  tabs.forEach(function (t) { t.addEventListener('click', function () { show(t.id); }); });
+
+  // ---------- 요소 모드 비교 화면 (Vue·React·성능 탭 공통) ----------
+  function el(tag, cls, kids) { var e = document.createElement(tag); if (cls) e.className = cls; (kids || []).forEach(function (k) { e.append(k); }); return e; }
+  function pane(badge, badgeCls, label) {
+    var mount = el('div');
+    var zoom = el('div', 'doc-zoom doc-root', [mount]);
+    var scroll = el('div', 'doc-scroll', [zoom]);
+    var head = el('header', 'sgc-pane-head', [el('span', 'sgc-badge ' + badgeCls, [badge]), label]);
+    var p = el('section', 'sgc-pane', [head, scroll]);
+    new ResizeObserver(function () { zoom.style.setProperty('--z', Math.min(1, (scroll.clientWidth - 16) / 794).toFixed(3)); }).observe(scroll);
+    return { el: p, mount: mount, scroll: scroll };
+  }
+  function stage(host, leftLabel, rightLabel) {
+    var L = pane('이전', 'sgc-badge-old', leftLabel), R = pane('새 버전', 'sgc-badge-new', rightLabel), X = pane('한 장 보기', 'sgc-badge-new', leftLabel + ' → ' + rightLabel);
+    X.el.hidden = true;
+    var bar = el('div'), list = el('aside');
+    var root = el('div', 'sgc-viewer', [bar, el('div', 'sgc-body', [el('div', 'sgc-panes', [L.el, R.el, X.el]), list])]);
+    host.replaceChildren(root);
+    return {
+      left: L, right: R,
+      attach: function (ctrl) {
+        var dirty = true;
+        function mode(m) {
+          var red = m === 'redline';
+          L.el.hidden = red; R.el.hidden = red; X.el.hidden = !red; root.dataset.mode = m;
+          if (red && dirty) { ctrl.renderRedline(X.mount); dirty = false; }
+        }
+        ctrl.on('update', function () { dirty = true; if (!X.el.hidden) mode('redline'); });
+        mode('side');
+        var tb = C.mountToolbar(bar, ctrl, { locale: 'ko', modes: true, onMode: mode });
+        var cl = C.mountChangeList(list, ctrl, { locale: 'ko' });
+        return { destroy: function () { tb.destroy(); cl.destroy(); } };
+      },
+    };
+  }
+  function fail(host, err) { var p = el('p', 'err', ['오류: ' + (err && err.message || err)]); host.prepend(p); console.error(err); }
+
+  var PAGES = 40;
+  var START = {};
+
+  // ---------- 일반 HTML (JSP 방식): 완성된 HTML 페이지 두 장 → mountViewer ----------
+  START['t-html'] = function () {
+    var host = document.getElementById('html-host');
+    var v = C.mountViewer(host, {
+      left: { html: D.serverPage(D.make(3, PAGES), 'SOP v3'), label: 'SOP-EQ-014 v3' },
+      right: { html: D.serverPage(D.make(4, PAGES), 'SOP v4'), label: 'SOP-EQ-014 v4' },
+      page: '.page', locale: 'ko', height: 'min(78vh, 900px)',
+    });
+    // 보기 환경이 iframe 안 읽기를 막으면: 같은 서버 HTML 을 페이지 안에 직접 넣어 비교 (JSP 를 한 화면에 그린 경우와 같음)
+    v.ready.catch(function () {
+      v.destroy();
+      var s = stage(host, 'SOP-EQ-014 v3', 'SOP-EQ-014 v4');
+      s.left.mount.innerHTML = D.toHtml(D.make(3, PAGES));
+      s.right.mount.innerHTML = D.toHtml(D.make(4, PAGES));
+      s.attach(C.createCompare({ left: s.left.mount, right: s.right.mount, leftScroller: s.left.scroll, rightScroller: s.right.scroll, page: '.page' }));
+    });
+  };
+
+  // ---------- Vue 3 ----------
+  START['t-vue'] = function () {
+    var host = document.getElementById('vue-stage');
+    if (!window.Vue) return fail(host, 'Vue 를 불러오지 못했습니다');
+    var s = stage(host, 'SOP-EQ-014 v3', 'SOP-EQ-014 v4');
+    var V = window.Vue;
+    var vh = function (t, p, k) { return V.h(t, p, k); };
+    var left = V.reactive(D.make(3, PAGES)), right = V.reactive(D.make(4, PAGES));
+    V.createApp({ render: function () { return V.h('div', null, D.render(vh, left)); } }).mount(s.left.mount);
+    V.createApp({ render: function () { return V.h('div', null, D.render(vh, right)); } }).mount(s.right.mount);
+    var ctrl = C.createCompare({ left: s.left.mount, right: s.right.mount, leftScroller: s.left.scroll, rightScroller: s.right.scroll, page: '.page', watch: true });
+    s.attach(ctrl);
+    var n = 0;
+    document.getElementById('vue-edit').onclick = function () {
+      n++;
+      edit(right, n);
+      document.getElementById('vue-toast').textContent = '고침 ' + n + '회 · Vue가 다시 그림 → 자동 재비교';
+    };
+  };
+
+  // ---------- React 18 ----------
+  START['t-react'] = function () {
+    var host = document.getElementById('react-stage');
+    if (!window.React || !window.ReactDOM) return fail(host, 'React 를 불러오지 못했습니다');
+    var s = stage(host, 'SOP-EQ-014 v3', 'SOP-EQ-014 v4');
+    var R = window.React;
+    var rh = function (t, p, k) { return R.createElement.apply(null, [t, p].concat(Array.isArray(k) ? k : [k])); };
+    var left = D.make(3, PAGES), right = D.make(4, PAGES);
+    function Doc(props) { return R.createElement('div', null, D.render(rh, props.doc)); }
+    ReactDOM.createRoot(s.left.mount).render(R.createElement(Doc, { doc: left }));
+    var rroot = ReactDOM.createRoot(s.right.mount);
+    rroot.render(R.createElement(Doc, { doc: right }));
+    var ctrl = C.createCompare({ left: s.left.mount, right: s.right.mount, leftScroller: s.left.scroll, rightScroller: s.right.scroll, page: '.page', watch: true });
+    s.attach(ctrl);
+    var n = 0;
+    document.getElementById('react-edit').onclick = function () {
+      n++;
+      right = JSON.parse(JSON.stringify(right));
+      edit(right, n);
+      rroot.render(R.createElement(Doc, { doc: right }));
+      document.getElementById('react-toast').textContent = '고침 ' + n + '회 · React가 다시 그림 → 자동 재비교';
+    };
+  };
+
+  /** "새 버전 고쳐 보기": 누를 때마다 다른 곳을 고친다 */
+  function edit(doc, n) {
+    var p = doc.pages[1 + (n * 3) % (doc.pages.length - 1)];
+    var k = n % 3;
+    if (k === 1) p.paras[0] = p.paras[0] + ' (현장 확인 후 서명한다.)';
+    else if (k === 2) p.rows.push(['pH', '6.0 ~ 8.0', '-']);
+    else p.checks.shift();
+  }
+
+  // ---------- 대용량 성능 ----------
+  var perfCtrl = null, perfStage = null;
+  function runPerf() {
+    var pages = Number(document.getElementById('perf-pages').value);
+    var btn = document.getElementById('perf-run');
+    btn.disabled = true; btn.textContent = '그리는 중…';
+    if (!perfStage) perfStage = stage(document.getElementById('perf-stage'), 'v3', 'v4');
+    if (perfCtrl) { perfCtrl.destroy(); perfCtrl = null; }
+    setTimeout(function () {
+      var t0 = performance.now();
+      perfStage.left.mount.innerHTML = D.toHtml(D.make(3, pages));
+      perfStage.right.mount.innerHTML = D.toHtml(D.make(4, pages));
+      perfStage.left.mount.getBoundingClientRect();     // 실제로 그려지게
+      var draw = performance.now() - t0;
+      btn.textContent = '비교하는 중…';
+      perfCtrl = C.createCompare({ left: perfStage.left.mount, right: perfStage.right.mount, leftScroller: perfStage.left.scroll, rightScroller: perfStage.right.scroll, page: '.page', worker: true, auto: false });
+      if (perfStage.ui) perfStage.ui.destroy();
+      perfStage.ui = perfStage.attach(perfCtrl);
+      perfCtrl.run().then(function () {
+        var t = perfCtrl.timing;
+        if (!t) throw perfCtrl.error || new Error('비교 실패');
+        var s = perfCtrl.stats;
+        var row = document.createElement('tr');
+        var f = function (ms) { return ms >= 1000 ? (ms / 1000).toFixed(2) + '초' : Math.round(ms) + 'ms'; };
+        [pages.toLocaleString() + '쪽', t.nodes.toLocaleString(), f(draw), f(t.snapshot), f(t.compare) + (t.worker ? ' · 백그라운드' : ''), f(t.paint), f(t.total), (s.added + s.modified + s.deleted + s.moved).toLocaleString() + '건']
+          .forEach(function (v, i) { var td = document.createElement('td'); td.textContent = v; if (i === 6) td.className = 'total'; if (i > 0 && i < 7) td.classList.add('mono'); row.append(td); });
+        var tb = document.getElementById('perf-rows');
+        if (tb.querySelector('td[colspan]')) tb.replaceChildren();
+        tb.prepend(row);
+      }).catch(function (e) { fail(document.getElementById('perf-stage'), e); })
+        .finally(function () { btn.disabled = false; btn.textContent = '그리고 비교하기'; });
+    }, 30);
+  }
+  START['t-perf'] = function () { document.getElementById('perf-run').onclick = runPerf; runPerf(); };
+
+  var first = 't-html';
+  try { var saved = localStorage.getItem('sgc-demo-tab'); if (saved && START[saved]) first = saved; } catch (e) {}
+  show(first);
+})();
+</script>
