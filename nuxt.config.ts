@@ -3,8 +3,8 @@
 const SITE = 'https://www.silvergate-solutions.com';
 // 미리 HTML로 만들 페이지 (영어: 주소 그대로, 한국어: /ko 아래). public/sitemap.xml 도 같이 고친다
 // 지금은 홈만 공개 (app/composables/useSiteNav.ts 의 HOME_ONLY). 세부 페이지를 다시 열 때 아래 주석의 목록으로 되돌린다
-// const PAGES = ['/', '/products', '/products/silverbio-author', '/industries', '/references', '/company', '/contact'];
-const PAGES = ['/'];
+// const PAGES = ['/', '/compare', '/products', '/products/silverbio-author', '/industries', '/references', '/company', '/contact'];
+const PAGES = ['/', '/compare'];   // 홈 + Compare 직접 해 보기 (홈만 공개 중에도 열어 둠)
 
 export default defineNuxtConfig({
   compatibilityDate: '2026-11-01',

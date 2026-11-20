@@ -4,6 +4,8 @@ import type { Change, MbrDocument } from '~/compare/types.js';
 import { compare } from '~/compare/engine.js';
 import { getSamples } from '~/compare/sample-data.js';
 
+// page: 전용 페이지(/compare)에서 쓸 때. 제목을 h1으로
+defineProps<{ page?: boolean }>();
 const { locale } = useI18n();
 
 // 샘플: 기본(짧은 문서) / 대용량(약 300쪽, 고를 때만 만들어서 홈 첫 화면은 가볍게)
@@ -80,9 +82,10 @@ onBeforeUnmount(() => clearTimeout(timer));
 
 <template>
   <!-- ===== 3-1. Compare 직접 해 보기: 버전을 고르면 엔진이 비교하고, 변경 목록을 누르면 그 위치로 이동 ===== -->
-  <section class="section cmp" id="compare-demo" aria-labelledby="cmp-title">
+  <section class="section cmp" :class="{ 'cmp--page': page }" id="compare-demo" aria-labelledby="cmp-title">
     <div class="container">
-      <h2 id="cmp-title" class="section__title reveal">{{ $t('cdemo.title') }}</h2>
+      <p v-if="page" class="product__name">SilverBio Compare</p>
+      <component :is="page ? 'h1' : 'h2'" id="cmp-title" class="section__title reveal">{{ $t('cdemo.title') }}</component>
       <p class="cmp__lead">{{ $t('cdemo.lead') }}</p>
 
       <div class="cmp-bar">

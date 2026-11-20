@@ -16,4 +16,18 @@
     <xhtml:link rel="alternate" hreflang="ko" href="https://www.silvergate-solutions.com/ko"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://www.silvergate-solutions.com/"/>
   </url>
+  <url>
+    <loc>https://www.silvergate-solutions.com/compare</loc>
+    <lastmod>2026-11-20</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.silvergate-solutions.com/compare"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://www.silvergate-solutions.com/ko/compare"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.silvergate-solutions.com/compare"/>
+  </url>
+  <url>
+    <loc>https://www.silvergate-solutions.com/ko/compare</loc>
+    <lastmod>2026-11-20</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.silvergate-solutions.com/compare"/>
+    <xhtml:link rel="alternate" hreflang="ko" href="https://www.silvergate-solutions.com/ko/compare"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.silvergate-solutions.com/compare"/>
+  </url>
 </urlset>

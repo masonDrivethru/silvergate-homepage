@@ -1,3 +1,7 @@
+<script setup lang="ts">
+const { pathTo } = useSiteNav();
+</script>
+
 <template>
   <!-- ===== 3. Solutions: 템플릿 버전 비교. 스크롤하면 변경점이 하나씩 강조됨 (data-c = 변경 순서) ===== -->
   <section class="pin pin--diff" id="solutions" data-scroll="diff" aria-labelledby="sol-title">
@@ -152,6 +156,10 @@
         </div>
         </div>
         <p class="diffx__sample">{{ $t('diff.hint') }}</p>
+        <!-- 직접 해 보기 페이지(/compare)로 가는 탭 모양 버튼 -->
+        <a class="cmp-entry" :href="pathTo(COMPARE_PATH)">
+          <span class="cmp-entry__dot" aria-hidden="true"></span>{{ $t('cdemo.entry') }}<span aria-hidden="true">→</span>
+        </a>
       </div>
     </div>
   </section>

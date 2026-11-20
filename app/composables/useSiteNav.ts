@@ -6,6 +6,8 @@
 export const HOME_ONLY = true;
 
 export const PRODUCT_AUTHOR_PATH = '/products/silverbio-author';
+// Compare 직접 해 보기 페이지. 홈만 공개 중에도 열어 두는 페이지 (홈 Compare 연출의 탭 버튼에서 들어감)
+export const COMPARE_PATH = '/compare';
 export const BOOK_URL = 'https://calendar.app.google/wLYapJcPyoxVQvN78';
 
 // 언어와 상관없는 페이지 이름 (index___ko → index)

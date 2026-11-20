@@ -30,7 +30,6 @@ onBeforeUnmount(() => scenes?.destroy());
   <SectionIntro />
   <SectionProduct />
   <SectionCompare />
-  <SectionCompareDemo />
   <SectionCapability />
   <SectionStrengths />
   <SectionIndustries :more="!HOME_ONLY" />

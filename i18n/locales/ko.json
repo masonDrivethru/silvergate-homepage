@@ -102,7 +102,10 @@
       "page": "{n} / {total}쪽",
       "notInOld": "이 버전에는 없음",
       "notInNew": "이 버전에서 삭제됨"
-    }
+    },
+    "entry": "직접 비교해 보기",
+    "back": "홈으로",
+    "metaTitle": "SilverBio Compare 직접 해 보기 | 실버게이트"
   },
   "nav": {
     "product": "제품",

@@ -139,7 +139,10 @@
       "page": "Page {n} of {total}",
       "notInOld": "Not in this version",
       "notInNew": "Removed in this version"
-    }
+    },
+    "entry": "Try it yourself",
+    "back": "Back to home",
+    "metaTitle": "Try SilverBio Compare | SilverGate"
   },
   "dtab": {
     "1": "Batch record",

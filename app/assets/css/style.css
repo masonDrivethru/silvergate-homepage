@@ -1070,7 +1070,7 @@ html[data-motion="calm"] main .section__title { background-position: 0 0; }
 /* =========================================================
    Compare 직접 해 보기 (app/components/section/CompareDemo.vue, components/compare/*)
    문서관리 시스템의 비교 화면처럼: 어두운 책상 위에 흰 A4 두 장을 나란히.
-   종이는 다크 모드에서도 흰색 (실제 문서처럼). 추가 = 초록, 수정 = 노랑, 삭제 = 빨강 + 여백의 변경 막대
+   종이는 다크 모드에서도 흰색 (실제 문서처럼). 추가 = 초록, 수정 = 노랑, 삭제 = 빨강 취소선 (변경 막대 없이 바탕색만)
    ========================================================= */
 .cmp { --add: #7ee2b8; --mod: #e9b45c; --del: #ff8f85; }
 :root[data-theme="light"] .cmp { --add: #0e8a5f; --mod: #a86a00; --del: #c8372d; }
@@ -1160,14 +1160,9 @@ html[data-motion="calm"] main .section__title { background-position: 0 0; }
 .sheet__foot { background-clip: content-box; }
 
 /* ---------- 변경 표시 (종이 위) ---------- */
-.sheet__row::before { content: ""; position: absolute; left: 3.2%; top: 4px; bottom: 4px; width: 3px; border-radius: 2px; }
 .sheet__row.is-add { background: linear-gradient(var(--p-add-bg), var(--p-add-bg)) content-box; }
-.sheet__row.is-add::before { background: var(--p-add); }
 .sheet__row.is-mod { background: linear-gradient(var(--p-mod-bg), var(--p-mod-bg)) content-box; }
-.sheet__row.is-mod::before { background: var(--p-mod); }
-.sheet__row.is-child::before { background: var(--p-mod); opacity: .45; }
 .sheet__row.is-del { background: linear-gradient(var(--p-del-bg), var(--p-del-bg)) content-box; }
-.sheet__row.is-del::before { background: var(--p-del); }
 .sheet__row.is-del :is(.sheet__title, .sheet__ins, .sheet__plabel, .sheet__pval, .sheet__section, .sheet__no) { color: var(--p-del); text-decoration: line-through; }
 .sheet__row.is-mod .sheet__cell--right .sheet__pval, .sheet__cell--right.is-mod .sheet__pval { color: var(--p-mod); font-weight: 700; }
 .sheet__cell--left .mk { color: var(--p-del); background: var(--p-del-bg); text-decoration: line-through; }
@@ -1212,7 +1207,6 @@ html[data-motion="calm"] main .section__title { background-position: 0 0; }
   .sheet-pair::before { width: 100%; }
   .paper-desk--left .sheet__cell--right, .paper-desk--right .sheet__cell--left { display: none; }
   .sheet__cell { padding-inline: 18px; }
-  .sheet__row::before { left: 6px; }
   .sheet__cols, .sheet__row { grid-template-columns: 2.6em minmax(0, 1fr) 5.6em; }
   .sheet__cols span:nth-child(4) { display: none; }
   .sheet__row--param .sheet__pval:last-child { grid-column: 2 / -1; font-size: .9em; color: var(--p-ink-3); }
@@ -1220,3 +1214,16 @@ html[data-motion="calm"] main .section__title { background-position: 0 0; }
   .sheet__meta div:nth-last-child(-n+3) { border-bottom: 1px solid var(--p-line); }
   .sheet__meta div:last-child { border-bottom: 0; }
 }
+
+/* 홈 Compare 연출 아래 "직접 비교해 보기" 탭 버튼 → /compare */
+.cmp-entry { margin-top: var(--s3); display: inline-flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 20px; border-radius: var(--r-pill); font-size: var(--fs-small); font-weight: 600; color: var(--silver-hi); text-decoration: none; background: rgb(var(--ink) / .08); border: 1px solid var(--glass-line); transition: background-color .2s, border-color .2s; }
+.cmp-entry:hover { background: rgb(var(--ink) / .14); border-color: rgb(var(--ink) / .3); }
+.cmp-entry:focus-visible { outline: 2px solid var(--silver-hi); outline-offset: 2px; }
+.cmp-entry__dot { width: 7px; height: 7px; border-radius: 50%; background: #7ee2b8; box-shadow: 0 0 10px #7ee2b8; }
+:root[data-theme="light"] .cmp-entry__dot { background: #0e8a5f; box-shadow: none; }
+/* 전용 페이지(/compare) */
+.cmp-back { padding-top: var(--s4); }
+.cmp-back a { font-size: var(--fs-small); color: var(--text-2); text-decoration: none; }
+.cmp-back a:hover { color: var(--text); }
+.cmp--page { padding-top: var(--s4); }
+.cmp--page .product__name { margin-bottom: var(--s2); }

@@ -14,7 +14,7 @@
 | 작업 폴더 | `C:\project\silvergate` |
 | GitHub 저장소 | https://github.com/masonDrivethru/silvergate-homepage |
 | Firebase 프로젝트 | `silvergate-web` |
-| 공개 범위 | **지금은 홈 한 페이지만 공개** (세부 페이지는 만들어 두었지만 숨김) |
+| 공개 범위 | **지금은 홈 + Compare 직접 해 보기(/compare)만 공개** (다른 세부 페이지는 만들어 두었지만 숨김) |
 
 ---
 
@@ -49,8 +49,8 @@
 홈에 직접 눌러 볼 수 있는 샘플 데모가 있음 (템플릿 탭 3개: 완충액 조제 MBR / 설비 세척 SOP / 정제 출하 규격서).
 상세 설계는 `compare-demo-spec.md` 참고.
 
-**직접 해 보기 데모 (사양서 1~3단계 완료)** — 홈의 Compare 연출 바로 아래 `SectionCompareDemo` (`#compare-demo`)
-- 화면: 실제 문서관리 시스템 비교 화면처럼 흰 A4 두 장을 나란히 (머리말 문서 정보표, 단계 표, 수행자·확인자 칸, 쪽 번호). 변경은 여백의 변경 막대 + 색 표시 (추가 초록, 수정 노랑, 삭제 빨강 취소선), 지시문은 바뀐 글자만 표시
+**직접 해 보기 데모 (사양서 1~3단계 완료)** — 전용 페이지 `/compare` (`app/pages/compare.vue` → `SectionCompareDemo`). 홈 Compare 연출의 탭 버튼에서 들어감
+- 화면: 실제 문서관리 시스템 비교 화면처럼 흰 A4 두 장을 나란히 (머리말 문서 정보표, 단계 표, 수행자·확인자 칸, 쪽 번호). 변경은 바탕색으로만 표시 (추가 초록, 수정 노랑, 삭제 빨강 취소선, 변경 막대 없음), 지시문은 바뀐 글자만 표시
 - 조작: 샘플 선택(짧은 문서 / 대용량 약 300쪽), 버전 고르기·바꾸기, 스텝/파라미터 기준 집계, 변경된 것만 보기, 변경 목록 누르면 그 위치로 이동. 휴대폰은 이전/새 버전 탭
 - 엔진: `app/compare/engine.js` 순수 JS (DOM·Vue 모름). `compare(이전, 새버전, { countBy })` → 집계·변경 목록·좌우 정렬 트리. 화면 문구는 만들지 않음 (`field` 값으로 ko/en 문구를 고름)
 - 데이터: `types.js` 형식, `sample-data.js`(한국어)·`sample-data-en.js`(영어) 가상 SGB-101 v1.0/v1.1, `sample-large.js` 규칙으로 만드는 대용량 가상 문서 (같은 seed면 같은 문서)
@@ -110,7 +110,7 @@
 1. **Intro** — 로고 등장 효과, 스크롤 안내
 2. **Product** — "기록부터 승인까지." SilverBio Author 샘플 화면 (작성·검토·승인, 감사 추적, 전자서명)
 3. **Compare** — 버전 비교 인터랙티브 데모 (스크롤 연출)
-   - **CompareDemo** — 직접 해 보기: 비교 엔진으로 A4 문서 두 장을 비교 (짧은 문서 / 대용량 약 300쪽)
+   - 연출 아래 **"직접 비교해 보기 →"** 탭 버튼 → 전용 페이지 `/compare` (한국어 `/ko/compare`)
 4. **Capability** — "세 단계, 하나의 플랫폼." MBR·EBR·MES 기능 표
 5. **Strengths** — "2008년부터 기업 시스템을 만들어 왔습니다…" (단어별 빛나는 스크롤 연출)
 6. **Industries** — 4개 산업
@@ -133,7 +133,7 @@
 지금은 이 주소로 들어오면 홈으로 이동시킵니다.
 
 **다시 열 때 바꿀 곳 (4군데)**
-1. `app/composables/useSiteNav.ts` → `HOME_ONLY = false`
+1. `app/composables/useSiteNav.ts` → `HOME_ONLY = false` (`/compare` 는 이미 공개 중)
 2. `nuxt.config.ts` → `PAGES` 를 주석에 있는 전체 목록으로
 3. `firebase.json` → `redirects` 삭제
 4. `public/sitemap.xml` → 세부 페이지 주소 추가
@@ -222,7 +222,8 @@ npm run typecheck    # 타입 검사
 ### 작업할 때 주의할 점
 - 문구는 `ko.json`, `en.json` 둘 다 같은 키로 고친다. `{ } @ | $` 문자는 `{'@'}` 처럼 감싼다
 - 스크롤 연출 클래스가 붙는 요소(`.reveal`, `.form` 등)에는 `:class` 바인딩을 쓰지 않는다
-- `public/` 안 파일(아이콘 등)을 바꾸면 `public/sw.js` 의 `CACHE` 버전을 올린다 (지금 `sg-v44`)
+- `public/` 안 파일(아이콘 등)을 바꾸면 `public/sw.js` 의 `CACHE` 버전을 올린다 (지금 `sg-v45`)
+- `firebase.json` 은 모든 주소를 `no-cache` 로 보낸다 (`/`, `/ko` 같은 확장자 없는 주소가 1시간 캐시돼 휴대폰에 옛 화면이 보이던 문제 수정). `_nuxt/`·이미지는 따로 오래 캐시
 - Compare 데모 샘플에는 실제 고객사 제품명·파라미터를 쓰지 않는다 (전부 가상 데이터)
 
 ---
@@ -248,6 +249,7 @@ npm run typecheck    # 타입 검사
 17. 세부 페이지는 애니메이션 없이 차분하게
 18. **홈 한 페이지만 공개** (메뉴·탭·세부 페이지 숨김), 쌍무지개 영문 표기 Double Rainbow
 19. 인천공항 프로젝트 파트너에 노즈소프트(Nozsoft) 추가
+20. **SilverBio Compare 직접 해 보기**: 비교 엔진 + A4 문서 비교 화면, 대용량(약 300쪽) 샘플, 전용 페이지 `/compare` + 홈 탭 버튼. 페이지 캐시 문제 수정
 
 ---
 
@@ -256,5 +258,5 @@ npm run typecheck    # 타입 검사
 - [ ] 세부 페이지 공개 여부 결정 (위 5장 "다시 열 때 바꿀 곳" 참고)
 - [ ] Cloudflare Turnstile 켜기 (사이트 키를 `nuxt.config.ts`, 비밀 키를 Apps Script 속성에)
 - [ ] AI 챗봇을 화면에 붙일지 결정 (붙이면 안내문에 노즈소프트 반영)
-- [ ] SilverBio Compare 직접 해 보기 데모: 완성, 배포 전 확인 필요 (`npm run dev` 후 홈에서 Compare 아래)
+- [x] SilverBio Compare 직접 해 보기 데모: `/compare` 페이지로 운영 공개 (2026-11-20)
 - [ ] git에 안 올린 파일 정리: `app/보고서(전기).sql`, `app/화면.jsp` (홈페이지와 관계없어 보임)
