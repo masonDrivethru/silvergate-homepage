@@ -2830,6 +2830,7 @@ function createCompare(options) {
   function updateScrollbar() {
     const sc = scrollers.left;
     if (!sc) return;
+    if (sc.target === scrollers.right?.target) return;
     const el = sc.target.nodeType === 1 ? sc.target : sc.doc.documentElement;
     ensureMarkStyle(el.ownerDocument, name + "l");
     if (opt.scrollbars !== "both" && link?.enabled) el.setAttribute("data-sgc-noscrollbar", "");
@@ -3588,7 +3589,8 @@ function createCompare(options) {
     }
     if (keys.length) await ensureAligned(keys);
     if (token !== goToken) return;
-    const sides = ["left", "right"].map((side) => ({ side, block: targetOf(side) })).filter((x) => x.block);
+    let sides = ["left", "right"].map((side) => ({ side, block: targetOf(side) })).filter((x) => x.block);
+    if (sides.length > 1 && scrollers.left.target === scrollers.right.target) sides = [sides.find((x) => x.side === "right") ?? sides[0]];
     let anySmooth = false;
     for (const { side, block } of sides) {
       const sc = scrollers[side];
@@ -3789,6 +3791,11 @@ function createCompare(options) {
     get syncScroll() {
       return link ? link.enabled : false;
     },
+    /** 두 문서가 한 스크롤 영역 안에 있음 (늘 함께 움직임 → 스크롤 맞춤 버튼 필요 없음) */
+    get sharedScroll() {
+      if (!scrollers.left) setupScroll();
+      return scrollers.left.target === scrollers.right.target;
+    },
     set syncScroll(v) {
       if (link) link.enabled = v;
       updateScrollbar();
@@ -3937,7 +3944,7 @@ function mountToolbar(el, ctrl, o = {}) {
             }
           }, m[md]))
         ) : null,
-        mode === "side" ? h(
+        mode === "side" && !ctrl.sharedScroll ? h(
           doc,
           "label",
           { class: "sgc-switch" },

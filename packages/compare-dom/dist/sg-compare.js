@@ -2876,8 +2876,10 @@ tr.sgc-spacer::after{content:none}
       updateScrollbar();
     }
     function updateScrollbar() {
+      var _a;
       const sc = scrollers.left;
       if (!sc) return;
+      if (sc.target === ((_a = scrollers.right) == null ? void 0 : _a.target)) return;
       const el = sc.target.nodeType === 1 ? sc.target : sc.doc.documentElement;
       ensureMarkStyle(el.ownerDocument, name + "l");
       if (opt.scrollbars !== "both" && (link == null ? void 0 : link.enabled)) el.setAttribute("data-sgc-noscrollbar", "");
@@ -3656,7 +3658,7 @@ tr.sgc-spacer::after{content:none}
     const focused = [];
     let goToken = 0;
     async function goTo(i, { smooth = true } = {}) {
-      var _a;
+      var _a, _b;
       if (!state.changes.length) return;
       i = (i % state.changes.length + state.changes.length) % state.changes.length;
       state.current = i;
@@ -3668,9 +3670,9 @@ tr.sgc-spacer::after{content:none}
       focused.length = 0;
       emit("focus", ch);
       const targetOf = (side) => {
-        var _a2, _b, _c;
+        var _a2, _b2, _c;
         let el = elOf(ch[side]);
-        if (!el && ((_a2 = ch.gap) == null ? void 0 : _a2.side) === side) el = (_b = ch.spacer) != null ? _b : elOf(ch.gap.node);
+        if (!el && ((_a2 = ch.gap) == null ? void 0 : _a2.side) === side) el = (_b2 = ch.spacer) != null ? _b2 : elOf(ch.gap.node);
         if (!el) return null;
         return ch.what === "text" ? (_c = blockOf(ch[side])) != null ? _c : el : el;
       };
@@ -3682,7 +3684,8 @@ tr.sgc-spacer::after{content:none}
       }
       if (keys.length) await ensureAligned(keys);
       if (token !== goToken) return;
-      const sides = ["left", "right"].map((side) => ({ side, block: targetOf(side) })).filter((x) => x.block);
+      let sides = ["left", "right"].map((side) => ({ side, block: targetOf(side) })).filter((x) => x.block);
+      if (sides.length > 1 && scrollers.left.target === scrollers.right.target) sides = [(_a = sides.find((x) => x.side === "right")) != null ? _a : sides[0]];
       let anySmooth = false;
       for (const { side, block } of sides) {
         const sc = scrollers[side];
@@ -3693,7 +3696,7 @@ tr.sgc-spacer::after{content:none}
         block.setAttribute("data-sgc-focus", "");
         focused.push(block);
         const fr = [];
-        if (((_a = ch[side]) == null ? void 0 : _a.nodeType) === 3) {
+        if (((_b = ch[side]) == null ? void 0 : _b.nodeType) === 3) {
           const r = ch[side].ownerDocument.createRange();
           r.selectNodeContents(ch[side]);
           fr.push(r);
@@ -3890,6 +3893,11 @@ tr.sgc-spacer::after{content:none}
       get syncScroll() {
         return link ? link.enabled : false;
       },
+      /** 두 문서가 한 스크롤 영역 안에 있음 (늘 함께 움직임 → 스크롤 맞춤 버튼 필요 없음) */
+      get sharedScroll() {
+        if (!scrollers.left) setupScroll();
+        return scrollers.left.target === scrollers.right.target;
+      },
       set syncScroll(v) {
         if (link) link.enabled = v;
         updateScrollbar();
@@ -4042,7 +4050,7 @@ tr.sgc-spacer::after{content:none}
               }
             }, m[md]))
           ) : null,
-          mode === "side" ? h(
+          mode === "side" && !ctrl.sharedScroll ? h(
             doc,
             "label",
             { class: "sgc-switch" },

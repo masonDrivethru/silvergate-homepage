@@ -82,6 +82,8 @@ export interface CompareController {
   readonly error: unknown;
   readonly filter: ChangeType | null;
   syncScroll: boolean;
+  /** 두 문서가 한 스크롤 영역 안에 있음 (leftScroller 와 rightScroller 가 같음) — 가장 자연스러운 스크롤 */
+  readonly sharedScroll: boolean;
   run(): Promise<void>;
   goTo(index: number, opt?: { smooth?: boolean }): void;
   next(): void;

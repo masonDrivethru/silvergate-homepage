@@ -34,7 +34,10 @@ function swap() { [leftVer.value, rightVer.value] = [rightVer.value, leftVer.val
 
 // ---------- 화면 비교 모듈 연결 (브라우저에서만) ----------
 const lDoc = ref<HTMLElement>(), rDoc = ref<HTMLElement>(), xDoc = ref<HTMLElement>();
-const lScroll = ref<HTMLElement>(), rScroll = ref<HTMLElement>(), xScroll = ref<HTMLElement>();
+// 두 문서를 한 스크롤 영역(desk)에 나란히: 브라우저가 한 장처럼 함께 움직여 늦거나 떨리지 않는다
+const desk = ref<HTMLElement>(), xScroll = ref<HTMLElement>();
+/** 휴대폰(좁은 화면)에서 보여 줄 쪽 */
+const phoneSide = ref<'left' | 'right'>('right');
 const bar = ref<HTMLElement>(), list = ref<HTMLElement>();
 const mode = ref<'side' | 'redline'>('side');
 const zoom = ref(1);
@@ -44,7 +47,7 @@ onMounted(async () => {
   const { createCompare, mountToolbar, mountChangeList } = await import('@silvergate/compare-dom');
   const lang = locale.value === 'ko' ? 'ko' : 'en';
   const ctrl = createCompare({
-    left: lDoc.value!, right: rDoc.value!, leftScroller: lScroll.value, rightScroller: rScroll.value,
+    left: lDoc.value!, right: rDoc.value!, leftScroller: desk.value, rightScroller: desk.value,
     page: '.mbr-page', watch: true, locale: lang,
   });
   let dirty = true;
@@ -55,12 +58,15 @@ onMounted(async () => {
     onMode: (m) => { mode.value = m; if (m === 'redline' && dirty) nextTick(drawRedline); },
   });
   const cl = mountChangeList(list.value!, ctrl, { locale: lang });
-  // 문서 칸 폭에 맞춰 A4 를 줄여 보이기 (양쪽 같은 배율)
+  // 문서 칸 폭에 맞춰 A4 를 줄여 보이기 (양쪽 같은 배율). 넓은 화면은 두 칸, 좁은 화면은 한 칸
   const ro = new ResizeObserver(() => {
-    const w = rScroll.value?.clientWidth ?? 800;
-    zoom.value = Math.min(1, Math.max(0.35, (w - 24) / 794));
+    const el = desk.value;
+    if (!el) return;
+    const cols = getComputedStyle(el).gridTemplateColumns.split(' ').filter(Boolean).length || 2;
+    const w = el.clientWidth / cols;
+    zoom.value = Math.min(1, Math.max(0.3, (w - 20) / 794));
   });
-  ro.observe(rScroll.value!);
+  ro.observe(desk.value!);
   cleanup = () => { ro.disconnect(); tb.destroy(); cl.destroy(); ctrl.destroy(); };
 });
 onBeforeUnmount(() => cleanup?.());
@@ -97,16 +103,15 @@ onBeforeUnmount(() => cleanup?.());
         <div ref="bar" />
         <div class="sgc-body">
           <div class="sgc-panes">
-            <section class="sgc-pane" :hidden="mode === 'redline'">
-              <header class="sgc-pane-head"><span class="sgc-badge sgc-badge-old">{{ $t('cdemo.old') }}</span>v{{ left.version }}</header>
-              <div ref="lScroll" class="cmp-desk" tabindex="0" :aria-label="`v${left.version}`">
-                <div ref="lDoc" class="cmp-zoom" :style="{ zoom }"><CompareMbrSheets :doc="left" :plan="plan" approved /></div>
+            <section class="sgc-pane cmp-both" :hidden="mode === 'redline'">
+              <!-- 머리: 넓은 화면은 두 칸 제목, 좁은 화면은 이전/새 버전 고르기 -->
+              <div class="cmp-heads" role="group" :aria-label="$t('cdemo.view')">
+                <button type="button" class="sgc-pane-head" :aria-pressed="phoneSide === 'left'" @click="phoneSide = 'left'"><span class="sgc-badge sgc-badge-old">{{ $t('cdemo.old') }}</span>v{{ left.version }}</button>
+                <button type="button" class="sgc-pane-head" :aria-pressed="phoneSide === 'right'" @click="phoneSide = 'right'"><span class="sgc-badge sgc-badge-new">{{ $t('cdemo.new') }}</span>v{{ right.version }}</button>
               </div>
-            </section>
-            <section class="sgc-pane" :hidden="mode === 'redline'">
-              <header class="sgc-pane-head"><span class="sgc-badge sgc-badge-new">{{ $t('cdemo.new') }}</span>v{{ right.version }}</header>
-              <div ref="rScroll" class="cmp-desk" tabindex="0" :aria-label="`v${right.version}`">
-                <div ref="rDoc" class="cmp-zoom" :style="{ zoom }"><CompareMbrSheets :doc="right" :plan="plan" /></div>
+              <div ref="desk" class="cmp-desk cmp-desk--two" :data-phone="phoneSide" tabindex="0" :aria-label="`v${left.version} ↔ v${right.version}`">
+                <div class="cmp-col cmp-col--left"><div ref="lDoc" class="cmp-zoom" :style="{ zoom }"><CompareMbrSheets :doc="left" :plan="plan" approved /></div></div>
+                <div class="cmp-col cmp-col--right"><div ref="rDoc" class="cmp-zoom" :style="{ zoom }"><CompareMbrSheets :doc="right" :plan="plan" /></div></div>
               </div>
             </section>
             <section class="sgc-pane" :hidden="mode !== 'redline'">

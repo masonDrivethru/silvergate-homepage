@@ -97,6 +97,7 @@ export function createCompare(options) {
   function updateScrollbar() {
     const sc = scrollers.left;
     if (!sc) return;
+    if (sc.target === scrollers.right?.target) return;   // 한 스크롤 영역에 두 문서: 스크롤바 하나뿐이라 숨기지 않음
     const el = sc.target.nodeType === 1 ? sc.target : sc.doc.documentElement;
     ensureMarkStyle(el.ownerDocument, name + 'l');
     if (opt.scrollbars !== 'both' && link?.enabled) el.setAttribute('data-sgc-noscrollbar', '');
@@ -828,7 +829,9 @@ export function createCompare(options) {
     if (keys.length) await ensureAligned(keys);
     if (token !== goToken) return;
     // ② 이동: 가까우면 부드럽게, 멀면 바로
-    const sides = ['left', 'right'].map((side) => ({ side, block: targetOf(side) })).filter((x) => x.block);
+    let sides = ['left', 'right'].map((side) => ({ side, block: targetOf(side) })).filter((x) => x.block);
+    // 두 문서가 한 스크롤 영역에 있으면(좌우가 늘 함께 움직임) 한쪽 기준으로만 맞춘다 (새 버전 쪽 우선)
+    if (sides.length > 1 && scrollers.left.target === scrollers.right.target) sides = [sides.find((x) => x.side === 'right') ?? sides[0]];
     let anySmooth = false;
     for (const { side, block } of sides) {
       const sc = scrollers[side];
@@ -983,6 +986,8 @@ export function createCompare(options) {
     get filter() { return state.filter; },
     get pages() { return state.pages; },
     get syncScroll() { return link ? link.enabled : false; },
+    /** 두 문서가 한 스크롤 영역 안에 있음 (늘 함께 움직임 → 스크롤 맞춤 버튼 필요 없음) */
+    get sharedScroll() { if (!scrollers.left) setupScroll(); return scrollers.left.target === scrollers.right.target; },
     set syncScroll(v) { if (link) link.enabled = v; updateScrollbar(); emit('sync', !!v); },
     setFilter(type) { state.filter = type && state.filter !== type ? type : null; emit('filter', state.filter); },
     run, goTo, next: () => step(1), prev: () => step(-1), renderRedline,

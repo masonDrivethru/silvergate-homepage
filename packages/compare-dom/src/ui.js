@@ -63,7 +63,7 @@ export function mountToolbar(el, ctrl, o = {}) {
             type: 'button', 'aria-pressed': mode === md ? 'true' : 'false',
             onclick: () => { mode = md; o.onMode?.(md); render(); },
           }, m[md]))) : null,
-        mode === 'side' ? h(doc, 'label', { class: 'sgc-switch' },
+        mode === 'side' && !ctrl.sharedScroll ? h(doc, 'label', { class: 'sgc-switch' },
           h(doc, 'input', { type: 'checkbox', checked: ctrl.syncScroll, onchange: (e) => { ctrl.syncScroll = e.target.checked; } }),
           h(doc, 'span', {}, m.sync)) : null,
         t ? h(doc, 'span', { class: 'sgc-time', title: timingTitle(t, m) }, m.took((t.total / 1000).toFixed(2))) : null),
