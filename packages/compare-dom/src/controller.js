@@ -731,14 +731,13 @@ export function createCompare(options) {
     if (ch.what === 'text' && t === 'modified' && ch.diffs) {
       for (const n of ch.alsoLeft ?? []) {
         if (n.nodeType === 3) for (const [s0, e0] of sideSpans(ch.diffs, 'left')) marks.left.textRange(n, s0, e0, 'del');
-        marks.left.attr(n.nodeType === 1 ? n : blockOf(n), n.nodeType === 1 ? 'data-sgc' : 'data-sgc-line', 'modified');
+        if (n.nodeType === 1) marks.left.attr(n, 'data-sgc', 'modified');
       }
       if (ch.span) for (const side of ['left', 'right']) { const n = ch.span[side]; if (n?.nodeType === 1) marks[side].attr(n, 'data-sgc', 'modified'); }
       for (const side of ['left', 'right']) {
         const tn = ch[side];
         if (!tn) continue;
         for (const [s, e] of sideSpans(ch.diffs, side)) marks[side].textRange(tn, s, e, side === 'left' ? 'del' : 'ins');
-        marks[side].attr(blockOf(tn), 'data-sgc-line', 'modified');
         if (!hasHighlightApi(tn.ownerDocument.defaultView)) marks[side].attr(blockOf(tn), 'data-sgc', 'modified');
       }
       return;
@@ -749,7 +748,6 @@ export function createCompare(options) {
       if (n) {
         if (n.nodeType === 3) {
           marks[side].wholeText(n, t === 'added' ? 'ins' : 'del');
-          marks[side].attr(blockOf(n), 'data-sgc-line', t);
           if (!hasHighlightApi(n.ownerDocument.defaultView)) marks[side].attr(n.parentElement, 'data-sgc', t);
         } else {
           marks[side].attr(n, 'data-sgc', t);
