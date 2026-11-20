@@ -544,19 +544,35 @@ export function createCompare(options) {
         if (c.type !== 'added' && c.type !== 'deleted') continue;
         const n = c.type === 'added' ? c.right : c.left;
         if (n?.nodeType !== 1 || /^(td|th)$/.test(n.localName) || !c.gap?.node) continue;
+        // 글자 중간의 작은 요소(배지·강조 등)는 빈 칸을 넣지 않는다 — 덩어리(문단·줄·단계)만. 높이는 아래에서 바깥 덩어리끼리 맞춤
+        const disp = n.ownerDocument.defaultView.getComputedStyle(n).display;
+        if (/^(inline|inline-block|inline-flex|contents|none)$/.test(disp)) continue;
         if (!(await tick())) return;
         const gside = c.gap.side, oside = gside === 'left' ? 'right' : 'left';
         let ref = el(c.gap.node), end = c.gap.end, after = null;
         // 쪽 문서: 원본이 있는 쪽 번호와 같은 쪽에 빈 칸을 넣는다 (다음 항목이 다음 쪽이면 앞 항목 뒤에)
         const want = pageNo(n, oside);
         const prev = el(c.gap.prev);
+        let intoPage = null;
         if (want >= 0) {
           if (prev && pageNo(prev, gside) === want && (end || pageNo(ref, gside) !== want)) after = prev;
-          else if (end && prev) after = prev;
+          else if (ref && !end && pageNo(ref, gside) === want) { /* 다음 항목 앞 (그대로) */ }
+          else {
+            // 앞뒤 항목이 모두 다른 쪽이면: 반대쪽 원본과 같은 쪽 번호의 첫머리에
+            const pg = root(gside).querySelectorAll(opt.page)[want];
+            if (pg) intoPage = pg;
+            else if (end && prev) after = prev;
+          }
         } else if (end && prev) after = prev;
-        if (!ref && !after) continue;
+        if (!ref && !after && !intoPage) continue;
         const h = spaceOf(n);
         if (h < 1) continue;
+        if (intoPage) {
+          // 쪽 안 첫 내용 앞 (비교에서 빠지는 머리말·표 머리 다음). 내용이 없으면 꼬리말 앞
+          const first = Array.from(intoPage.children).find((x) => !x.hasAttribute('data-sgc-ignore') && !x.classList.contains('sgc-spacer'))
+            ?? Array.from(intoPage.children).reverse().find((x) => x.hasAttribute('data-sgc-ignore')) ?? null;
+          if (first) { ref = first; end = false; after = null; } else { ref = intoPage; end = true; after = null; }
+        }
         plans.push({ c, ref, end, after, h, label: c.type === 'added' ? msg.gapAdded : msg.gapDeleted, gap: parentGap(after ?? (end ? ref.lastElementChild ?? ref : ref)) });
       }
     }
@@ -581,9 +597,26 @@ export function createCompare(options) {
     applyFixes(fixes);
     // 4) 재기 → 쓰기: 감싼 큰 덩어리끼리 한 번 더 (안쪽에서 맞추지 못한 차이까지)
     const seen = new Set(), tops = [];
+    const esc = (v) => (globalThis.CSS?.escape ? CSS.escape(v) : String(v).replace(/["\\]/g, '\\$&'));
     for (const ch of list) {
-      if (!ch.left || !ch.right) continue;
-      const a = topUnit(ch.left, 'left'), b = topUnit(ch.right, 'right');
+      let a, b;
+      if (ch.left && ch.right) { a = topUnit(ch.left, 'left'); b = topUnit(ch.right, 'right'); }
+      else {
+        // 한쪽에만 있는 작은 변경(덩어리 안쪽): 같은 ID(data-sgc-key)를 가진 바깥 덩어리끼리
+        const side = ch.right ? 'right' : 'left', other = side === 'right' ? 'left' : 'right';
+        const u = topUnit(ch[side], side);
+        const key = u?.getAttribute?.('data-sgc-key');
+        if (!u || !key || u === (side === 'right' ? ch.right : ch.left)) continue;
+        const v = root(other).querySelector(`[data-sgc-key="${esc(key)}"]`);
+        if (!v) continue;
+        // 그 안의 가장 가까운 ID 줄끼리도 (예: 단계 안 파라미터 줄) — 바깥만 맞추면 안쪽 줄이 조금씩 어긋남
+        const inner = (ch[side].nodeType === 1 ? ch[side] : ch[side].parentElement)?.closest('[data-sgc-key]');
+        if (inner && inner !== u && u.contains(inner)) {
+          const iv = v.querySelector(`[data-sgc-key="${esc(inner.getAttribute('data-sgc-key'))}"]`);
+          if (iv && !seen.has(side === 'right' ? iv : inner)) { seen.add(side === 'right' ? iv : inner); tops.push(side === 'right' ? [iv, inner] : [inner, iv]); }
+        }
+        [a, b] = side === 'right' ? [v, u] : [u, v];
+      }
       if (!a || !b || seen.has(a)) continue;
       seen.add(a);
       tops.push([a, b]);

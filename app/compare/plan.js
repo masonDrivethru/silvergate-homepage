@@ -7,26 +7,25 @@
 
 /** @param {import('./types.js').MbrDocument} doc */
 export function itemsOf(doc) {
-  // 대략의 높이 (px, 문서 글자 크기 기준). 쪽 본문 약 900px
-  const out = [{ key: 'head', cost: 330 }];
-  if (doc.materials?.length) out.push({ key: 'mat', cost: 48 + doc.materials.length * 21 + (doc.materialsLayout === 'detailed' ? 22 : 0) });
+  // 높이 (px, 문서 글자 16px 기준, 실제 잰 값 + 여유). 머리말·표 머리·꼬리말(약 240px)은 쪽마다 따로라 빼고, 쪽 본문 약 790px
+  const out = [];
+  const perLine = (text) => (/[\uac00-\ud7a3]/.test(text ?? '') ? 36 : 66);   // 한 줄에 들어가는 글자 수 (한글 / 영문)
+  if (doc.materials?.length) out.push({ key: 'mat', cost: 75 + doc.materials.length * 33 + (doc.materialsLayout === 'detailed' ? 32 : 0) });
   doc.groups.forEach((g) => {
     const gid = g.groupId ?? g.title;
-    out.push({ key: `g:${gid}`, cost: 34 });
+    out.push({ key: `g:${gid}`, cost: 48 });
     for (const s of g.steps ?? []) {
-      const lines = Math.max(1, Math.ceil((s.instruction?.length ?? 0) / 110));
-      out.push({ key: `s:${gid}:${s.stepId ?? s.title}`, cost: 44 + lines * 16 + (s.params?.length ? 24 + s.params.length * 21 : 0) + 26 });
+      const lines = Math.max(1, Math.ceil((s.instruction?.length ?? 0) / perLine(s.instruction)));
+      out.push({ key: `s:${gid}:${s.stepId ?? s.title}`, cost: 100 + (lines - 1) * 24 + (s.params?.length ?? 0) * 33 });
     }
   });
-  // 전자서명 기록: 늘 마지막 쪽에 따로
-  if (doc.signatures) out.push({ key: 'manifest', cost: 260, newPage: true });
   return out;
 }
 
 /**
  * @returns {string[][]} 쪽마다 항목 키 목록 (양쪽 공통)
  */
-export function planPages(left, right, pageCost = 880) {
+export function planPages(left, right, pageCost = 740) {
   const L = itemsOf(left), R = itemsOf(right);
   const lpos = new Map(L.map((x, i) => [x.key, i]));
   const rset = new Set(R.map((x) => x.key));

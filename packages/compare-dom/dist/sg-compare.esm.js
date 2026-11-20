@@ -3291,18 +3291,38 @@ function createCompare(options) {
         if (c.type !== "added" && c.type !== "deleted") continue;
         const n = c.type === "added" ? c.right : c.left;
         if (n?.nodeType !== 1 || /^(td|th)$/.test(n.localName) || !c.gap?.node) continue;
+        const disp = n.ownerDocument.defaultView.getComputedStyle(n).display;
+        if (/^(inline|inline-block|inline-flex|contents|none)$/.test(disp)) continue;
         if (!await tick()) return;
         const gside = c.gap.side, oside = gside === "left" ? "right" : "left";
         let ref = el(c.gap.node), end = c.gap.end, after = null;
         const want = pageNo(n, oside);
         const prev = el(c.gap.prev);
+        let intoPage = null;
         if (want >= 0) {
           if (prev && pageNo(prev, gside) === want && (end || pageNo(ref, gside) !== want)) after = prev;
-          else if (end && prev) after = prev;
+          else if (ref && !end && pageNo(ref, gside) === want) {
+          } else {
+            const pg = root(gside).querySelectorAll(opt.page)[want];
+            if (pg) intoPage = pg;
+            else if (end && prev) after = prev;
+          }
         } else if (end && prev) after = prev;
-        if (!ref && !after) continue;
+        if (!ref && !after && !intoPage) continue;
         const h2 = spaceOf(n);
         if (h2 < 1) continue;
+        if (intoPage) {
+          const first = Array.from(intoPage.children).find((x) => !x.hasAttribute("data-sgc-ignore") && !x.classList.contains("sgc-spacer")) ?? Array.from(intoPage.children).reverse().find((x) => x.hasAttribute("data-sgc-ignore")) ?? null;
+          if (first) {
+            ref = first;
+            end = false;
+            after = null;
+          } else {
+            ref = intoPage;
+            end = true;
+            after = null;
+          }
+        }
         plans.push({ c, ref, end, after, h: h2, label: c.type === "added" ? msg.gapAdded : msg.gapDeleted, gap: parentGap(after ?? (end ? ref.lastElementChild ?? ref : ref)) });
       }
     }
@@ -3328,9 +3348,29 @@ function createCompare(options) {
     }
     applyFixes(fixes);
     const seen = /* @__PURE__ */ new Set(), tops = [];
+    const esc2 = (v) => globalThis.CSS?.escape ? CSS.escape(v) : String(v).replace(/["\\]/g, "\\$&");
     for (const ch of list) {
-      if (!ch.left || !ch.right) continue;
-      const a = topUnit(ch.left, "left"), b = topUnit(ch.right, "right");
+      let a, b;
+      if (ch.left && ch.right) {
+        a = topUnit(ch.left, "left");
+        b = topUnit(ch.right, "right");
+      } else {
+        const side = ch.right ? "right" : "left", other = side === "right" ? "left" : "right";
+        const u = topUnit(ch[side], side);
+        const key = u?.getAttribute?.("data-sgc-key");
+        if (!u || !key || u === (side === "right" ? ch.right : ch.left)) continue;
+        const v = root(other).querySelector(`[data-sgc-key="${esc2(key)}"]`);
+        if (!v) continue;
+        const inner = (ch[side].nodeType === 1 ? ch[side] : ch[side].parentElement)?.closest("[data-sgc-key]");
+        if (inner && inner !== u && u.contains(inner)) {
+          const iv = v.querySelector(`[data-sgc-key="${esc2(inner.getAttribute("data-sgc-key"))}"]`);
+          if (iv && !seen.has(side === "right" ? iv : inner)) {
+            seen.add(side === "right" ? iv : inner);
+            tops.push(side === "right" ? [iv, inner] : [inner, iv]);
+          }
+        }
+        [a, b] = side === "right" ? [v, u] : [u, v];
+      }
       if (!a || !b || seen.has(a)) continue;
       seen.add(a);
       tops.push([a, b]);
