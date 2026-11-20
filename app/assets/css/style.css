@@ -1244,8 +1244,7 @@ html[data-motion="calm"] main .section__title { background-position: 0 0; }
 }
 :root[data-theme="light"] .cmp-live.cmp-live :is(.sgc-viewer, .sgc-toolbar, .sgc-list) { --sgc-c-added: #1d4ed8; --sgc-c-modified: #b45309; --sgc-c-deleted: #b91c1c; --sgc-c-moved: #6d28d9; }
 .cmp-live .cmp-viewer { margin-top: var(--s3); --sgc-height: min(82vh, 980px); border-radius: var(--r-md); box-shadow: var(--glass-shadow); }
-.cmp-desk { flex: 1; min-height: 0; overflow: auto; background: #e6e8ec; padding: 16px 0; }
-:root:not([data-theme="light"]) .cmp-desk { background: #2a2c31; }
+.cmp-desk { flex: 1; min-height: 0; overflow: auto; background: #525659; padding: 16px 0; }  /* PDF 뷰어처럼 짙은 회색 바탕 */
 .cmp-zoom { width: max-content; margin: 0 auto; }
 
 .mbr {
@@ -1255,7 +1254,15 @@ html[data-motion="calm"] main .section__title { background-position: 0 0; }
 }
 .mbr :is(h1, h2, h3, h4, h5, p, td, th, span, b, dt, dd) { color: inherit; font-family: inherit; letter-spacing: normal; text-transform: none; }
 .mbr :is(h1, h2, h3, h4) { line-height: 1.3; background: none; -webkit-text-fill-color: currentColor; }
-.mbr-page { width: 794px; min-height: 1123px; margin: 0 auto 18px; padding: 44px 60px 34px; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.18); display: flex; flex-direction: column; gap: 10px; box-sizing: border-box; content-visibility: auto; contain-intrinsic-size: auto 794px auto 1123px; }
+.mbr-page { position: relative; width: 794px; min-height: 1123px; margin: 0 auto 18px; padding: 44px 60px 34px; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.35); display: flex; flex-direction: column; gap: 10px; box-sizing: border-box; content-visibility: auto; contain-intrinsic-size: auto 794px auto 1123px; }
+/* 문서 관리 시스템이 덧붙이는 표시: 상태 워터마크(대각선), 위·아래 여백의 작은 회색 줄 */
+.mbr-page[data-watermark]::before { content: attr(data-watermark); position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) rotate(-35deg); font: 700 64px/1 Arial, sans-serif; letter-spacing: .08em; color: rgba(0,0,0,.07); white-space: nowrap; pointer-events: none; z-index: 0; }
+.mbr-page > * { position: relative; z-index: 1; }
+.mbr-overlay { position: absolute !important; left: 60px; right: 60px; margin: 0; font-size: 8.5px; color: #6b6b6b; letter-spacing: .02em; }
+.mbr-overlay--top { top: 18px; }
+.mbr-overlay--bottom { bottom: 12px; text-align: center; }
+.mbr-ins--flush { margin-left: 0; }
+.mbr-manifest { display: grid; gap: 8px; }
 .mbr-run { width: 100%; border-collapse: collapse; font-size: 10px; margin-bottom: 6px; }
 .mbr-run td { border: 0.75px solid var(--rule); padding: 3px 6px; vertical-align: middle; }
 .mbr-run__org { width: 22%; font-weight: 700; letter-spacing: .06em; text-align: center; }
@@ -1282,4 +1289,4 @@ html[data-motion="calm"] main .section__title { background-position: 0 0; }
 .mbr-step .mbr-tbl { margin-left: 3em; width: calc(100% - 3em); }
 .mbr-sign { margin: 2px 0 0 3em; display: flex; gap: 24px; font-size: 10px; color: var(--ink-2); }
 .mbr-sign span { flex: 1; border-bottom: 0.75px solid var(--rule-soft); padding-bottom: 8px; }
-.mbr-foot { margin-top: auto; display: flex; justify-content: space-between; gap: 16px; font-size: 9.5px; color: var(--ink-2); border-top: 0.75px solid var(--rule); padding-top: 5px; }
+.mbr-foot { margin-top: auto; margin-bottom: 10px; display: flex; justify-content: space-between; gap: 16px; font-size: 9.5px; color: var(--ink-2); border-top: 0.75px solid var(--rule); padding-top: 5px; }

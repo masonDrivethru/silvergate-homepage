@@ -62,6 +62,7 @@
  * @property {boolean} [paramCpp]                        파라미터 표에 CPP 열 표시
  * @property {string[]} [signatures]  [작성자, 날짜, 검토자, 날짜, 승인자, 날짜] (샘플, 가상)
  * @property {string} [reason]        개정 사유 (샘플)
+ * @property {'superseded' | 'effective' | 'review'} [status]  문서 관리 시스템 상태 (샘플)
  */
 
 /** @typedef {"added" | "modified" | "deleted"} ChangeType */

@@ -18,6 +18,8 @@ export function itemsOf(doc) {
       out.push({ key: `s:${gid}:${s.stepId ?? s.title}`, cost: 44 + lines * 16 + (s.params?.length ? 24 + s.params.length * 21 : 0) + 26 });
     }
   });
+  // 전자서명 기록: 늘 마지막 쪽에 따로
+  if (doc.signatures) out.push({ key: 'manifest', cost: 260, newPage: true });
   return out;
 }
 
@@ -28,8 +30,8 @@ export function planPages(left, right, pageCost = 880) {
   const L = itemsOf(left), R = itemsOf(right);
   const lpos = new Map(L.map((x, i) => [x.key, i]));
   const rset = new Set(R.map((x) => x.key));
-  const cost = new Map();
-  for (const x of [...L, ...R]) cost.set(x.key, Math.max(cost.get(x.key) ?? 0, x.cost));
+  const cost = new Map(), fresh = new Set();
+  for (const x of [...L, ...R]) { cost.set(x.key, Math.max(cost.get(x.key) ?? 0, x.cost)); if (x.newPage) fresh.add(x.key); }
   // 합친 순서: 오른쪽 순서를 기준으로, 왼쪽에만 있는 항목은 왼쪽에서 앞에 있던 공통 항목 바로 뒤에
   const merged = [];
   let li = 0;
@@ -48,7 +50,7 @@ export function planPages(left, right, pageCost = 880) {
   merged.forEach((k, i) => {
     const c = cost.get(k) ?? 1;
     const need = k.startsWith('g:') ? c + (cost.get(merged[i + 1]) ?? 0) : c;
-    if (cur.length && used + need > pageCost) { pages.push(cur); cur = []; used = 0; }
+    if (cur.length && (used + need > pageCost || fresh.has(k))) { pages.push(cur); cur = []; used = 0; }
     cur.push(k); used += c;
   });
   if (cur.length || !pages.length) pages.push(cur);

@@ -101,6 +101,8 @@ export function getAllSamples(locale) {
   const reasons = lang === 'ko'
     ? { '1.0': '최초 제정', '1.1': '배양 온도 변경, 중간 샘플링 추가', '1.2': '기준값 조정, 단계 순서 변경', '2.0': '원자재 표·파라미터 표 개편, 정밀 여과 구간 신설' }
     : { '1.0': 'Initial issue', '1.1': 'Culture temperature change, in-process sampling added', '1.2': 'Limits adjusted, step order changed', '2.0': 'Material and parameter tables restructured, clarification section added' };
+  // 문서 관리 시스템의 상태 (가상): 1.0·1.1 대체됨, 1.2 시행, 2.0 검토 중
+  v10.status = 'superseded'; v11.status = 'superseded'; v12.status = 'effective'; v20.status = 'review';
   v10.signatures = sign('2026-02-10', '2026-02-18', '2026-02-24'); v10.reason = reasons['1.0'];
   v11.signatures = sign('2026-05-20', '2026-06-02', '2026-06-09'); v11.reason = reasons['1.1'];
   v12.signatures = sign('2026-08-11', '2026-08-19', '2026-08-26'); v12.reason = reasons['1.2'];

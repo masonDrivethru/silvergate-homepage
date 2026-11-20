@@ -14,6 +14,7 @@ const { t } = useI18n();
 
 type Item =
   | { kind: 'head' }
+  | { kind: 'manifest' }
   | { kind: 'mat' }
   | { kind: 'group'; no: number; id: string; title: string }
   | { kind: 'step'; gid: string; step: Step };
@@ -21,6 +22,7 @@ type Item =
 const byKey = computed(() => {
   const m = new Map<string, Item>([['head', { kind: 'head' }]]);
   if (props.doc.materials?.length) m.set('mat', { kind: 'mat' });
+  if (props.doc.signatures) m.set('manifest', { kind: 'manifest' });
   props.doc.groups.forEach((g, gi) => {
     const id = g.groupId ?? g.title;
     m.set(`g:${id}`, { kind: 'group', no: gi + 1, id, title: g.title });
@@ -32,7 +34,22 @@ const byKey = computed(() => {
 const pages = computed(() => (props.plan ?? planPages(props.doc, props.doc))
   .map((keys) => keys.filter((k) => byKey.value.has(k)).map((k) => [k, byKey.value.get(k)!] as const)));
 
-const docNo = computed(() => `MBR-${props.doc.productName.split(' ')[0]}-001`);
+const docNo = 'MBR-0014';
+/** 문서 관리 시스템 상태 (샘플): 대체됨 / 시행 / 검토 중 */
+const status = computed(() => props.doc.status ?? (props.approved ? 'effective' : 'review'));
+const statusText = computed(() => t('cdemo.paper.st_' + status.value));
+/** 워터마크: 시행본은 없음 */
+const watermark = computed(() => (status.value === 'superseded' ? t('cdemo.paper.wm_superseded') : status.value === 'review' ? t('cdemo.paper.wm_review') : ''));
+/** 전자서명 기록: 서명 날짜에 가상의 시각(UTC)을 붙임 */
+const manifest = computed(() => {
+  const s = props.doc.signatures ?? [];
+  const times = ['09:12:41', '14:03:27', '10:48:05'];
+  return [
+    { name: s[0], meaning: t('cdemo.paper.mAuthor'), at: `${s[1]} ${times[0]} UTC` },
+    { name: s[2], meaning: t('cdemo.paper.mReview'), at: `${s[3]} ${times[1]} UTC` },
+    { name: s[4], meaning: t('cdemo.paper.mApproval'), at: `${s[5]} ${times[2]} UTC` },
+  ];
+});
 const val = (p: Param) => [p.value, p.unit].filter(Boolean).join(' ');
 const range = (p: Param) => formatSpec(p.spec);
 /** 상세 원자재 표: 공정 단계별로 묶어 첫 줄에만 단계 칸(rowspan) */
@@ -50,7 +67,10 @@ const matKey = (m: Material) => 'm:' + m.name;
 
 <template>
   <div class="mbr">
-    <article v-for="(page, pi) in pages" :key="pi" class="mbr-page">
+    <article v-for="(page, pi) in pages" :key="pi" class="mbr-page" :data-watermark="watermark || undefined">
+      <!-- 문서 관리 시스템이 PDF 에 덧붙이는 표시 줄 (위·아래 여백, 비교에서 뺌) -->
+      <p class="mbr-overlay mbr-overlay--top" data-sgc-ignore aria-hidden="true">{{ t('cdemo.paper.overlayTop', { status: statusText, date: doc.effectiveDate }) }}</p>
+      <p class="mbr-overlay mbr-overlay--bottom" data-sgc-ignore aria-hidden="true">{{ t('cdemo.paper.overlayBottom') }}</p>
       <!-- 쪽마다 반복되는 머리말 (비교에서 뺌) -->
       <table class="mbr-run" data-sgc-ignore aria-hidden="true">
         <tbody>
@@ -70,7 +90,7 @@ const matKey = (m: Material) => 'm:' + m.name;
           <table class="mbr-tbl mbr-info">
             <tbody>
               <tr><th>{{ t('cdemo.paper.docNo') }}</th><td>{{ docNo }}</td><th>{{ t('cdemo.paper.version') }}</th><td>{{ doc.version }}</td></tr>
-              <tr><th>{{ t('cdemo.paper.effective') }}</th><td>{{ doc.effectiveDate }}</td><th>{{ t('cdemo.paper.status') }}</th><td><span data-sgc-ignore>{{ approved ? t('cdemo.paper.statusEff') : t('cdemo.paper.review') }}</span></td></tr>
+              <tr><th>{{ t('cdemo.paper.effective') }}</th><td>{{ doc.effectiveDate }}</td><th>{{ t('cdemo.paper.status') }}</th><td><span data-sgc-ignore>{{ statusText }}</span></td></tr>
               <tr v-if="doc.reason"><th>{{ t('cdemo.paper.reason') }}</th><td colspan="3">{{ doc.reason }}</td></tr>
             </tbody>
           </table>
@@ -109,6 +129,18 @@ const matKey = (m: Material) => 'm:' + m.name;
             <thead><tr><th>{{ t('cdemo.paper.colMaterial') }}</th><th>{{ t('cdemo.paper.colQty') }}</th><th>{{ t('cdemo.paper.colUnit') }}</th></tr></thead>
             <tbody>
               <tr v-for="m in doc.materials" :key="matKey(m)" :data-sgc-key="matKey(m)"><td>{{ m.name }}</td><td>{{ m.qty }}</td><td>{{ m.unit }}</td></tr>
+            </tbody>
+          </table>
+        </section>
+
+        <!-- 전자서명 기록 (마지막 쪽) -->
+        <section v-else-if="it.kind === 'manifest'" class="mbr-manifest" data-sgc-key="manifest">
+          <h3 class="mbr-sec">{{ t('cdemo.paper.manifest') }}</h3>
+          <p class="mbr-ins mbr-ins--flush">{{ t('cdemo.paper.manifestNote') }}</p>
+          <table class="mbr-tbl">
+            <thead><tr><th>{{ t('cdemo.paper.signedBy') }}</th><th>{{ t('cdemo.paper.meaning') }}</th><th>{{ t('cdemo.paper.dateTime') }}</th></tr></thead>
+            <tbody>
+              <tr v-for="(m, mi) in manifest" :key="mi" :data-sgc-key="'man:' + mi"><td>{{ m.name }}</td><td>{{ m.meaning }}</td><td>{{ m.at }}</td></tr>
             </tbody>
           </table>
         </section>
