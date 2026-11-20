@@ -86,6 +86,17 @@ export function createCompare(options) {
     scrollers.right = makeScroller(root('right'), opt.rightScroller);
     link?.destroy();
     link = opt.syncScroll === false ? null : linkScroll(scrollers.left, scrollers.right, () => anchors);
+    updateScrollbar();
+  }
+
+  /** 스크롤 맞춤 중에는 오른쪽 스크롤바 하나만 (왼쪽은 숨김, 휠·터치는 그대로). 맞춤을 끄면 다시 보임 */
+  function updateScrollbar() {
+    const sc = scrollers.left;
+    if (!sc) return;
+    const el = sc.target.nodeType === 1 ? sc.target : sc.doc.documentElement;
+    ensureMarkStyle(el.ownerDocument, name + 'l');
+    if (opt.scrollbars !== 'both' && link?.enabled) el.setAttribute('data-sgc-noscrollbar', '');
+    else el.removeAttribute('data-sgc-noscrollbar');
   }
 
   async function run() {
@@ -161,6 +172,69 @@ export function createCompare(options) {
     };
   }
 
+  /**
+   * 사람이 보기 좋게 정리:
+   *  1) 속성이 생기거나 없어진 것(예: colspan 이 새로 붙음 = 칸 병합)은 요소 "수정"
+   *  2) 똑같은 덩어리가 한쪽에서 없어지고 다른 곳에 생겼으면 "이동" (표 줄 순서 바뀜 등)
+   *  3) 같은 표의 같은 열 칸들이 한꺼번에 추가/삭제됐으면 "열 추가/삭제" 한 건으로
+   */
+  function refine(list) {
+    for (const ch of list) {
+      if (ch.what !== 'attr') continue;
+      const l = ch.left?.nodeType === 1 ? ch.left : null, r = ch.right?.nodeType === 1 ? ch.right : null;
+      if (ch.type === 'added' || ch.type === 'deleted' || ch.attr === 'a' || ch.attr === '') {
+        ch.type = 'modified';
+        const names = [...opt.attrs, 'value'].filter((n) => (l?.getAttribute(n) ?? null) !== (r?.getAttribute(n) ?? null));
+        ch.attr = names.join(', ') || ch.attr;
+        ch.before = names.map((n) => l?.getAttribute(n) ?? '–').join(', ');
+        ch.after = names.map((n) => r?.getAttribute(n) ?? '–').join(', ');
+      }
+    }
+    // 2) 이동
+    const byHash = new Map();
+    for (const ch of list) if (ch.type === 'deleted' && ch.what === 'node' && ch.h) {
+      if (!byHash.has(ch.h)) byHash.set(ch.h, []);
+      byHash.get(ch.h).push(ch);
+    }
+    const drop = new Set();
+    for (const ch of list) {
+      if (ch.type !== 'added' || ch.what !== 'node' || !ch.h) continue;
+      const cand = byHash.get(ch.h);
+      const del = cand?.shift();
+      if (!del) continue;
+      del.type = 'moved'; del.what = 'moved'; del.right = ch.right; del.gap = null;
+      del.page = { left: del.page.left, right: ch.page.right };
+      drop.add(ch);
+    }
+    let out = list.filter((ch) => !drop.has(ch));
+    // 3) 열 묶기
+    const groups = new Map();
+    for (const ch of out) {
+      if ((ch.type !== 'added' && ch.type !== 'deleted') || ch.what !== 'node') continue;
+      const n = ch.type === 'added' ? ch.right : ch.left;
+      if (n?.nodeType !== 1 || (n.localName !== 'td' && n.localName !== 'th')) continue;
+      const table = n.closest('table');
+      if (!table) continue;
+      const key = ch.type + '|' + n.cellIndex;
+      let byTable = groups.get(table);
+      if (!byTable) groups.set(table, (byTable = new Map()));
+      if (!byTable.has(key)) byTable.set(key, []);
+      byTable.get(key).push(ch);
+    }
+    const merged = new Set();
+    for (const byTable of groups.values()) for (const cells of byTable.values()) {
+      if (cells.length < 2) continue;
+      const head = cells[0];
+      head.what = 'column';
+      head.extra = cells.slice(1).map((c) => ({ node: c.type === 'added' ? c.right : c.left, gap: c.gap }));
+      head.count = cells.length;
+      for (const c of cells.slice(1)) merged.add(c);
+    }
+    out = out.filter((ch) => !merged.has(ch));
+    out.forEach((ch, i) => { ch.index = i; delete ch.h; });
+    return out;
+  }
+
   async function apply(out, id) {
     const tick = slicer(id);
     const list = [];
@@ -194,18 +268,21 @@ export function createCompare(options) {
       if (ch.what === 'attr' || ch.what === 'moved') {
         ch.left = L.node; ch.right = R.node;
       }
+      if (ch.what === 'node') ch.h = (L.node ? L.obj : R.obj)?.h;
       ch.page = { left: pgL && ch.left ? pgL(ch.left) : pgL && ch.gap?.side === 'left' ? pgL(ch.gap.node) : null,
                   right: pgR && ch.right ? pgR(ch.right) : pgR && ch.gap?.side === 'right' ? pgR(ch.gap.node) : null };
-      ch.text = describe(ch);
       list.push(ch);
     }
+    const final = refine(list);
+    for (const ch of final) ch.text = describe(ch);
     // 2) 한 번에 옛 표시를 지우고 새 표시 (깜빡임 없이)
     marks.left.clear(); marks.right.clear();
-    for (const ch of list) paint(ch);
+    for (const ch of final) paint(ch);
     marks.left.flush(); marks.right.flush();
-    state.changes = list;
-    state.stats = out.stats;
-    state.current = list.length ? Math.min(Math.max(state.current, -1), list.length - 1) : -1;
+    state.changes = final;
+    state.stats = { added: 0, modified: 0, deleted: 0, moved: 0 };
+    for (const ch of final) state.stats[ch.type]++;
+    state.current = final.length ? Math.min(Math.max(state.current, -1), final.length - 1) : -1;
 
     // 스크롤 맞춤 기준점 (쪽 정보가 있으면 쪽별로 묶어 둔다)
     const side = (sd) => {
@@ -246,6 +323,13 @@ export function createCompare(options) {
 
   function paint(ch) {
     const t = ch.type;
+    if (ch.extra) {
+      const side = t === 'added' ? 'right' : 'left';
+      for (const x of ch.extra) {
+        paint({ ...ch, extra: null, what: 'node', [side]: x.node, gap: x.gap });
+      }
+      return paint({ ...ch, extra: null, what: 'node' });
+    }
     if (ch.what === 'text' && t === 'modified' && ch.diffs) {
       for (const side of ['left', 'right']) {
         const tn = ch[side];
@@ -294,6 +378,10 @@ export function createCompare(options) {
     if (ch.what === 'text' && ch.diffs) return { diffs: trimDiffs(ch.diffs) };
     if (ch.what === 'attr') return { attr: ch.attr, before: ch.before, after: ch.after, context: snippet(ch.right ?? ch.left, 60) };
     if (ch.what === 'moved') return { context: snippet(ch.right ?? ch.left) };
+    if (ch.what === 'column') {
+      const n = ch.type === 'added' ? ch.right : ch.left;
+      return { column: ch.count, context: [n, ...ch.extra.map((x) => x.node)].map((x) => snippet(x, 20)).join(' · ') };
+    }
     return { context: snippet(ch.type === 'deleted' ? ch.left : ch.right) };
   }
 
@@ -365,7 +453,12 @@ export function createCompare(options) {
     if (cs.nodes.length !== snaps.right.nodes.length) console.warn('[sg-compare] 한 장 보기: 복사본 구조가 달라 일부 표시가 어긋날 수 있습니다');
     const inserts = [];
     const idx = new Map(snaps.right.nodes.map((n, i) => [n, i]));
-    for (const ch of state.changes) {
+    // 묶인 열(column)은 칸마다 하나씩 펼쳐서
+    const flatList = state.changes.flatMap((c) => !c.extra ? [c] : [
+      { ...c, what: 'node' },
+      ...c.extra.map((x) => ({ ...c, what: 'node', [c.type === 'added' ? 'right' : 'left']: x.node, gap: x.gap })),
+    ]);
+    for (const ch of flatList) {
       if (ch.what === 'text' && ch.type === 'modified' && ch.diffs && ch.right) {
         const i = idx.get(ch.right);
         const tn = cs.nodes[i];
@@ -422,7 +515,7 @@ export function createCompare(options) {
     get filter() { return state.filter; },
     get pages() { return state.pages; },
     get syncScroll() { return link ? link.enabled : false; },
-    set syncScroll(v) { if (link) link.enabled = v; emit('sync', !!v); },
+    set syncScroll(v) { if (link) link.enabled = v; updateScrollbar(); emit('sync', !!v); },
     setFilter(type) { state.filter = type && state.filter !== type ? type : null; emit('filter', state.filter); },
     run, goTo, next: () => step(1), prev: () => step(-1), renderRedline,
     on(ev, f) { if (!listeners.has(ev)) listeners.set(ev, []); listeners.get(ev).push(f); return () => api.off(ev, f); },
@@ -432,6 +525,7 @@ export function createCompare(options) {
       destroyed = true; runId++;
       clearTimeout(debounceTimer); clearTimeout(focusTimer);
       unwatch(); link?.destroy();
+      try { const sc = scrollers.left; (sc?.target.nodeType === 1 ? sc.target : sc?.doc.documentElement)?.removeAttribute('data-sgc-noscrollbar'); } catch {}
       marks.left.clear(); marks.right.clear();
       listeners.clear();
     },

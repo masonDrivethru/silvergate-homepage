@@ -2489,6 +2489,8 @@ var SgCompare = (() => {
 @keyframes sgc-pulse{0%{outline-color:rgba(37,99,235,1);outline-offset:8px}100%{outline-offset:3px}}
 ins.sgc-ins{background:rgba(34,197,94,.3);text-decoration:underline;text-decoration-color:#16a34a;text-decoration-thickness:2px;color:inherit}
 del.sgc-del{background:rgba(239,68,68,.24);text-decoration:line-through;text-decoration-color:#dc2626;text-decoration-thickness:2px;color:inherit}
+[data-sgc-noscrollbar]{scrollbar-width:none}
+[data-sgc-noscrollbar]::-webkit-scrollbar{display:none}
 @media print{[data-sgc-focus]{outline:none!important}}
 `;
 
@@ -2742,6 +2744,15 @@ del.sgc-del{background:rgba(239,68,68,.24);text-decoration:line-through;text-dec
       scrollers.right = makeScroller(root("right"), opt.rightScroller);
       link == null ? void 0 : link.destroy();
       link = opt.syncScroll === false ? null : linkScroll(scrollers.left, scrollers.right, () => anchors);
+      updateScrollbar();
+    }
+    function updateScrollbar() {
+      const sc = scrollers.left;
+      if (!sc) return;
+      const el = sc.target.nodeType === 1 ? sc.target : sc.doc.documentElement;
+      ensureMarkStyle(el.ownerDocument, name + "l");
+      if (opt.scrollbars !== "both" && (link == null ? void 0 : link.enabled)) el.setAttribute("data-sgc-noscrollbar", "");
+      else el.removeAttribute("data-sgc-noscrollbar");
     }
     async function run() {
       var _a;
@@ -2812,8 +2823,78 @@ del.sgc-del{background:rgba(239,68,68,.24);text-decoration:line-through;text-dec
         return id === runId && !destroyed;
       };
     }
+    function refine(list) {
+      var _a, _b;
+      for (const ch of list) {
+        if (ch.what !== "attr") continue;
+        const l = ((_a = ch.left) == null ? void 0 : _a.nodeType) === 1 ? ch.left : null, r = ((_b = ch.right) == null ? void 0 : _b.nodeType) === 1 ? ch.right : null;
+        if (ch.type === "added" || ch.type === "deleted" || ch.attr === "a" || ch.attr === "") {
+          ch.type = "modified";
+          const names = [...opt.attrs, "value"].filter((n) => {
+            var _a2, _b2;
+            return ((_a2 = l == null ? void 0 : l.getAttribute(n)) != null ? _a2 : null) !== ((_b2 = r == null ? void 0 : r.getAttribute(n)) != null ? _b2 : null);
+          });
+          ch.attr = names.join(", ") || ch.attr;
+          ch.before = names.map((n) => {
+            var _a2;
+            return (_a2 = l == null ? void 0 : l.getAttribute(n)) != null ? _a2 : "\u2013";
+          }).join(", ");
+          ch.after = names.map((n) => {
+            var _a2;
+            return (_a2 = r == null ? void 0 : r.getAttribute(n)) != null ? _a2 : "\u2013";
+          }).join(", ");
+        }
+      }
+      const byHash = /* @__PURE__ */ new Map();
+      for (const ch of list) if (ch.type === "deleted" && ch.what === "node" && ch.h) {
+        if (!byHash.has(ch.h)) byHash.set(ch.h, []);
+        byHash.get(ch.h).push(ch);
+      }
+      const drop = /* @__PURE__ */ new Set();
+      for (const ch of list) {
+        if (ch.type !== "added" || ch.what !== "node" || !ch.h) continue;
+        const cand = byHash.get(ch.h);
+        const del = cand == null ? void 0 : cand.shift();
+        if (!del) continue;
+        del.type = "moved";
+        del.what = "moved";
+        del.right = ch.right;
+        del.gap = null;
+        del.page = { left: del.page.left, right: ch.page.right };
+        drop.add(ch);
+      }
+      let out = list.filter((ch) => !drop.has(ch));
+      const groups = /* @__PURE__ */ new Map();
+      for (const ch of out) {
+        if (ch.type !== "added" && ch.type !== "deleted" || ch.what !== "node") continue;
+        const n = ch.type === "added" ? ch.right : ch.left;
+        if ((n == null ? void 0 : n.nodeType) !== 1 || n.localName !== "td" && n.localName !== "th") continue;
+        const table = n.closest("table");
+        if (!table) continue;
+        const key = ch.type + "|" + n.cellIndex;
+        let byTable = groups.get(table);
+        if (!byTable) groups.set(table, byTable = /* @__PURE__ */ new Map());
+        if (!byTable.has(key)) byTable.set(key, []);
+        byTable.get(key).push(ch);
+      }
+      const merged = /* @__PURE__ */ new Set();
+      for (const byTable of groups.values()) for (const cells of byTable.values()) {
+        if (cells.length < 2) continue;
+        const head = cells[0];
+        head.what = "column";
+        head.extra = cells.slice(1).map((c) => ({ node: c.type === "added" ? c.right : c.left, gap: c.gap }));
+        head.count = cells.length;
+        for (const c of cells.slice(1)) merged.add(c);
+      }
+      out = out.filter((ch) => !merged.has(ch));
+      out.forEach((ch, i) => {
+        ch.index = i;
+        delete ch.h;
+      });
+      return out;
+    }
     async function apply(out, id) {
-      var _a, _b, _c, _d, _e, _f;
+      var _a, _b, _c, _d, _e, _f, _g;
       const tick = slicer(id);
       const list = [];
       const pgL = pageIndex("left"), pgR = pageIndex("right");
@@ -2853,21 +2934,24 @@ del.sgc-del{background:rgba(239,68,68,.24);text-decoration:line-through;text-dec
           ch.left = L.node;
           ch.right = R.node;
         }
+        if (ch.what === "node") ch.h = (_e = L.node ? L.obj : R.obj) == null ? void 0 : _e.h;
         ch.page = {
-          left: pgL && ch.left ? pgL(ch.left) : pgL && ((_e = ch.gap) == null ? void 0 : _e.side) === "left" ? pgL(ch.gap.node) : null,
-          right: pgR && ch.right ? pgR(ch.right) : pgR && ((_f = ch.gap) == null ? void 0 : _f.side) === "right" ? pgR(ch.gap.node) : null
+          left: pgL && ch.left ? pgL(ch.left) : pgL && ((_f = ch.gap) == null ? void 0 : _f.side) === "left" ? pgL(ch.gap.node) : null,
+          right: pgR && ch.right ? pgR(ch.right) : pgR && ((_g = ch.gap) == null ? void 0 : _g.side) === "right" ? pgR(ch.gap.node) : null
         };
-        ch.text = describe(ch);
         list.push(ch);
       }
+      const final = refine(list);
+      for (const ch of final) ch.text = describe(ch);
       marks.left.clear();
       marks.right.clear();
-      for (const ch of list) paint(ch);
+      for (const ch of final) paint(ch);
       marks.left.flush();
       marks.right.flush();
-      state.changes = list;
-      state.stats = out.stats;
-      state.current = list.length ? Math.min(Math.max(state.current, -1), list.length - 1) : -1;
+      state.changes = final;
+      state.stats = { added: 0, modified: 0, deleted: 0, moved: 0 };
+      for (const ch of final) state.stats[ch.type]++;
+      state.current = final.length ? Math.min(Math.max(state.current, -1), final.length - 1) : -1;
       const side = (sd) => {
         const els = snaps[sd].anchors.map((i) => snaps[sd].nodes[i]);
         if (!opt.page) return { els };
@@ -2917,6 +3001,13 @@ del.sgc-del{background:rgba(239,68,68,.24);text-decoration:line-through;text-dec
     function paint(ch) {
       var _a;
       const t = ch.type;
+      if (ch.extra) {
+        const side = t === "added" ? "right" : "left";
+        for (const x of ch.extra) {
+          paint({ ...ch, extra: null, what: "node", [side]: x.node, gap: x.gap });
+        }
+        return paint({ ...ch, extra: null, what: "node" });
+      }
       if (ch.what === "text" && t === "modified" && ch.diffs) {
         for (const side of ["left", "right"]) {
           const tn = ch[side];
@@ -2964,6 +3055,10 @@ del.sgc-del{background:rgba(239,68,68,.24);text-decoration:line-through;text-dec
       if (ch.what === "text" && ch.diffs) return { diffs: trimDiffs(ch.diffs) };
       if (ch.what === "attr") return { attr: ch.attr, before: ch.before, after: ch.after, context: snippet((_a = ch.right) != null ? _a : ch.left, 60) };
       if (ch.what === "moved") return { context: snippet((_b = ch.right) != null ? _b : ch.left) };
+      if (ch.what === "column") {
+        const n = ch.type === "added" ? ch.right : ch.left;
+        return { column: ch.count, context: [n, ...ch.extra.map((x) => x.node)].map((x) => snippet(x, 20)).join(" \xB7 ") };
+      }
       return { context: snippet(ch.type === "deleted" ? ch.left : ch.right) };
     }
     function elOf(n) {
@@ -3048,7 +3143,11 @@ del.sgc-del{background:rgba(239,68,68,.24);text-decoration:line-through;text-dec
       if (cs.nodes.length !== snaps.right.nodes.length) console.warn("[sg-compare] \uD55C \uC7A5 \uBCF4\uAE30: \uBCF5\uC0AC\uBCF8 \uAD6C\uC870\uAC00 \uB2EC\uB77C \uC77C\uBD80 \uD45C\uC2DC\uAC00 \uC5B4\uAE0B\uB0A0 \uC218 \uC788\uC2B5\uB2C8\uB2E4");
       const inserts = [];
       const idx = new Map(snaps.right.nodes.map((n, i) => [n, i]));
-      for (const ch of state.changes) {
+      const flatList = state.changes.flatMap((c) => !c.extra ? [c] : [
+        { ...c, what: "node" },
+        ...c.extra.map((x) => ({ ...c, what: "node", [c.type === "added" ? "right" : "left"]: x.node, gap: x.gap }))
+      ]);
+      for (const ch of flatList) {
         if (ch.what === "text" && ch.type === "modified" && ch.diffs && ch.right) {
           const i = idx.get(ch.right);
           const tn = cs.nodes[i];
@@ -3140,6 +3239,7 @@ del.sgc-del{background:rgba(239,68,68,.24);text-decoration:line-through;text-dec
       },
       set syncScroll(v) {
         if (link) link.enabled = v;
+        updateScrollbar();
         emit("sync", !!v);
       },
       setFilter(type) {
@@ -3167,12 +3267,18 @@ del.sgc-del{background:rgba(239,68,68,.24);text-decoration:line-through;text-dec
         emit("update", api);
       },
       destroy() {
+        var _a;
         destroyed = true;
         runId++;
         clearTimeout(debounceTimer);
         clearTimeout(focusTimer);
         unwatch();
         link == null ? void 0 : link.destroy();
+        try {
+          const sc = scrollers.left;
+          (_a = (sc == null ? void 0 : sc.target.nodeType) === 1 ? sc.target : sc == null ? void 0 : sc.doc.documentElement) == null ? void 0 : _a.removeAttribute("data-sgc-noscrollbar");
+        } catch {
+        }
         marks.left.clear();
         marks.right.clear();
         listeners.clear();
@@ -3222,6 +3328,8 @@ del.sgc-del{background:rgba(239,68,68,.24);text-decoration:line-through;text-dec
       prev: "\uC774\uC804 \uBCC0\uACBD",
       next: "\uB2E4\uC74C \uBCC0\uACBD",
       filterHint: "\uB20C\uB7EC\uC11C \uC774 \uC885\uB958\uB9CC \uBCF4\uAE30",
+      column: (n) => `\uD45C \uC5F4 ${n}\uCE78`,
+      attrNames: { colspan: "\uAC00\uB85C \uBCD1\uD569(colspan)", rowspan: "\uC138\uB85C \uBCD1\uD569(rowspan)", value: "\uC785\uB825\uAC12", src: "\uADF8\uB9BC", href: "\uB9C1\uD06C" },
       nodes: "\uC77D\uC740 \uC694\uC18C",
       took: (s) => `\uBE44\uAD50 ${s}\uCD08`,
       page: (p) => `${p}\uCABD`,
@@ -3244,6 +3352,8 @@ del.sgc-del{background:rgba(239,68,68,.24);text-decoration:line-through;text-dec
       prev: "Previous change",
       next: "Next change",
       filterHint: "Show only this type",
+      column: (n) => `Table column (${n} cells)`,
+      attrNames: { colspan: "Merge (colspan)", rowspan: "Merge (rowspan)", value: "Input value", src: "Image", href: "Link" },
       nodes: "Nodes",
       took: (s) => `${s}s`,
       page: (p) => `p.${p}`,
@@ -3384,7 +3494,7 @@ del.sgc-del{background:rgba(239,68,68,.24);text-decoration:line-through;text-dec
     const ul = h(doc, "ol", { class: "sgc-list-items" });
     el.replaceChildren(head, ul);
     function item(c) {
-      var _a2, _b, _c;
+      var _a2, _b, _c, _d;
       const where = [];
       if (c.page.left || c.page.right) {
         const p = (_a2 = c.page.right) != null ? _a2 : c.page.left;
@@ -3394,8 +3504,15 @@ del.sgc-del{background:rgba(239,68,68,.24);text-decoration:line-through;text-dec
       if (c.text.diffs) {
         body.push(h(doc, "span", { class: "sgc-li-diff" }, c.text.diffs.map(([op, t]) => op === 0 ? t : h(doc, op < 0 ? "del" : "ins", {}, t))));
       } else if (c.what === "attr") {
+        const an = String((_b = c.text.attr) != null ? _b : "").split(", ").map((a) => {
+          var _a3, _b2;
+          return (_b2 = (_a3 = m.attrNames) == null ? void 0 : _a3[a]) != null ? _b2 : a;
+        }).join(", ");
         body.push(h(doc, "span", { class: "sgc-li-ctx" }, c.text.context || ""));
-        body.push(h(doc, "span", { class: "sgc-li-attr" }, `${c.text.attr}: `, h(doc, "del", {}, String((_b = c.text.before) != null ? _b : "")), " \u2192 ", h(doc, "ins", {}, String((_c = c.text.after) != null ? _c : ""))));
+        body.push(h(doc, "span", { class: "sgc-li-attr" }, `${an}: `, h(doc, "del", {}, String((_c = c.text.before) != null ? _c : "")), " \u2192 ", h(doc, "ins", {}, String((_d = c.text.after) != null ? _d : ""))));
+      } else if (c.what === "column") {
+        body.push(h(doc, "span", { class: "sgc-li-attr" }, m.column(c.text.column)));
+        body.push(h(doc, "span", { class: "sgc-li-ctx" }, c.text.context || ""));
       } else {
         body.push(h(doc, "span", { class: "sgc-li-ctx" }, c.text.context || m.empty));
       }

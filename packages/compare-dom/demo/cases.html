@@ -1,0 +1,40 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>어려운 경우 확인</title>
+<style>body{font:14px sans-serif;margin:12px} .row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px} .sc{border:1px solid #ccc;padding:8px;height:260px;overflow:auto} table{border-collapse:collapse;width:100%} td,th{border:1px solid #999;padding:4px 6px}</style></head>
+<body><div id="cases"></div>
+<script src="../dist/sg-compare.js"></script>
+<script>
+var T = function (rows) { return '<table><tbody>' + rows.map(function (r) { return '<tr>' + r.map(function (c) { return typeof c === 'string' ? '<td>' + c + '</td>' : '<td' + (c.cs ? ' colspan="' + c.cs + '"' : '') + (c.rs ? ' rowspan="' + c.rs + '"' : '') + '>' + c.t + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody></table>'; };
+var base = [['항목', '기준', '단위'], ['전도도', '≤ 1.3', 'µS/cm'], ['TOC', '≤ 500', 'ppb'], ['온도', '60 ~ 70', '°C'], ['육안', '잔류물 없음', '-']];
+window.CASES = {
+  A_column_added: [T(base), T(base.map(function (r, i) { return [r[0], i ? '확인자' : '담당', r[1], r[2]]; }))],
+  B_colspan_merge: [T(base), T([base[0], base[1], [{ t: 'TOC ≤ 500 ppb', cs: 3 }], base[3], base[4]])],
+  B_rowspan_merge: [T(base), T([base[0], [{ t: '전도도·TOC', rs: 2 }, '≤ 1.3', 'µS/cm'], ['≤ 500', 'ppb'], base[3], base[4]])],
+  C_table_to_list: [T(base), '<ul>' + base.slice(1).map(function (r) { return '<li>' + r.join(' ') + '</li>'; }).join('') + '</ul>'],
+  C_rows_shuffled: [T(base), T([base[0], base[3], base[1], base[4], base[2]])],
+};
+window.runCase = async function (name) {
+  var host = document.getElementById('cases');
+  var row = document.createElement('div'); row.className = 'row';
+  var L = document.createElement('div'), R = document.createElement('div'); L.className = R.className = 'sc';
+  L.innerHTML = CASES[name][0]; R.innerHTML = CASES[name][1];
+  row.append(L, R); host.append(row);
+  var c = SgCompare.createCompare({ left: L, right: R, auto: false, worker: false });
+  await c.run();
+  return { name: name, stats: c.stats, list: c.changes.map(function (x) { return x.type + ':' + x.what + ':' + (x.text.context || (x.text.diffs || []).map(function (d) { return (d[0] < 0 ? '-' : d[0] > 0 ? '+' : '') + d[1]; }).join('') || (x.attr + ' ' + x.before + '→' + x.after)); }) };
+};
+// D: 연속으로 다시 그려지기
+window.runRepeat = async function () {
+  var row = document.createElement('div'); row.className = 'row';
+  var L = document.createElement('div'), R = document.createElement('div'); L.className = R.className = 'sc';
+  L.innerHTML = T(base); R.innerHTML = T(base);
+  row.append(L, R); document.getElementById('cases').append(row);
+  var runs = 0, updates = 0;
+  var c = SgCompare.createCompare({ left: L, right: R, watch: true, worker: false });
+  c.on('start', function () { runs++; }); c.on('update', function () { updates++; });
+  await new Promise(function (r) { setTimeout(r, 500); });
+  runs = 0; updates = 0;
+  for (var i = 1; i <= 10; i++) { R.querySelectorAll('td')[4].textContent = '≤ ' + (500 - i * 10); await new Promise(function (r) { setTimeout(r, 50); }); }
+  await new Promise(function (r) { setTimeout(r, 900); });
+  return { runs: runs, updates: updates, final: c.changes.map(function (x) { return (x.text.diffs || []).map(function (d) { return (d[0] < 0 ? '-' : d[0] > 0 ? '+' : '') + d[1]; }).join(''); }) };
+};
+</script></body></html>

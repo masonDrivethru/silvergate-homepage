@@ -58,7 +58,22 @@ ID가 없어도 동작합니다: 똑같은 덩어리를 기준점으로 잡고, 
 
 비교에서 빼고 싶은 곳(인쇄 시각, 조회한 사람 등)에는 `data-sgc-ignore` 를 달거나 `ignore: '.print-time'` 옵션을 씁니다.
 
-## 4. 속도: 수천 쪽에서도 가볍게
+## 4. 어려운 경우는 이렇게 표시합니다
+
+| 경우 | 표시 |
+| --- | --- |
+| 표에 열이 생기거나 없어짐 | 칸마다 색을 칠하고, 변경 목록에는 "표 열 N칸" 한 건 |
+| 칸 병합 (colspan·rowspan) | 합쳐진 칸은 "수정: 가로/세로 병합 1 → 3", 없어진 칸은 "삭제" |
+| 표 줄·문단 순서만 바뀜 | 내용이 똑같으면 "이동" (ID 가 없어도) |
+| 구조가 완전히 바뀜 (표 → 목록 등) | 이전 덩어리 "삭제" + 새 덩어리 "추가" |
+| 화면이 연속으로 여러 번 다시 그려짐 (`watch: true`) | 0.3초 조용해질 때까지 기다렸다가 한 번만 비교. 비교 중에 또 바뀌면 하던 비교는 버리고 새로 |
+| 보이는 줄만 그리는 화면 (가상 스크롤) | 화면에 없는 부분은 비교할 수 없음 → 이런 화면은 데이터끼리 비교(`@silvergate/compare-core`) |
+
+확인 페이지: `demo/cases.html`
+
+**스크롤바:** 스크롤 맞춤이 켜져 있으면 오른쪽 스크롤바 하나만 보입니다 (왼쪽은 숨김, 휠·터치는 그대로 됨). 맞춤을 끄면 양쪽 다 보입니다. 늘 양쪽 다 보이게 하려면 `scrollbars: 'both'`.
+
+## 5. 속도: 수천 쪽에서도 가볍게
 
 | 무엇이 | 어떻게 가볍게 |
 | --- | --- |
@@ -81,17 +96,17 @@ ID가 없어도 동작합니다: 똑같은 덩어리를 기준점으로 잡고, 
 
 측정 페이지: `demo/bench.html?pages=3000&cv=1` (저장소에서 `npx serve packages/compare-dom` 후 열기).
 
-## 5. 옵션 요약
+## 6. 옵션 요약
 
-`left`, `right`, `leftScroller`, `rightScroller`, `page`, `attrs`(비교할 속성, 기본 src·href·alt·colspan·rowspan·type + 입력칸 값), `ignore`, `keyAttrs`, `worker`('auto'), `watch`, `debounce`, `syncScroll`, `auto`. 자세한 타입은 `src/index.d.ts`.
+`left`, `right`, `leftScroller`, `rightScroller`, `page`, `attrs`(비교할 속성, 기본 src·href·alt·colspan·rowspan·type + 입력칸 값), `ignore`, `keyAttrs`, `worker`('auto'), `watch`, `debounce`, `syncScroll`, `scrollbars`('one' | 'both'), `auto`. 자세한 타입은 `src/index.d.ts`.
 
 색은 CSS 변수로 바꿀 수 있습니다: `--sgc-ins-bg`, `--sgc-del-bg`, `--sgc-ins-line`, `--sgc-del-line`, `--sgc-mod-line`, `--sgc-focus` 등.
 
-## 6. 브라우저
+## 7. 브라우저
 
 Chrome·Edge 105+, Safari 17.2+, Firefox 140+ 에서 글자 단위 표시까지 됩니다. 그보다 오래된 브라우저에서는 글자 대신 바뀐 문단 전체에 색이 들어갑니다.
 
-## 7. 개발
+## 8. 개발
 
 ```
 npm test            # 엔진 단위 테스트 (packages/compare-core)

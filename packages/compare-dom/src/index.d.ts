@@ -29,6 +29,8 @@ export interface CompareOptions {
   debounce?: number;
   /** 좌우 스크롤 맞춤. 기본 true */
   syncScroll?: boolean;
+  /** 'one' (기본): 스크롤 맞춤 중에는 오른쪽 스크롤바만 보임. 'both': 늘 양쪽 */
+  scrollbars?: 'one' | 'both';
   /** 만들자마자 비교. 기본 true */
   auto?: boolean;
   /** 엔진(compare-core) 규칙 덮어쓰기 (고급) */
@@ -41,7 +43,10 @@ export interface ChangeItem {
   index: number;
   type: ChangeType;
   /** text = 글자 수정, attr = 속성·태그·입력값, node = 덩어리 추가/삭제, moved = 순서 */
-  what: 'text' | 'attr' | 'node' | 'moved';
+  what: 'text' | 'attr' | 'node' | 'moved' | 'column';
+  /** what = 'column' 일 때 같은 열의 나머지 칸 */
+  extra?: Array<{ node: Node; gap: ChangeItem['gap'] }>;
+  count?: number;
   path: string;
   /** 왼쪽·오른쪽 실제 DOM 노드 (없는 쪽은 null) */
   left: Node | null;

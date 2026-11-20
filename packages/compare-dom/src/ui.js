@@ -111,8 +111,12 @@ export function mountChangeList(el, ctrl, o = {}) {
       body.push(h(doc, 'span', { class: 'sgc-li-diff' }, c.text.diffs.map(([op, t]) =>
         op === 0 ? t : h(doc, op < 0 ? 'del' : 'ins', {}, t))));
     } else if (c.what === 'attr') {
+      const an = String(c.text.attr ?? '').split(', ').map((a) => m.attrNames?.[a] ?? a).join(', ');
       body.push(h(doc, 'span', { class: 'sgc-li-ctx' }, c.text.context || ''));
-      body.push(h(doc, 'span', { class: 'sgc-li-attr' }, `${c.text.attr}: `, h(doc, 'del', {}, String(c.text.before ?? '')), ' → ', h(doc, 'ins', {}, String(c.text.after ?? ''))));
+      body.push(h(doc, 'span', { class: 'sgc-li-attr' }, `${an}: `, h(doc, 'del', {}, String(c.text.before ?? '')), ' → ', h(doc, 'ins', {}, String(c.text.after ?? ''))));
+    } else if (c.what === 'column') {
+      body.push(h(doc, 'span', { class: 'sgc-li-attr' }, m.column(c.text.column)));
+      body.push(h(doc, 'span', { class: 'sgc-li-ctx' }, c.text.context || ''));
     } else {
       body.push(h(doc, 'span', { class: 'sgc-li-ctx' }, c.text.context || m.empty));
     }
