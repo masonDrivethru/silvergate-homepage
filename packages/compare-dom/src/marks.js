@@ -123,7 +123,7 @@ export function ensureMarkStyle(doc, name) {
 const highlightCss = (n) => `
 ::highlight(${n}-ins){background-color:var(--sgc-ins-bg,rgba(34,197,94,.26));color:inherit}
 ::highlight(${n}-del){background-color:var(--sgc-del-bg,rgba(239,68,68,.2));color:inherit;text-decoration:line-through;text-decoration-color:var(--sgc-del-line,rgba(220,38,38,.8));text-decoration-thickness:1px}
-::highlight(${n}-focus){background-color:var(--sgc-focus-bg,rgba(37,99,235,.28))}
+::highlight(${n}-focus){background-color:var(--sgc-focus-bg,rgba(59,130,246,.18))}
 `;
 
 /* 읽기 편하게: 테두리 없이 옅은 배경 하나 + 필요한 곳만 가는 막대 */
@@ -139,9 +139,11 @@ const MARK_CSS = `
 [data-sgc-gap="before"]{box-shadow:0 -2px 0 0 var(--sgc-gap-line,rgba(220,38,38,.55))}
 [data-sgc-gap="end"]{box-shadow:0 2px 0 0 var(--sgc-gap-line,rgba(220,38,38,.55))}
 [data-sgc-gap][data-sgc-side="left"]{--sgc-gap-line:rgba(22,163,74,.6)}
-[data-sgc-focus]{outline:2px solid var(--sgc-focus,#2563eb)!important;outline-offset:2px;animation:sgc-pulse 1.2s ease-out 1}
-@keyframes sgc-pulse{0%{outline-offset:7px}100%{outline-offset:2px}}
-@media (prefers-reduced-motion:reduce){[data-sgc-focus]{animation:none}}
+@property --sgc-flash{syntax:'<number>';inherits:false;initial-value:0}
+[data-sgc-focus]{--sgc-flash:.5;--sgc-flash-rgb:var(--sgc-focus-rgb,59 130 246);background-image:linear-gradient(rgb(var(--sgc-flash-rgb) / calc(var(--sgc-flash) * .26)),rgb(var(--sgc-flash-rgb) / calc(var(--sgc-flash) * .26)))!important;animation:sgc-flash 1.6s ease-in-out 1 both;border-radius:3px}
+@keyframes sgc-flash{0%{--sgc-flash:0}14%{--sgc-flash:1}36%{--sgc-flash:.2}56%{--sgc-flash:.85}100%{--sgc-flash:0}}
+@media (prefers-reduced-motion:reduce){[data-sgc-focus]{animation:sgc-flash-soft 1.6s ease-out 1 both}}
+@keyframes sgc-flash-soft{0%{--sgc-flash:.7}100%{--sgc-flash:0}}
 ins.sgc-ins{background:rgba(34,197,94,.26);text-decoration:none;color:inherit}
 del.sgc-del{background:rgba(239,68,68,.18);text-decoration:line-through;text-decoration-color:rgba(220,38,38,.8);text-decoration-thickness:1px;color:inherit}
 .sgc-spacer{display:block;box-sizing:border-box;position:relative;margin:0;padding:0;list-style:none;background:repeating-linear-gradient(135deg,rgba(100,116,139,.09) 0 6px,transparent 6px 12px);border:1px dashed rgba(100,116,139,.4);border-radius:3px}
@@ -151,5 +153,5 @@ tr.sgc-spacer>td{position:relative;padding:0!important;background:repeating-line
 tr.sgc-spacer::after{content:none}
 [data-sgc-noscrollbar]{scrollbar-color:transparent transparent}
 [data-sgc-noscrollbar]::-webkit-scrollbar-thumb,[data-sgc-noscrollbar]::-webkit-scrollbar-track{background:transparent}
-@media print{[data-sgc-focus]{outline:none!important}}
+@media print{[data-sgc-focus]{background-image:none!important}}
 `;

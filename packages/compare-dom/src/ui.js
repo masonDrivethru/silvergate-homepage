@@ -286,7 +286,8 @@ const UI_CSS = `
 .sgc-list-items{list-style:none;margin:0;padding:6px;overflow:auto;flex:1;min-height:0}
 .sgc-li{display:block;width:100%;text-align:left;padding:8px 10px;margin:0 0 1px;border:1px solid transparent;border-radius:8px;background:transparent;color:inherit;font:inherit;cursor:pointer}
 .sgc-li:hover{background:var(--sgc-bg2)}
-.sgc-li[aria-current="true"]{border-color:var(--sgc-acc);background:color-mix(in srgb,var(--sgc-acc) 8%,var(--sgc-bg))}
+.sgc-li[aria-current="true"]{background:color-mix(in srgb,var(--sgc-acc) 10%,var(--sgc-bg))}
+.sgc-li:focus-visible{outline:2px solid var(--sgc-acc);outline-offset:-2px}
 .sgc-li-top{display:flex;align-items:center;gap:8px;margin-bottom:4px}
 .sgc-li-where{color:var(--sgc-mut);font-size:12px}
 .sgc-li-no{display:none}

@@ -757,7 +757,8 @@ export function createCompare(options) {
       }
       // 표 칸 하나가 생기거나 없어진 것은 반대쪽 빈자리 줄을 긋지 않는다 (열 추가 때 줄마다 선이 생겨 어지러움)
       const isCell = n?.nodeType === 1 && (n.localName === 'td' || n.localName === 'th');
-      if (ch.gap?.node && !isCell) {
+      // 높이 맞추기가 켜져 있으면 빈 칸(빗금)이 자리를 보여 주므로 빈자리 줄은 긋지 않는다
+      if (ch.gap?.node && !isCell && opt.align === false) {
         const g = ch.gap.node.nodeType === 1 ? ch.gap.node : ch.gap.node.parentElement;
         marks[ch.gap.side].attr(g, 'data-sgc-gap', ch.gap.end ? 'end' : 'before');
         marks[ch.gap.side].attr(g, 'data-sgc-side', ch.gap.side);

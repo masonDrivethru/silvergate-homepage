@@ -1062,6 +1062,8 @@ html[data-motion="calm"] body::before { animation: none; }
 html[data-motion="calm"] .cursor-light, html[data-motion="calm"] .sprog,
 html[data-motion="calm"] .table-glass::before, html[data-motion="calm"] .form::after, html[data-motion="calm"] .btn--silver::after { display: none; }
 html[data-motion="calm"] main *, html[data-motion="calm"] main *::before, html[data-motion="calm"] main *::after { animation: none !important; transition-property: color, background-color, border-color !important; transition-duration: .2s !important; transition-delay: 0s !important; }
+/* 비교 화면: 변경 위치로 이동했을 때 잠깐 반짝이는 표시는 예외로 허용 (모듈의 sgc-flash) */
+html[data-motion="calm"] main [data-sgc-focus] { animation: sgc-flash 1.6s ease-in-out 1 both !important; }
 html[data-motion="calm"] main :is(.reveal, .project, .industries li, .steps li, .table-glass tbody tr, .table-glass .ok, .facts div, .client, .faq__item, .audit__rows li) { opacity: 1; transform: none; }
 html[data-motion="calm"] main .facts div + div { background-size: 100% 1px; }
 html[data-motion="calm"] main .industries .icon { stroke-dashoffset: 0; filter: none; }
