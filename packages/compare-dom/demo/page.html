@@ -52,6 +52,8 @@ select{height:36px;border:1px solid var(--line);border-radius:8px;background:var
 .stage{--sgc-height:min(78vh,900px)}
 .doc-scroll{flex:1;min-height:0;overflow:auto;background:var(--desk);padding:16px 8px}
 .doc-zoom{zoom:var(--z,1)}
+.doc-desk{padding:16px 0}
+.doc-desk .sgc-col{padding:0 6px}
 .perf{width:100%;border-collapse:collapse;font:13px/1.4 var(--f-ui);font-variant-numeric:tabular-nums}
 .perf-wrap{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:10px}
 .perf th,.perf td{padding:9px 12px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
@@ -167,31 +169,49 @@ select{height:36px;border:1px solid var(--line);border-radius:8px;background:var
 
   // ---------- 요소 모드 비교 화면 (Vue·React·성능 탭 공통) ----------
   function el(tag, cls, kids) { var e = document.createElement(tag); if (cls) e.className = cls; (kids || []).forEach(function (k) { e.append(k); }); return e; }
-  function pane(badge, badgeCls, label, noZoom) {
-    var mount = el('div');
-    var zoom = el('div', 'doc-zoom doc-root', [mount]);
-    var scroll = el('div', 'doc-scroll', [zoom]);
-    var head = el('header', 'sgc-pane-head', [el('span', 'sgc-badge ' + badgeCls, [badge]), label]);
-    var p = el('section', 'sgc-pane', [head, scroll]);
-    if (!noZoom) new ResizeObserver(function () { zoom.style.setProperty('--z', Math.min(1, (scroll.clientWidth - 16) / 794).toFixed(3)); }).observe(scroll);
-    return { el: p, mount: mount, scroll: scroll };
-  }
+  /**
+   * 비교 화면 (요소 모드): 두 문서를 한 스크롤 영역(desk)에 나란히 → 좌우가 한 장처럼 함께 움직임.
+   * 휴대폰은 이전/새 버전 버튼으로 한쪽씩. 한 장 보기는 따로.
+   */
   function stage(host, leftLabel, rightLabel, noZoom) {
-    var L = pane('이전', 'sgc-badge-old', leftLabel, noZoom), R = pane('새 버전', 'sgc-badge-new', rightLabel, noZoom), X = pane('한 장 보기', 'sgc-badge-new', leftLabel + ' → ' + rightLabel, noZoom);
-    X.el.hidden = true;
+    function col(side) {
+      var mount = el('div');
+      var zoom = el('div', 'doc-zoom doc-root', [mount]);
+      return { col: el('div', 'sgc-col sgc-col--' + side, [zoom]), zoom: zoom, mount: mount };
+    }
+    var L = col('left'), R = col('right');
+    var desk = el('div', 'sgc-shared doc-desk'); desk.dataset.phone = 'right'; desk.tabIndex = 0;
+    desk.append(L.col, R.col);
+    function head(side, badge, cls, label) {
+      var b = el('button', 'sgc-pane-head', [el('span', 'sgc-badge ' + cls, [badge]), label]);
+      b.type = 'button'; b.dataset.side = side; b.setAttribute('aria-pressed', side === 'right' ? 'true' : 'false');
+      b.onclick = function () { desk.dataset.phone = side; heads.querySelectorAll('button').forEach(function (x) { x.setAttribute('aria-pressed', x.dataset.side === side ? 'true' : 'false'); }); };
+      return b;
+    }
+    var heads = el('div', 'sgc-heads', [head('left', '이전', 'sgc-badge-old', leftLabel), head('right', '새 버전', 'sgc-badge-new', rightLabel)]);
+    var both = el('section', 'sgc-pane sgc-both', [heads, desk]);
+    var X = col('x'), xs = el('div', 'doc-scroll', [X.zoom]);
+    var xp = el('section', 'sgc-pane', [el('header', 'sgc-pane-head', [el('span', 'sgc-badge sgc-badge-new', ['한 장 보기']), leftLabel + ' → ' + rightLabel]), xs]);
+    xp.hidden = true;
     var bar = el('div'), list = el('aside');
-    var root = el('div', 'sgc-viewer', [bar, el('div', 'sgc-body', [el('div', 'sgc-panes', [L.el, R.el, X.el]), list])]);
+    var root = el('div', 'sgc-viewer', [bar, el('div', 'sgc-body', [el('div', 'sgc-panes sgc-panes--one', [both, xp]), list])]);
     host.replaceChildren(root);
+    if (!noZoom) new ResizeObserver(function () {
+      var cols = getComputedStyle(desk).gridTemplateColumns.split(' ').filter(Boolean).length || 2;
+      var z = Math.min(1, (desk.clientWidth / cols - 16) / 794).toFixed(3);
+      [L.zoom, R.zoom].forEach(function (x) { x.style.setProperty('--z', z); });
+      X.zoom.style.setProperty('--z', Math.min(1, (xs.clientWidth - 16) / 794).toFixed(3));
+    }).observe(root);
     return {
-      left: L, right: R,
+      left: { mount: L.mount, scroll: desk }, right: { mount: R.mount, scroll: desk },
       attach: function (ctrl) {
         var dirty = true;
         function mode(m) {
           var red = m === 'redline';
-          L.el.hidden = red; R.el.hidden = red; X.el.hidden = !red; root.dataset.mode = m;
+          both.hidden = red; xp.hidden = !red; root.dataset.mode = m;
           if (red && dirty) { ctrl.renderRedline(X.mount); dirty = false; }
         }
-        ctrl.on('update', function () { dirty = true; if (!X.el.hidden) mode('redline'); });
+        ctrl.on('update', function () { dirty = true; if (!xp.hidden) mode('redline'); });
         mode('side');
         var tb = C.mountToolbar(bar, ctrl, { locale: 'ko', modes: true, onMode: mode });
         var cl = C.mountChangeList(list, ctrl, { locale: 'ko' });

@@ -17,7 +17,9 @@
   SgCompare.mountViewer(document.getElementById('cmp'), {
     left:  { url: '/sop/view.jsp?id=14&ver=3', label: 'SOP-EQ-014 v3' },
     right: { url: '/sop/view.jsp?id=14&ver=4', label: 'SOP-EQ-014 v4' },
-    page: '.page',          // 쪽 요소 (있으면 "n쪽" 표시 + 스크롤을 쪽 단위로 가볍게 맞춤)
+    page: '.page',          // 쪽 요소 (있으면 "n쪽" 표시 + 높이 맞추기를 보이는 쪽만)
+    // layout: 'shared' (기본) — 두 iframe 을 문서 높이만큼 늘려 한 스크롤 영역에 나란히 (좌우가 한 장처럼 움직임)
+    //         'split'          — iframe 마다 따로 스크롤 + 스크롤 맞춤 (수천 쪽짜리 서버 화면은 이쪽이 가벼움)
     locale: 'ko',
   });
 </script>

@@ -14,9 +14,9 @@ export function makeScroller(root, given) {
       if ((oy === 'auto' || oy === 'scroll' || oy === 'overlay') && p !== doc.body && p !== doc.documentElement) { el = p; break; }
     }
   }
-  if (el && el !== win && el !== doc.scrollingElement) {
+  if (el && el !== win && el !== doc.scrollingElement && el.nodeType === 1) {
     return {
-      target: el, doc,
+      target: el, doc: el.ownerDocument,
       get top() { return el.scrollTop; },
       set top(v) { el.scrollTop = v; },
       viewTop: () => el.getBoundingClientRect().top,
@@ -35,13 +35,29 @@ export function makeScroller(root, given) {
   };
 }
 
+/**
+ * el 의 화면 위쪽 위치를 doc(스크롤 영역이 있는 문서) 기준으로.
+ * el 이 iframe 안에 있으면 iframe 위치를 더한다 (iframe 두 개를 한 스크롤 영역에 나란히 둘 때)
+ */
+export function topIn(el, doc) {
+  let top = el.getBoundingClientRect().top;
+  let w = el.ownerDocument.defaultView;
+  while (w && w.document !== doc && w.frameElement) {
+    const f = w.frameElement;
+    const cs = f.ownerDocument.defaultView.getComputedStyle(f);
+    top += f.getBoundingClientRect().top + (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.paddingTop) || 0);
+    w = w.parent;
+  }
+  return top;
+}
+
 /** 스크롤 영역 안에서 el 이 위에서 ratio 높이에 오게 */
 export function scrollIntoScroller(sc, el, ratio = 0.3, smooth = true) {
-  const r = el.getBoundingClientRect();
-  const top = sc.top + (r.top - sc.viewTop()) - sc.height() * ratio;
+  const top = sc.top + (topIn(el, sc.doc) - sc.viewTop()) - sc.height() * ratio;
   const t = sc.target;
   const v = Math.max(0, Math.min(top, sc.max()));
-  if (t.scrollTo) t.scrollTo({ top: v, behavior: smooth ? 'smooth' : 'auto' });
+  // smooth 가 아니면 페이지 CSS(scroll-behavior: smooth)와 상관없이 즉시
+  if (t.scrollTo) t.scrollTo({ top: v, behavior: smooth ? 'smooth' : 'instant' });
   else sc.top = v;
 }
 

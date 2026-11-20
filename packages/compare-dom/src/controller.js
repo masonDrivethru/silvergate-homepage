@@ -6,7 +6,7 @@ import { snapshot, snapshotAsync, resolveRoot, locate, normText, yieldToBrowser,
 import { diffTrees } from './engine.js';
 import { spawnWorker } from './spawn.js';
 import { SideMarks, ensureMarkStyle, sideSpans, blockOf, hasHighlightApi } from './marks.js';
-import { makeScroller, scrollIntoScroller, linkScroll } from './scroll.js';
+import { makeScroller, scrollIntoScroller, linkScroll, topIn } from './scroll.js';
 import { getMessages } from './messages.js';
 
 let seq = 0;
@@ -518,10 +518,12 @@ export function createCompare(options) {
       const scEl = sc ?? makeScroller(r).target;
       const pages = Array.from(r.querySelectorAll(opt.page));
       const idx = new Map(pages.map((p, i) => [p, i]));
+      // 스크롤 영역이 다른 문서(iframe 바깥)에 있으면 iframe 자기 화면 기준 (iframe 이 문서 높이만큼 늘어나 있으면 전부 보이는 것으로 봄)
+      const ioRoot = scEl && scEl.nodeType === 1 && scEl.ownerDocument === r.ownerDocument ? scEl : null;
       const io = new win.IntersectionObserver((entries) => {
         for (const e of entries) if (e.isIntersecting) queue.add(side + ':' + idx.get(e.target));
         drain();
-      }, { root: scEl && scEl.nodeType === 1 ? scEl : null, rootMargin: '150% 0px 150% 0px' });
+      }, { root: ioRoot, rootMargin: '150% 0px 150% 0px' });
       for (const p of pages) if (groups.has(side + ':' + idx.get(p))) io.observe(p);
       lazyIO.push(io);
     }
@@ -810,6 +812,8 @@ export function createCompare(options) {
     const token = ++goToken;
     if (!scrollers.left) setupScroll();
     link?.pause(2000);
+    clearTimeout(focusTimer);   // 앞에서 누른 변경의 "표시 지우기" 타이머가 새 표시를 지우지 않게
+    marks.left.setFocus([]); marks.right.setFocus([]);
     for (const el of focused) el.removeAttribute('data-sgc-focus');
     focused.length = 0;
     emit('focus', ch);
@@ -835,7 +839,7 @@ export function createCompare(options) {
     let anySmooth = false;
     for (const { side, block } of sides) {
       const sc = scrollers[side];
-      const dist = Math.abs(block.getBoundingClientRect().top - sc.viewTop());
+      const dist = Math.abs(topIn(block, sc.doc) - sc.viewTop());
       const soft = smooth && dist < sc.height() * 1.5 && !matchMedia?.('(prefers-reduced-motion: reduce)').matches;
       anySmooth ||= soft;
       scrollIntoScroller(sc, block, 0.3, soft);
@@ -863,7 +867,7 @@ export function createCompare(options) {
         for (const { side, block } of sides) {
           if (!block.isConnected) continue;
           const sc = scrollers[side];
-          const want = sc.top + (block.getBoundingClientRect().top - sc.viewTop()) - sc.height() * 0.3;
+          const want = sc.top + (topIn(block, sc.doc) - sc.viewTop()) - sc.height() * 0.3;
           const v = Math.max(0, Math.min(want, sc.max()));
           if (Math.abs(v - sc.top) > 2) { scrollIntoScroller(sc, block, 0.3, false); moved = true; }
         }

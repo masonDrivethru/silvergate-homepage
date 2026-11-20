@@ -187,13 +187,44 @@ export function mountViewer(host, o) {
   const fx = h(doc, 'iframe', { class: 'sgc-frame', title: m.redline });
   const bar = h(doc, 'div');
   const list = h(doc, 'aside');
-  const paneL = h(doc, 'section', { class: 'sgc-pane' }, h(doc, 'header', { class: 'sgc-pane-head' }, h(doc, 'span', { class: 'sgc-badge sgc-badge-old' }, m.before), o.left.label ?? ''), fl);
-  const paneR = h(doc, 'section', { class: 'sgc-pane' }, h(doc, 'header', { class: 'sgc-pane-head' }, h(doc, 'span', { class: 'sgc-badge sgc-badge-new' }, m.after), o.right.label ?? ''), fr);
+  // shared(기본): 두 iframe 을 문서 높이만큼 늘려 한 스크롤 영역에 나란히 → 좌우가 한 장처럼 함께 움직임
+  // split: iframe 마다 따로 스크롤 + 스크롤 맞춤 (수천 쪽짜리 서버 화면은 이쪽이 가벼움)
+  const shared = o.layout !== 'split';
   const paneX = h(doc, 'section', { class: 'sgc-pane sgc-pane-redline', hidden: true }, h(doc, 'header', { class: 'sgc-pane-head' }, m.redline, ` · ${o.left.label ?? ''} → ${o.right.label ?? ''}`), fx);
-  const panes = h(doc, 'div', { class: 'sgc-panes' }, paneL, paneR, paneX);
+  let paneL, paneR, both = null, desk = null;
+  if (shared) {
+    for (const f of [fl, fr]) { f.setAttribute('scrolling', 'no'); f.classList.add('sgc-frame--fit'); }
+    const head = (side, badge, cls, label) => h(doc, 'button', { type: 'button', class: 'sgc-pane-head', 'data-side': side, 'aria-pressed': side === 'right' ? 'true' : 'false', onclick: () => pick(side) },
+      h(doc, 'span', { class: `sgc-badge ${cls}` }, badge), label ?? '');
+    desk = h(doc, 'div', { class: 'sgc-shared', 'data-phone': 'right', tabindex: '0' },
+      h(doc, 'div', { class: 'sgc-col sgc-col--left' }, fl), h(doc, 'div', { class: 'sgc-col sgc-col--right' }, fr));
+    both = h(doc, 'section', { class: 'sgc-pane sgc-both' },
+      h(doc, 'div', { class: 'sgc-heads', role: 'group' }, head('left', m.before, 'sgc-badge-old', o.left.label), head('right', m.after, 'sgc-badge-new', o.right.label)), desk);
+    paneL = paneR = both;
+  } else {
+    paneL = h(doc, 'section', { class: 'sgc-pane' }, h(doc, 'header', { class: 'sgc-pane-head' }, h(doc, 'span', { class: 'sgc-badge sgc-badge-old' }, m.before), o.left.label ?? ''), fl);
+    paneR = h(doc, 'section', { class: 'sgc-pane' }, h(doc, 'header', { class: 'sgc-pane-head' }, h(doc, 'span', { class: 'sgc-badge sgc-badge-new' }, m.after), o.right.label ?? ''), fr);
+  }
+  const panes = h(doc, 'div', { class: 'sgc-panes' + (shared ? ' sgc-panes--one' : '') }, ...(shared ? [both] : [paneL, paneR]), paneX);
   const root = h(doc, 'div', { class: 'sgc-viewer' }, bar, h(doc, 'div', { class: 'sgc-body' }, panes, list));
   if (o.height) root.style.setProperty('--sgc-height', o.height);
   host.replaceChildren(root);
+  /** 휴대폰(좁은 화면): 이전/새 버전 중 한쪽만 */
+  function pick(side) {
+    if (!desk) return;
+    desk.dataset.phone = side;
+    for (const b of both.querySelectorAll('.sgc-heads button')) b.setAttribute('aria-pressed', b.dataset.side === side ? 'true' : 'false');
+  }
+  /** iframe 높이를 안쪽 문서 높이에 맞춤 (내용·빈 칸이 바뀌면 다시) */
+  const fits = [];
+  function fitFrame(f) {
+    const d = f.contentDocument, w = f.contentWindow;
+    if (!d || !w) return;
+    const fit = () => { f.style.height = Math.ceil(d.documentElement.scrollHeight) + 'px'; };
+    fit();
+    if (w.ResizeObserver) { const ro = new w.ResizeObserver(fit); ro.observe(d.documentElement); if (d.body) ro.observe(d.body); fits.push(() => ro.disconnect()); }
+    w.addEventListener('load', fit);
+  }
 
   const loaded = (f) => new Promise((res) => {
     const ok = () => f.contentDocument && f.contentDocument.readyState === 'complete' && f.contentDocument.body;
@@ -203,7 +234,9 @@ export function mountViewer(host, o) {
 
   let ctrl = null, tb = null, cl = null, redlineDirty = true;
   const ready = Promise.all([loaded(fl), loaded(fr)]).then(() => {
-    ctrl = createCompare({ ...o, left: fl, right: fr, auto: false, watch: o.watch ?? false });
+    if (shared) { fitFrame(fl); fitFrame(fr); }
+    ctrl = createCompare({ ...o, left: fl, right: fr, auto: false, watch: o.watch ?? false,
+      ...(shared ? { leftScroller: desk, rightScroller: desk } : {}) });
     tb = mountToolbar(bar, ctrl, { locale: o.locale, labels: o.labels, modes: true, onMode: setMode });
     cl = mountChangeList(list, ctrl, { locale: o.locale, labels: o.labels });
     ctrl.on('update', () => { redlineDirty = true; if (!paneX.hidden) drawRedline(); });
@@ -220,6 +253,7 @@ export function mountViewer(host, o) {
   function setMode(md) {
     const red = md === 'redline';
     paneL.hidden = red; paneR.hidden = red; paneX.hidden = !red;
+    if (!red && shared) { fitFrame(fl); fitFrame(fr); }
     root.dataset.mode = md;
     if (red && redlineDirty && ctrl) drawRedline();
   }
@@ -228,7 +262,7 @@ export function mountViewer(host, o) {
     ready,
     get controller() { return ctrl; },
     setMode(md) { tb?.setMode(md); setMode(md); },
-    destroy() { tb?.destroy(); cl?.destroy(); ctrl?.destroy(); host.replaceChildren(); },
+    destroy() { for (const f of fits) f(); tb?.destroy(); cl?.destroy(); ctrl?.destroy(); host.replaceChildren(); },
   };
 }
 
@@ -249,6 +283,21 @@ const UI_CSS = `
 .sgc-body{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 300px}
 .sgc-panes{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--sgc-bd);min-height:0}
 .sgc-viewer[data-mode="redline"] .sgc-panes{grid-template-columns:1fr}
+.sgc-panes--one{grid-template-columns:1fr}
+.sgc-both{display:flex;flex-direction:column;min-height:0}
+.sgc-heads{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--sgc-bd)}
+.sgc-heads .sgc-pane-head{width:100%;border:0;font:inherit;font-weight:600;color:var(--sgc-fg);text-align:left;cursor:default}
+.sgc-shared{flex:1;min-height:0;overflow:auto;display:grid;grid-template-columns:1fr 1fr;align-items:start;background:var(--sgc-bg2)}
+.sgc-col{min-width:0}
+.sgc-col+.sgc-col{box-shadow:inset 1px 0 0 var(--sgc-bd)}
+.sgc-frame--fit{display:block;flex:none;height:600px;overflow:hidden}
+@media (max-width:640px){
+  .sgc-heads .sgc-pane-head{cursor:pointer;justify-content:center;opacity:.55}
+  .sgc-heads .sgc-pane-head[aria-pressed="true"]{opacity:1;box-shadow:inset 0 -2px 0 var(--sgc-acc)}
+  .sgc-shared{grid-template-columns:1fr}
+  .sgc-shared[data-phone="right"] .sgc-col--left,.sgc-shared[data-phone="left"] .sgc-col--right{display:none}
+  .sgc-col+.sgc-col{box-shadow:none}
+}
 .sgc-pane{display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--sgc-bg2)}
 .sgc-pane[hidden]{display:none}
 .sgc-pane-head{display:flex;align-items:center;gap:8px;padding:8px 14px;font-weight:600;background:var(--sgc-bg);border-bottom:1px solid var(--sgc-bd);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

@@ -104,7 +104,9 @@ export function mountToolbar(el: HTMLElement, ctrl: CompareController, o?: UiOpt
 export function mountChangeList(el: HTMLElement, ctrl: CompareController, o?: UiOptions & { max?: number }): { destroy(): void };
 
 export interface ViewerSource { url?: string; html?: string; label?: string }
-export function mountViewer(host: HTMLElement, o: Omit<CompareOptions, 'left' | 'right'> & UiOptions & { left: ViewerSource; right: ViewerSource; height?: string }): {
+export function mountViewer(host: HTMLElement, o: Omit<CompareOptions, 'left' | 'right'> & UiOptions & { left: ViewerSource; right: ViewerSource; height?: string;
+  /** 'shared'(기본): 두 iframe 을 한 스크롤 영역에 나란히 / 'split': 따로 스크롤 + 스크롤 맞춤 */
+  layout?: 'shared' | 'split' }): {
   ready: Promise<CompareController>;
   readonly controller: CompareController | null;
   setMode(m: 'side' | 'redline'): void;

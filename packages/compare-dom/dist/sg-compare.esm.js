@@ -2534,10 +2534,10 @@ function makeScroller(root, given) {
       }
     }
   }
-  if (el && el !== win && el !== doc.scrollingElement) {
+  if (el && el !== win && el !== doc.scrollingElement && el.nodeType === 1) {
     return {
       target: el,
-      doc,
+      doc: el.ownerDocument,
       get top() {
         return el.scrollTop;
       },
@@ -2564,12 +2564,22 @@ function makeScroller(root, given) {
     max: () => se().scrollHeight - win.innerHeight
   };
 }
+function topIn(el, doc) {
+  let top = el.getBoundingClientRect().top;
+  let w = el.ownerDocument.defaultView;
+  while (w && w.document !== doc && w.frameElement) {
+    const f = w.frameElement;
+    const cs = f.ownerDocument.defaultView.getComputedStyle(f);
+    top += f.getBoundingClientRect().top + (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.paddingTop) || 0);
+    w = w.parent;
+  }
+  return top;
+}
 function scrollIntoScroller(sc, el, ratio = 0.3, smooth = true) {
-  const r = el.getBoundingClientRect();
-  const top = sc.top + (r.top - sc.viewTop()) - sc.height() * ratio;
+  const top = sc.top + (topIn(el, sc.doc) - sc.viewTop()) - sc.height() * ratio;
   const t = sc.target;
   const v = Math.max(0, Math.min(top, sc.max()));
-  if (t.scrollTo) t.scrollTo({ top: v, behavior: smooth ? "smooth" : "auto" });
+  if (t.scrollTo) t.scrollTo({ top: v, behavior: smooth ? "smooth" : "instant" });
   else sc.top = v;
 }
 function linkScroll(A, B, getAnchors) {
@@ -3258,10 +3268,11 @@ function createCompare(options) {
       const scEl = sc ?? makeScroller(r).target;
       const pages = Array.from(r.querySelectorAll(opt.page));
       const idx = new Map(pages.map((p, i) => [p, i]));
+      const ioRoot = scEl && scEl.nodeType === 1 && scEl.ownerDocument === r.ownerDocument ? scEl : null;
       const io = new win.IntersectionObserver((entries) => {
         for (const e of entries) if (e.isIntersecting) queue.add(side + ":" + idx.get(e.target));
         drain();
-      }, { root: scEl && scEl.nodeType === 1 ? scEl : null, rootMargin: "150% 0px 150% 0px" });
+      }, { root: ioRoot, rootMargin: "150% 0px 150% 0px" });
       for (const p of pages) if (groups.has(side + ":" + idx.get(p))) io.observe(p);
       lazyIO.push(io);
     }
@@ -3572,6 +3583,9 @@ function createCompare(options) {
     const token = ++goToken;
     if (!scrollers.left) setupScroll();
     link?.pause(2e3);
+    clearTimeout(focusTimer);
+    marks.left.setFocus([]);
+    marks.right.setFocus([]);
     for (const el of focused) el.removeAttribute("data-sgc-focus");
     focused.length = 0;
     emit("focus", ch);
@@ -3594,7 +3608,7 @@ function createCompare(options) {
     let anySmooth = false;
     for (const { side, block } of sides) {
       const sc = scrollers[side];
-      const dist = Math.abs(block.getBoundingClientRect().top - sc.viewTop());
+      const dist = Math.abs(topIn(block, sc.doc) - sc.viewTop());
       const soft = smooth && dist < sc.height() * 1.5 && !matchMedia?.("(prefers-reduced-motion: reduce)").matches;
       anySmooth || (anySmooth = soft);
       scrollIntoScroller(sc, block, 0.3, soft);
@@ -3626,7 +3640,7 @@ function createCompare(options) {
         for (const { side, block } of sides) {
           if (!block.isConnected) continue;
           const sc = scrollers[side];
-          const want = sc.top + (block.getBoundingClientRect().top - sc.viewTop()) - sc.height() * 0.3;
+          const want = sc.top + (topIn(block, sc.doc) - sc.viewTop()) - sc.height() * 0.3;
           const v = Math.max(0, Math.min(want, sc.max()));
           if (Math.abs(v - sc.top) > 2) {
             scrollIntoScroller(sc, block, 0.3, false);
@@ -4101,13 +4115,65 @@ function mountViewer(host, o) {
   const fx = h(doc, "iframe", { class: "sgc-frame", title: m.redline });
   const bar = h(doc, "div");
   const list = h(doc, "aside");
-  const paneL = h(doc, "section", { class: "sgc-pane" }, h(doc, "header", { class: "sgc-pane-head" }, h(doc, "span", { class: "sgc-badge sgc-badge-old" }, m.before), o.left.label ?? ""), fl);
-  const paneR = h(doc, "section", { class: "sgc-pane" }, h(doc, "header", { class: "sgc-pane-head" }, h(doc, "span", { class: "sgc-badge sgc-badge-new" }, m.after), o.right.label ?? ""), fr);
+  const shared = o.layout !== "split";
   const paneX = h(doc, "section", { class: "sgc-pane sgc-pane-redline", hidden: true }, h(doc, "header", { class: "sgc-pane-head" }, m.redline, ` \xB7 ${o.left.label ?? ""} \u2192 ${o.right.label ?? ""}`), fx);
-  const panes = h(doc, "div", { class: "sgc-panes" }, paneL, paneR, paneX);
+  let paneL, paneR, both = null, desk = null;
+  if (shared) {
+    for (const f of [fl, fr]) {
+      f.setAttribute("scrolling", "no");
+      f.classList.add("sgc-frame--fit");
+    }
+    const head = (side, badge, cls, label) => h(
+      doc,
+      "button",
+      { type: "button", class: "sgc-pane-head", "data-side": side, "aria-pressed": side === "right" ? "true" : "false", onclick: () => pick(side) },
+      h(doc, "span", { class: `sgc-badge ${cls}` }, badge),
+      label ?? ""
+    );
+    desk = h(
+      doc,
+      "div",
+      { class: "sgc-shared", "data-phone": "right", tabindex: "0" },
+      h(doc, "div", { class: "sgc-col sgc-col--left" }, fl),
+      h(doc, "div", { class: "sgc-col sgc-col--right" }, fr)
+    );
+    both = h(
+      doc,
+      "section",
+      { class: "sgc-pane sgc-both" },
+      h(doc, "div", { class: "sgc-heads", role: "group" }, head("left", m.before, "sgc-badge-old", o.left.label), head("right", m.after, "sgc-badge-new", o.right.label)),
+      desk
+    );
+    paneL = paneR = both;
+  } else {
+    paneL = h(doc, "section", { class: "sgc-pane" }, h(doc, "header", { class: "sgc-pane-head" }, h(doc, "span", { class: "sgc-badge sgc-badge-old" }, m.before), o.left.label ?? ""), fl);
+    paneR = h(doc, "section", { class: "sgc-pane" }, h(doc, "header", { class: "sgc-pane-head" }, h(doc, "span", { class: "sgc-badge sgc-badge-new" }, m.after), o.right.label ?? ""), fr);
+  }
+  const panes = h(doc, "div", { class: "sgc-panes" + (shared ? " sgc-panes--one" : "") }, ...shared ? [both] : [paneL, paneR], paneX);
   const root = h(doc, "div", { class: "sgc-viewer" }, bar, h(doc, "div", { class: "sgc-body" }, panes, list));
   if (o.height) root.style.setProperty("--sgc-height", o.height);
   host.replaceChildren(root);
+  function pick(side) {
+    if (!desk) return;
+    desk.dataset.phone = side;
+    for (const b of both.querySelectorAll(".sgc-heads button")) b.setAttribute("aria-pressed", b.dataset.side === side ? "true" : "false");
+  }
+  const fits = [];
+  function fitFrame(f) {
+    const d = f.contentDocument, w = f.contentWindow;
+    if (!d || !w) return;
+    const fit = () => {
+      f.style.height = Math.ceil(d.documentElement.scrollHeight) + "px";
+    };
+    fit();
+    if (w.ResizeObserver) {
+      const ro = new w.ResizeObserver(fit);
+      ro.observe(d.documentElement);
+      if (d.body) ro.observe(d.body);
+      fits.push(() => ro.disconnect());
+    }
+    w.addEventListener("load", fit);
+  }
   const loaded = (f) => new Promise((res) => {
     const ok = () => f.contentDocument && f.contentDocument.readyState === "complete" && f.contentDocument.body;
     if (ok() && (f.src || f.srcdoc) && f.contentDocument.URL !== "about:blank") return res();
@@ -4115,7 +4181,18 @@ function mountViewer(host, o) {
   });
   let ctrl = null, tb = null, cl = null, redlineDirty = true;
   const ready = Promise.all([loaded(fl), loaded(fr)]).then(() => {
-    ctrl = createCompare({ ...o, left: fl, right: fr, auto: false, watch: o.watch ?? false });
+    if (shared) {
+      fitFrame(fl);
+      fitFrame(fr);
+    }
+    ctrl = createCompare({
+      ...o,
+      left: fl,
+      right: fr,
+      auto: false,
+      watch: o.watch ?? false,
+      ...shared ? { leftScroller: desk, rightScroller: desk } : {}
+    });
     tb = mountToolbar(bar, ctrl, { locale: o.locale, labels: o.labels, modes: true, onMode: setMode });
     cl = mountChangeList(list, ctrl, { locale: o.locale, labels: o.labels });
     ctrl.on("update", () => {
@@ -4139,6 +4216,10 @@ function mountViewer(host, o) {
     paneL.hidden = red;
     paneR.hidden = red;
     paneX.hidden = !red;
+    if (!red && shared) {
+      fitFrame(fl);
+      fitFrame(fr);
+    }
     root.dataset.mode = md;
     if (red && redlineDirty && ctrl) drawRedline();
   }
@@ -4152,6 +4233,7 @@ function mountViewer(host, o) {
       setMode(md);
     },
     destroy() {
+      for (const f of fits) f();
       tb?.destroy();
       cl?.destroy();
       ctrl?.destroy();
@@ -4176,6 +4258,21 @@ var UI_CSS = `
 .sgc-body{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 300px}
 .sgc-panes{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--sgc-bd);min-height:0}
 .sgc-viewer[data-mode="redline"] .sgc-panes{grid-template-columns:1fr}
+.sgc-panes--one{grid-template-columns:1fr}
+.sgc-both{display:flex;flex-direction:column;min-height:0}
+.sgc-heads{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--sgc-bd)}
+.sgc-heads .sgc-pane-head{width:100%;border:0;font:inherit;font-weight:600;color:var(--sgc-fg);text-align:left;cursor:default}
+.sgc-shared{flex:1;min-height:0;overflow:auto;display:grid;grid-template-columns:1fr 1fr;align-items:start;background:var(--sgc-bg2)}
+.sgc-col{min-width:0}
+.sgc-col+.sgc-col{box-shadow:inset 1px 0 0 var(--sgc-bd)}
+.sgc-frame--fit{display:block;flex:none;height:600px;overflow:hidden}
+@media (max-width:640px){
+  .sgc-heads .sgc-pane-head{cursor:pointer;justify-content:center;opacity:.55}
+  .sgc-heads .sgc-pane-head[aria-pressed="true"]{opacity:1;box-shadow:inset 0 -2px 0 var(--sgc-acc)}
+  .sgc-shared{grid-template-columns:1fr}
+  .sgc-shared[data-phone="right"] .sgc-col--left,.sgc-shared[data-phone="left"] .sgc-col--right{display:none}
+  .sgc-col+.sgc-col{box-shadow:none}
+}
 .sgc-pane{display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--sgc-bg2)}
 .sgc-pane[hidden]{display:none}
 .sgc-pane-head{display:flex;align-items:center;gap:8px;padding:8px 14px;font-weight:600;background:var(--sgc-bg);border-bottom:1px solid var(--sgc-bd);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
