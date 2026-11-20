@@ -1270,7 +1270,7 @@ html[data-motion="calm"] main .section__title { background-position: 0 0; }
 }
 .mbr :is(h1, h2, h3, h4, h5, p, td, th, span, b, dt, dd) { color: inherit; font-family: inherit; letter-spacing: normal; text-transform: none; }
 .mbr :is(h1, h2, h3, h4) { line-height: 1.3; background: none; -webkit-text-fill-color: currentColor; }
-.mbr-page { position: relative; width: 794px; min-height: 1123px; margin: 0 auto 18px; padding: 44px 60px 34px; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.35); display: flex; flex-direction: column; gap: 10px; box-sizing: border-box; content-visibility: auto; contain-intrinsic-size: auto 794px auto 1123px; }
+.mbr-page { position: relative; width: 794px; min-height: 1123px; margin: 0 auto 18px; padding: 44px 60px 34px; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,.35); display: flex; flex-direction: column; gap: 10px; box-sizing: border-box; content-visibility: auto; contain-intrinsic-size: auto 674px auto 1045px; }   /* 안쪽 크기 = A4(794×1123) − 여백 */
 /* 문서 관리 시스템이 덧붙이는 표시: 상태 워터마크(대각선), 위·아래 여백의 작은 회색 줄 */
 .mbr-page[data-watermark]::before { content: attr(data-watermark); position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) rotate(-35deg); font: 700 64px/1 Arial, sans-serif; letter-spacing: .08em; color: rgba(0,0,0,.07); white-space: nowrap; pointer-events: none; z-index: 0; }
 .mbr-page > * { position: relative; z-index: 1; }

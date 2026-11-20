@@ -49,64 +49,70 @@
 
   function make(ver, pages) {
     var cover = ver === 4
-      ? { ver: 'v4', date: '2026-12-01', reason: '세척 온도 기준 상향, TOC 기준 강화, 세척액 농도 항목 추가', sign: [['작성', '김지원', '2026-11-10'], ['검토', '이서연', '2026-11-14'], ['검토', '최하준', '2026-11-15'], ['승인', '박도윤', '2026-11-18']] }
-      : { ver: 'v3', date: '2025-06-01', reason: '정기 개정', sign: [['작성', '김지원', '2025-05-12'], ['검토', '이서연', '2025-05-20'], ['승인', '박도윤', '2025-05-26']] };
+      ? { ver: 'v4', status: 'review', date: '2026-12-01', reason: '세척 온도 기준 상향, TOC 기준 강화, 세척액 농도 항목 추가', sign: [['작성', '김지원', '2026-11-10'], ['검토', '이서연', '2026-11-14'], ['검토', '최하준', '2026-11-15'], ['승인', '박도윤', '2026-11-18']] }
+      : { ver: 'v3', status: 'superseded', date: '2025-06-01', reason: '정기 개정', sign: [['작성', '김지원', '2025-05-12'], ['검토', '이서연', '2025-05-20'], ['승인', '박도윤', '2025-05-26']] };
     var list = [];
     for (var i = 1; i <= pages; i++) list.push(page(i, pages, ver));
     return { cover: cover, pages: list, total: pages };
   }
 
-  // ---------- 일반 HTML 문자열 (JSP·서버 화면이 내보내는 것과 같은 모양) ----------
-  function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
-  function coverHtml(d) {
-    var c = d.cover;
-    return '<article class="page cover" data-page="0">' +
-      '<div class="pg-head"><span class="pg-org">실버바이오 데모 제약 (가상)</span><span class="pg-doc">SOP-EQ-014</span></div>' +
-      '<h1 class="cv-title">설비 세척 표준작업지침서</h1>' +
-      '<table class="cv-meta"><tbody>' +
-      '<tr><th>문서 번호</th><td>SOP-EQ-014</td><th>개정</th><td>' + esc(c.ver) + '</td></tr>' +
-      '<tr><th>시행일</th><td>' + esc(c.date) + '</td><th>쪽수</th><td>' + d.total + '</td></tr>' +
-      '<tr><th>개정 사유</th><td colspan="3">' + esc(c.reason) + '</td></tr>' +
-      '</tbody></table>' +
-      '<table class="cv-sign"><thead><tr><th>구분</th><th>이름</th><th>날짜</th></tr></thead><tbody>' +
-      c.sign.map(function (s) { return '<tr><td>' + esc(s[0]) + '</td><td>' + esc(s[1]) + '</td><td>' + esc(s[2]) + '</td></tr>'; }).join('') +
-      '</tbody></table></article>';
-  }
-  function pageHtml(p) {
-    return '<article class="page" data-page="' + p.no + '">' +
-      '<div class="pg-head"><span class="pg-org">실버바이오 데모 제약 (가상)</span><span class="pg-doc">SOP-EQ-014</span></div>' +
-      '<h2 class="pg-title">' + esc(p.title) + '</h2>' +
-      p.paras.map(function (t) { return '<p>' + esc(t) + '</p>'; }).join('') +
-      (p.note ? '<div class="pg-note">' + esc(p.note) + '</div>' : '') +
-      '<table class="pg-table"><thead><tr><th>항목</th><th>기준</th><th>단위</th></tr></thead><tbody>' +
-      p.rows.map(function (r) { return '<tr><td>' + esc(r[0]) + '</td><td>' + esc(r[1]) + '</td><td>' + esc(r[2]) + '</td></tr>'; }).join('') +
-      '</tbody></table>' +
-      '<h3 class="pg-sub">확인 항목</h3><ul class="pg-checks">' +
-      p.checks.map(function (t) { return '<li>' + esc(t) + '</li>'; }).join('') +
-      '</ul><div class="pg-foot"><span>SOP-EQ-014</span><span>' + p.no + ' / ' + p.total + '</span></div></article>';
-  }
-  function toHtml(d) { return coverHtml(d) + d.pages.map(pageHtml).join(''); }
+  // ---------- 문서 양식: eQMS(문서 관리 시스템)에 올라가는 통제 문서(controlled document) 모양 ----------
+  // 쪽마다 머리말 표 · 첫 쪽 문서 정보와 승인 서명표 · 번호 붙은 절 · 관리 문서 꼬리말 · 상태 워터마크 ·
+  // 시스템 표시 줄 · 마지막 쪽 전자서명 기록. 반복되는 머리말·꼬리말·표시 줄은 data-sgc-ignore (비교에서 뺌)
+  var ORG = '실버바이오 데모 제약 (가상)', DOCNO = 'SOP-EQ-014', TITLE = '설비 세척 표준작업지침서';
+  var STATUS = { superseded: '대체됨', effective: '시행', review: '검토 중' };
+  var WM = { superseded: 'SUPERSEDED', review: 'DRAFT – IN REVIEW' };
+  var DEPT = ['생산팀', '품질보증팀', '품질보증팀', '품질보증 책임자'];
+  var TIMES = ['09:12:41', '14:03:27', '15:20:09', '10:48:05'];
+  var MEANING = { '작성': '작성자', '검토': '검토자', '승인': '승인자' };
 
-  // ---------- 같은 마크업을 Vue / React 로 (h / createElement 함수만 넘기면 됨) ----------
-  /** el(tag, props, children) 모양의 함수로 문서를 그린다 */
-  function render(el, d, keyed) {
-    var c = d.cover;
-    var cover = el('article', { className: 'page cover', 'data-page': '0', key: 'cover' }, [
-      el('div', { className: 'pg-head' }, [el('span', { className: 'pg-org' }, '실버바이오 데모 제약 (가상)'), el('span', { className: 'pg-doc' }, 'SOP-EQ-014')]),
-      el('h1', { className: 'cv-title' }, '설비 세척 표준작업지침서'),
-      el('table', { className: 'cv-meta' }, [el('tbody', null, [
-        el('tr', null, [el('th', null, '문서 번호'), el('td', null, 'SOP-EQ-014'), el('th', null, '개정'), el('td', null, c.ver)]),
-        el('tr', null, [el('th', null, '시행일'), el('td', null, c.date), el('th', null, '쪽수'), el('td', null, String(d.total))]),
+  function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+  var ATTR = { className: 'class', colSpan: 'colspan', rowSpan: 'rowspan' };
+  /** el 과 같은 모양으로 HTML 글자를 만드는 함수 (JSP 처럼 서버가 내보내는 HTML) */
+  function htmlEl(tag, props, kids) {
+    var a = '';
+    for (var k in props || {}) {
+      if (k === 'key' || props[k] === undefined || props[k] === null || props[k] === false) continue;
+      a += ' ' + (ATTR[k] || k) + (props[k] === '' ? '' : '="' + esc(props[k]) + '"');
+    }
+    if (tag === 'br' || tag === 'hr' || tag === 'img') return { __html: '<' + tag + a + '>' };
+    var inner = (Array.isArray(kids) ? kids : kids === undefined || kids === null ? [] : [kids]).map(function (x) { return x && x.__html !== undefined ? x.__html : esc(x); }).join('');
+    return { __html: '<' + tag + a + '>' + inner + '</' + tag + '>' };
+  }
+
+  /** 문서 전체를 el(tag, props, children) 로 그린다 — 일반 HTML · Vue · React 가 모두 이 하나를 쓴다 */
+  function render(el, d) {
+    var c = d.cover, total = d.pages.length + 2;     // 표지 + 본문 + 전자서명 기록
+    var ign = { 'data-sgc-ignore': '', 'aria-hidden': 'true' };
+    function frame(no, kids, extraClass) {
+      var props = { className: 'page' + (extraClass ? ' ' + extraClass : ''), 'data-page': String(no), key: 'pg' + no };
+      if (WM[c.status]) props['data-watermark'] = WM[c.status];
+      return el('article', props, [
+        el('p', Object.assign({ className: 'pg-overlay pg-overlay--top', key: 'ot' }, ign), '상태: ' + STATUS[c.status] + ' · 시행일: ' + c.date),
+        el('p', Object.assign({ className: 'pg-overlay pg-overlay--bottom', key: 'ob' }, ign), '인쇄본은 관리되지 않음 · 최신 버전은 문서 관리 시스템에서 확인'),
+        el('table', Object.assign({ className: 'pg-run', key: 'run' }, ign), [el('tbody', null, [
+          el('tr', null, [el('td', { className: 'pg-run__org', rowSpan: 2 }, ORG), el('td', { className: 'pg-run__title', rowSpan: 2 }, [el('b', null, TITLE), el('br', null, []), DOCNO]), el('td', { className: 'pg-run__k' }, '문서 번호'), el('td', { className: 'pg-run__v' }, DOCNO)]),
+          el('tr', null, [el('td', { className: 'pg-run__k' }, '버전'), el('td', { className: 'pg-run__v' }, c.ver + ' · ' + (no + 1) + ' / ' + total + '쪽')]),
+        ])]),
+      ].concat(kids).concat([
+        el('div', Object.assign({ className: 'pg-foot', key: 'f' }, ign), [el('span', null, '대외비 · 관리 문서 — 인쇄본은 관리되지 않습니다.'), el('span', null, DOCNO + ' ' + c.ver + ' · ' + (no + 1) + ' / ' + total + '쪽')]),
+      ]));
+    }
+    var cover = frame(0, [
+      el('h1', { className: 'cv-title', key: 't' }, TITLE),
+      el('table', { className: 'cv-meta', key: 'm' }, [el('tbody', null, [
+        el('tr', null, [el('th', null, '문서 번호'), el('td', null, DOCNO), el('th', null, '버전'), el('td', null, c.ver)]),
+        el('tr', null, [el('th', null, '시행일'), el('td', null, c.date), el('th', null, '상태'), el('td', null, [el('span', { 'data-sgc-ignore': '' }, STATUS[c.status])])]),
         el('tr', null, [el('th', null, '개정 사유'), el('td', { colSpan: 3 }, c.reason)]),
       ])]),
-      el('table', { className: 'cv-sign' }, [
-        el('thead', null, [el('tr', null, [el('th', null, '구분'), el('th', null, '이름'), el('th', null, '날짜')])]),
-        el('tbody', null, c.sign.map(function (s, i) { return el('tr', { key: i }, [el('td', null, s[0]), el('td', null, s[1]), el('td', null, s[2])]); })),
+      el('h3', { className: 'cv-h', key: 'ah' }, '승인'),
+      el('table', { className: 'cv-sign', key: 's' }, [
+        el('thead', null, [el('tr', null, [el('th', null, '구분'), el('th', null, '이름'), el('th', null, '부서'), el('th', null, '날짜')])]),
+        el('tbody', null, c.sign.map(function (s, i) { return el('tr', { key: i }, [el('td', null, s[0]), el('td', null, s[1]), el('td', null, DEPT[i] || ''), el('td', null, s[2])]); })),
       ]),
-    ]);
+    ], 'cover');
     var pages = d.pages.map(function (p) {
-      return el('article', { className: 'page', 'data-page': String(p.no), key: 'p' + p.no }, [
-        el('div', { className: 'pg-head', key: 'h' }, [el('span', { className: 'pg-org' }, '실버바이오 데모 제약 (가상)'), el('span', { className: 'pg-doc' }, 'SOP-EQ-014')]),
+      return frame(p.no, [
         el('h2', { className: 'pg-title', key: 't' }, p.title),
       ].concat(p.paras.map(function (t, i) { return el('p', { key: 'p' + i }, t); }))
         .concat(p.note ? [el('div', { className: 'pg-note', key: 'n' }, p.note)] : [])
@@ -117,33 +123,50 @@
           ]),
           el('h3', { className: 'pg-sub', key: 's' }, '확인 항목'),
           el('ul', { className: 'pg-checks', key: 'c' }, p.checks.map(function (t, i) { return el('li', { key: i }, t); })),
-          el('div', { className: 'pg-foot', key: 'f' }, [el('span', null, 'SOP-EQ-014'), el('span', null, p.no + ' / ' + p.total)]),
         ]));
     });
-    return [cover].concat(pages);
+    var manifest = frame(d.pages.length + 1, [
+      el('h2', { className: 'pg-title', key: 't' }, '전자서명 기록 (Signature Manifest)'),
+      el('p', { key: 'n' }, '문서 관리 시스템에서 적용된 전자서명 (21 CFR Part 11). 이 쪽은 문서의 일부입니다.'),
+      el('table', { className: 'pg-table mf-table', key: 'tb' }, [
+        el('thead', null, [el('tr', null, [el('th', null, '서명자'), el('th', null, '서명 의미'), el('th', null, '서명 일시 (UTC)')])]),
+        el('tbody', null, c.sign.map(function (s, i) { return el('tr', { key: i }, [el('td', null, s[1]), el('td', null, MEANING[s[0]] || s[0]), el('td', null, s[2] + ' ' + (TIMES[i] || '09:00:00') + ' UTC')]); })),
+      ]),
+    ], 'manifest');
+    return [cover].concat(pages).concat([manifest]);
   }
+  function toHtml(d) { return render(htmlEl, d).map(function (x) { return x.__html; }).join(''); }
 
-  /** 문서 용지 모양 (A4). 비교 모듈과 상관없는 "고객사 화면" CSS 역할 */
+  /** 문서 용지 모양 (A4 통제 문서). 비교 모듈과 상관없는 "고객사 화면" CSS 역할 */
   var CSS = [
-    '.doc-root{--paper:#fff;--ink:#1d2330;--ink2:#5b6474;--rule:#cfd5de;--head:#eef1f5;font-family:"Noto Serif KR","Batang",serif;color:var(--ink)}',
-    '.page{width:794px;min-height:1123px;margin:0 auto 18px;padding:56px 64px 48px;background:var(--paper);box-shadow:0 1px 3px rgba(16,24,40,.12),0 0 0 1px rgba(16,24,40,.06);display:flex;flex-direction:column;gap:12px;content-visibility:auto;contain-intrinsic-size:auto 794px auto 1123px;box-sizing:border-box}',
-    '.pg-head{display:flex;justify-content:space-between;font:12px/1.4 "Noto Sans KR",sans-serif;color:var(--ink2);border-bottom:1px solid var(--rule);padding-bottom:8px;margin-bottom:8px}',
-    '.pg-title{font-size:21px;margin:6px 0 4px;font-weight:700}',
-    '.page p{font-size:15px;line-height:1.75;margin:0}',
-    '.pg-table,.cv-meta,.cv-sign{border-collapse:collapse;width:100%;font:14px/1.5 "Noto Sans KR",sans-serif}',
-    '.pg-table th,.pg-table td,.cv-meta th,.cv-meta td,.cv-sign th,.cv-sign td{border:1px solid var(--rule);padding:7px 10px;text-align:left}',
-    '.pg-table th,.cv-meta th,.cv-sign th{background:var(--head);font-weight:600}',
-    '.pg-sub{font:600 15px/1.4 "Noto Sans KR",sans-serif;margin:10px 0 0}',
-    '.pg-checks{margin:0;padding-left:22px;font-size:15px;line-height:1.8}',
-    '.pg-note{border:1px solid #e9b949;background:#fff8e6;padding:10px 14px;font:14px/1.6 "Noto Sans KR",sans-serif}',
-    '.pg-foot{margin-top:auto;display:flex;justify-content:space-between;font:12px "Noto Sans KR",sans-serif;color:var(--ink2);border-top:1px solid var(--rule);padding-top:8px}',
-    '.cover{justify-content:flex-start;gap:28px}.cv-title{font-size:30px;text-align:center;margin:120px 0 40px;letter-spacing:.04em}',
+    '.doc-root{--ink:#111;--ink2:#4a4a4a;--rule:#222;--head:#ededed;color:var(--ink);font:12px/1.5 Arial,"Helvetica Neue","Noto Sans KR","Malgun Gothic",sans-serif}',
+    '.page{position:relative;width:794px;min-height:1123px;margin:0 auto 18px;padding:44px 60px 34px;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.35);display:flex;flex-direction:column;gap:9px;content-visibility:auto;contain-intrinsic-size:auto 674px auto 1045px;box-sizing:border-box}',
+    '.page[data-watermark]::before{content:attr(data-watermark);position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) rotate(-35deg);font:700 64px/1 Arial,sans-serif;letter-spacing:.08em;color:rgba(0,0,0,.07);white-space:nowrap;pointer-events:none;z-index:0}',
+    '.page>*{position:relative;z-index:1}',
+    '.pg-overlay{position:absolute!important;left:60px;right:60px;margin:0!important;font-size:8.5px;color:#6b6b6b}',
+    '.pg-overlay--top{top:18px}.pg-overlay--bottom{bottom:12px;text-align:center}',
+    '.pg-run{width:100%;border-collapse:collapse;font-size:10px;margin-bottom:6px}',
+    '.pg-run td{border:.75px solid var(--rule);padding:3px 6px;vertical-align:middle}',
+    '.pg-run__org{width:24%;font-weight:700;text-align:center}.pg-run__title{text-align:center;line-height:1.35}.pg-run__title b{font-size:11.5px}',
+    '.pg-run__k{width:12%;background:var(--head);white-space:nowrap}.pg-run__v{width:22%;white-space:nowrap}',
+    '.cv-title{margin:4px 0 6px;font-size:15px;font-weight:700;text-align:center}',
+    '.cv-h{margin:6px 0 0;font-size:12px;font-weight:700}',
+    '.pg-title{margin:6px 0 0;font-size:13px;font-weight:700;padding-bottom:3px;border-bottom:1.25px solid var(--rule)}',
+    '.page p{margin:0}',
+    '.pg-table,.cv-meta,.cv-sign{border-collapse:collapse;width:100%;font-size:11px}',
+    '.pg-table th,.pg-table td,.cv-meta th,.cv-meta td,.cv-sign th,.cv-sign td{border:.75px solid var(--rule);padding:3px 6px;text-align:left;vertical-align:top}',
+    '.pg-table th,.cv-meta th,.cv-sign th{background:var(--head);font-weight:700}',
+    '.cv-meta th{width:16%}',
+    '.pg-sub{margin:4px 0 0;font-size:12px;font-weight:700}',
+    '.pg-checks{margin:0;padding-left:20px}',
+    '.pg-note{border:.75px solid var(--rule);background:#f6f6f6;padding:5px 9px;font-size:11px}',
+    '.pg-foot{margin-top:auto;margin-bottom:10px;display:flex;justify-content:space-between;gap:16px;font-size:9.5px;color:var(--ink2);border-top:.75px solid var(--rule);padding-top:5px}',
   ].join('\n');
 
   /** JSP 화면처럼 완성된 HTML 문서 한 장 (iframe 에 그대로 넣음) */
   function serverPage(d, title) {
     return '<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>' + esc(title) + '</title>' +
-      '<style>body{margin:0;padding:20px 0;background:#e9ecf1}' + CSS + '</style>' +
+      '<style>body{margin:0;padding:20px 0;background:#525659}' + CSS + '</style>' +
       '<script>function z(){var w=document.documentElement.clientWidth;document.body.style.zoom=Math.min(1,(w-24)/794)}addEventListener("resize",z);addEventListener("DOMContentLoaded",z)<\/script>' +
       '</head><body><main class="doc-root">' + toHtml(d) + '</main></body></html>';
   }
