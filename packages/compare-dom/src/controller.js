@@ -439,7 +439,9 @@ export function createCompare(options) {
     sp.className = 'sgc-spacer';
     sp.setAttribute('data-sgc-ignore', '');
     sp.setAttribute('aria-hidden', 'true');
-    if (afterNode) afterNode.parentNode.insertBefore(sp, afterNode.nextSibling);
+    // 그사이 화면이 다시 그려져 기준 요소가 없어졌으면 넣지 않는다 (다시 비교하면서 새로 넣음)
+    if (afterNode) { if (!afterNode.parentNode) return null; afterNode.parentNode.insertBefore(sp, afterNode.nextSibling); }
+    else if (!parent || !(end || ref.parentNode)) return null;
     else if (end) parent.appendChild(sp); else parent.insertBefore(sp, ref);
     spacers.push(sp);
     return sp;
@@ -559,6 +561,7 @@ export function createCompare(options) {
     // 2) 넣기 (한꺼번에)
     for (const pl of plans) {
       const { c, ref, end, after, h, label } = pl;
+      if ((after && !after.isConnected) || (!after && !ref?.isConnected)) continue;
       if (after) {
         const nxt = after.nextSibling;
         c.spacer = nxt ? makeSpacer(nxt.nodeType === 1 ? nxt : after.parentElement, !nxt || nxt.nodeType !== 1, h, label, after, pl.gap) : makeSpacer(after.parentElement, true, h, label, null, pl.gap);
@@ -832,50 +835,74 @@ export function createCompare(options) {
     }
     if (keys.length) await ensureAligned(keys);
     if (token !== goToken) return;
-    // ② 이동: 가까우면 부드럽게, 멀면 바로
+    // ② 이동: 부드럽게 (움직임 줄이기 설정이면 바로)
     let sides = ['left', 'right'].map((side) => ({ side, block: targetOf(side) })).filter((x) => x.block);
     // 두 문서가 한 스크롤 영역에 있으면(좌우가 늘 함께 움직임) 한쪽 기준으로만 맞춘다 (새 버전 쪽 우선)
     if (sides.length > 1 && scrollers.left.target === scrollers.right.target) sides = [sides.find((x) => x.side === 'right') ?? sides[0]];
-    let anySmooth = false;
-    for (const { side, block } of sides) {
-      const sc = scrollers[side];
-      const dist = Math.abs(topIn(block, sc.doc) - sc.viewTop());
-      const soft = smooth && dist < sc.height() * 1.5 && !matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-      anySmooth ||= soft;
-      scrollIntoScroller(sc, block, 0.3, soft);
-      block.setAttribute('data-sgc-focus', '');
-      focused.push(block);
-      const fr = [];
-      if (ch[side]?.nodeType === 3) { const r = ch[side].ownerDocument.createRange(); r.selectNodeContents(ch[side]); fr.push(r); }
-      marks[side].setFocus(fr);
-    }
-    // ③ 자리가 잡힐 때까지(새로 그려진 쪽의 높이 변화, 늦게 들어간 빈 칸) 최대 1초 동안 지켜보며 바로잡는다.
-    //    사용자가 직접 스크롤(휠·터치·키)하면 바로 멈춘다
-    if (anySmooth) await new Promise((r) => setTimeout(r, 450));
+    const reduce = !!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    const soft = smooth && !reduce;
     let userMoved = false;
     const stopper = () => { userMoved = true; };
     const docsSet = new Set(sides.map(({ side }) => root(side).ownerDocument));
     for (const d of docsSet) for (const ev of ['wheel', 'touchstart', 'keydown', 'mousedown']) d.addEventListener(ev, stopper, { passive: true, capture: true });
+    /** 목표까지 남은 거리 (px) */
+    const offBy = (sc, block) => {
+      const want = sc.top + (topIn(block, sc.doc) - sc.viewTop()) - sc.height() * 0.3;
+      return Math.max(0, Math.min(want, sc.max())) - sc.top;
+    };
+    /** 스크롤이 멈출 때까지 (scrollend 또는 몇 프레임 동안 그대로), 최대 1.5초 */
+    const settle = (sc) => new Promise((res) => {
+      const t = sc.target;
+      let last = sc.top, same = 0, done = false;
+      const finish = () => { if (done) return; done = true; t.removeEventListener('scrollend', finish); res(); };
+      t.addEventListener('scrollend', finish, { once: true });
+      const until = performance.now() + 1500;
+      const tick = () => {
+        if (done) return;
+        const now = sc.top;
+        same = Math.abs(now - last) < 0.5 ? same + 1 : 0;
+        last = now;
+        if (same >= 4 || performance.now() > until || userMoved) return finish();
+        requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
     try {
-      const until = performance.now() + 1000;
-      let stable = 0;
-      while (performance.now() < until && stable < 8 && !userMoved) {
-        await new Promise((r) => requestAnimationFrame(r));
-        if (token !== goToken) return;
+      // 부드럽게 가고 → 멈추면 다시 재서(그사이 새로 그려진 쪽·빈 칸 때문에 자리가 바뀌었으면) 다시 부드럽게, 최대 4번
+      for (let round = 0; round < 4 && !userMoved; round++) {
         if (keys.length) await ensureAligned(keys);
-        let moved = false;
+        if (token !== goToken) return;
+        let moving = false;
         for (const { side, block } of sides) {
           if (!block.isConnected) continue;
           const sc = scrollers[side];
-          const want = sc.top + (topIn(block, sc.doc) - sc.viewTop()) - sc.height() * 0.3;
-          const v = Math.max(0, Math.min(want, sc.max()));
-          if (Math.abs(v - sc.top) > 2) { scrollIntoScroller(sc, block, 0.3, false); moved = true; }
+          if (Math.abs(offBy(sc, block)) > 2) { scrollIntoScroller(sc, block, 0.3, soft); moving = true; }
         }
-        stable = moved ? 0 : stable + 1;
-        link?.pause(300);
+        if (!moving) break;
+        link?.pause(2000);
+        await Promise.all(sides.map(({ side }) => settle(scrollers[side])));
+        if (token !== goToken) return;
       }
     } finally {
       for (const d of docsSet) for (const ev of ['wheel', 'touchstart', 'keydown', 'mousedown']) d.removeEventListener(ev, stopper, { capture: true });
+    }
+    if (token !== goToken) return;
+    // ③ 도착한 뒤에 반짝 (이동 중에 반짝이면 도착했을 때 이미 끝나 있음)
+    for (const { side, block } of sides.length ? sides : []) {
+      block.setAttribute('data-sgc-focus', '');
+      focused.push(block);
+    }
+    for (const side of ['left', 'right']) {
+      const fr = [];
+      if (ch[side]?.nodeType === 3) { const r = ch[side].ownerDocument.createRange(); r.selectNodeContents(ch[side]); fr.push(r); }
+      marks[side].setFocus(fr);
+    }
+    // 한 스크롤 영역일 때 반대쪽 짝도 반짝 (양쪽에서 같은 자리가 보이게)
+    if (scrollers.left.target === scrollers.right.target) {
+      for (const side of ['left', 'right']) {
+        const other = targetOf(side);
+        if (other && !focused.includes(other)) { other.setAttribute('data-sgc-focus', ''); focused.push(other); }
+      }
     }
     link?.pause(250);
     clearTimeout(focusTimer);

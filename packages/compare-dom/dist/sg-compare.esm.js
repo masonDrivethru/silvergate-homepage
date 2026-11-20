@@ -3189,7 +3189,10 @@ function createCompare(options) {
     sp.className = "sgc-spacer";
     sp.setAttribute("data-sgc-ignore", "");
     sp.setAttribute("aria-hidden", "true");
-    if (afterNode) afterNode.parentNode.insertBefore(sp, afterNode.nextSibling);
+    if (afterNode) {
+      if (!afterNode.parentNode) return null;
+      afterNode.parentNode.insertBefore(sp, afterNode.nextSibling);
+    } else if (!parent || !(end || ref.parentNode)) return null;
     else if (end) parent.appendChild(sp);
     else parent.insertBefore(sp, ref);
     spacers.push(sp);
@@ -3304,6 +3307,7 @@ function createCompare(options) {
     }
     for (const pl of plans) {
       const { c, ref, end, after, h: h2, label } = pl;
+      if (after && !after.isConnected || !after && !ref?.isConnected) continue;
       if (after) {
         const nxt = after.nextSibling;
         c.spacer = nxt ? makeSpacer(nxt.nodeType === 1 ? nxt : after.parentElement, !nxt || nxt.nodeType !== 1, h2, label, after, pl.gap) : makeSpacer(after.parentElement, true, h2, label, null, pl.gap);
@@ -3605,15 +3609,66 @@ function createCompare(options) {
     if (token !== goToken) return;
     let sides = ["left", "right"].map((side) => ({ side, block: targetOf(side) })).filter((x) => x.block);
     if (sides.length > 1 && scrollers.left.target === scrollers.right.target) sides = [sides.find((x) => x.side === "right") ?? sides[0]];
-    let anySmooth = false;
-    for (const { side, block } of sides) {
-      const sc = scrollers[side];
-      const dist = Math.abs(topIn(block, sc.doc) - sc.viewTop());
-      const soft = smooth && dist < sc.height() * 1.5 && !matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-      anySmooth || (anySmooth = soft);
-      scrollIntoScroller(sc, block, 0.3, soft);
+    const reduce = !!globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    const soft = smooth && !reduce;
+    let userMoved = false;
+    const stopper = () => {
+      userMoved = true;
+    };
+    const docsSet = new Set(sides.map(({ side }) => root(side).ownerDocument));
+    for (const d of docsSet) for (const ev of ["wheel", "touchstart", "keydown", "mousedown"]) d.addEventListener(ev, stopper, { passive: true, capture: true });
+    const offBy = (sc, block) => {
+      const want = sc.top + (topIn(block, sc.doc) - sc.viewTop()) - sc.height() * 0.3;
+      return Math.max(0, Math.min(want, sc.max())) - sc.top;
+    };
+    const settle = (sc) => new Promise((res) => {
+      const t = sc.target;
+      let last = sc.top, same = 0, done = false;
+      const finish = () => {
+        if (done) return;
+        done = true;
+        t.removeEventListener("scrollend", finish);
+        res();
+      };
+      t.addEventListener("scrollend", finish, { once: true });
+      const until = performance.now() + 1500;
+      const tick = () => {
+        if (done) return;
+        const now2 = sc.top;
+        same = Math.abs(now2 - last) < 0.5 ? same + 1 : 0;
+        last = now2;
+        if (same >= 4 || performance.now() > until || userMoved) return finish();
+        requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
+    try {
+      for (let round = 0; round < 4 && !userMoved; round++) {
+        if (keys.length) await ensureAligned(keys);
+        if (token !== goToken) return;
+        let moving = false;
+        for (const { side, block } of sides) {
+          if (!block.isConnected) continue;
+          const sc = scrollers[side];
+          if (Math.abs(offBy(sc, block)) > 2) {
+            scrollIntoScroller(sc, block, 0.3, soft);
+            moving = true;
+          }
+        }
+        if (!moving) break;
+        link?.pause(2e3);
+        await Promise.all(sides.map(({ side }) => settle(scrollers[side])));
+        if (token !== goToken) return;
+      }
+    } finally {
+      for (const d of docsSet) for (const ev of ["wheel", "touchstart", "keydown", "mousedown"]) d.removeEventListener(ev, stopper, { capture: true });
+    }
+    if (token !== goToken) return;
+    for (const { side, block } of sides.length ? sides : []) {
       block.setAttribute("data-sgc-focus", "");
       focused.push(block);
+    }
+    for (const side of ["left", "right"]) {
       const fr = [];
       if (ch[side]?.nodeType === 3) {
         const r = ch[side].ownerDocument.createRange();
@@ -3622,36 +3677,14 @@ function createCompare(options) {
       }
       marks[side].setFocus(fr);
     }
-    if (anySmooth) await new Promise((r) => setTimeout(r, 450));
-    let userMoved = false;
-    const stopper = () => {
-      userMoved = true;
-    };
-    const docsSet = new Set(sides.map(({ side }) => root(side).ownerDocument));
-    for (const d of docsSet) for (const ev of ["wheel", "touchstart", "keydown", "mousedown"]) d.addEventListener(ev, stopper, { passive: true, capture: true });
-    try {
-      const until = performance.now() + 1e3;
-      let stable = 0;
-      while (performance.now() < until && stable < 8 && !userMoved) {
-        await new Promise((r) => requestAnimationFrame(r));
-        if (token !== goToken) return;
-        if (keys.length) await ensureAligned(keys);
-        let moved = false;
-        for (const { side, block } of sides) {
-          if (!block.isConnected) continue;
-          const sc = scrollers[side];
-          const want = sc.top + (topIn(block, sc.doc) - sc.viewTop()) - sc.height() * 0.3;
-          const v = Math.max(0, Math.min(want, sc.max()));
-          if (Math.abs(v - sc.top) > 2) {
-            scrollIntoScroller(sc, block, 0.3, false);
-            moved = true;
-          }
+    if (scrollers.left.target === scrollers.right.target) {
+      for (const side of ["left", "right"]) {
+        const other = targetOf(side);
+        if (other && !focused.includes(other)) {
+          other.setAttribute("data-sgc-focus", "");
+          focused.push(other);
         }
-        stable = moved ? 0 : stable + 1;
-        link?.pause(300);
       }
-    } finally {
-      for (const d of docsSet) for (const ev of ["wheel", "touchstart", "keydown", "mousedown"]) d.removeEventListener(ev, stopper, { capture: true });
     }
     link?.pause(250);
     clearTimeout(focusTimer);
