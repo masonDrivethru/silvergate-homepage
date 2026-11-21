@@ -148,4 +148,57 @@ setTimeout(function () { drawTable(document.querySelector('#left .grid'), v1); }
 setTimeout(function () { drawTable(document.querySelector('#right .grid'), v2); }, 400);
 </script></body></html>`;
 
-export const PAGES = { jsontable, basic, viewer, legacy, portal, inner, widgets, blank, pages, hidden, tables };
+// ---------- 기준정보(블록)를 쌓아 표를 만들고, 조건에 따라 칸을 합치고, 실행 데이터(회차)만큼 표를 반복하는 컴포넌트 ----------
+export const BRICK_JS = `
+// 고객사 컴포넌트 흉내 (바닐라 JS). 비교 모듈은 모른다. 부를 때마다 통째로 새로 그린다
+function drawSheet(host, model) {
+  host.replaceChildren();
+  model.runs.forEach(function (run) {
+    var cap = document.createElement('h4'); cap.textContent = run.title; cap.style.margin = '12px 0 4px'; host.appendChild(cap);
+    var t = document.createElement('table'), hr = t.createTHead().insertRow();
+    ['구분', '항목', '기준', '결과', '판정'].forEach(function (x) { var th = document.createElement('th'); th.textContent = x; hr.appendChild(th); });
+    var body = t.createTBody(), last = null, lastCell = null;
+    model.bricks.forEach(function (b) {                 // 블록 하나 = 줄 하나 (기준정보가 늘면 블록이 늘어난다)
+      var tr = body.insertRow(), v = run.values[b.id];
+      if (b.group === last && lastCell) lastCell.rowSpan += 1;       // 같은 구분이 이어지면 세로로 합침
+      else { lastCell = tr.insertCell(); lastCell.textContent = b.group; last = b.group; }
+      tr.insertCell().textContent = b.item;
+      if (v === undefined || v === null) {                           // 조건: 해당 없음 → 기준·결과·판정 칸을 하나로 합침
+        var c = tr.insertCell(); c.colSpan = 3; c.textContent = '해당 없음'; c.style.textAlign = 'center';
+      } else if (b.noSpec) {                                         // 조건: 기준이 없는 항목 → 기준·결과를 합침
+        var c2 = tr.insertCell(); c2.colSpan = 2; c2.textContent = v; tr.insertCell().textContent = '-';
+      } else {
+        tr.insertCell().textContent = b.spec; tr.insertCell().textContent = v;
+        tr.insertCell().textContent = b.judge ? b.judge(v) : '적합';
+      }
+    });
+    host.appendChild(t);
+  });
+}
+var B1 = [
+  { id: 'look', group: '물리', item: '성상', spec: '흰색 분말' },
+  { id: 'water', group: '물리', item: '수분', spec: '2.0% 이하' },
+  { id: 'assay', group: '화학', item: '함량', spec: '98.0 ~ 102.0%' },
+  { id: 'imp', group: '화학', item: '유연물질', spec: '0.5% 이하' },
+  { id: 'note', group: '기타', item: '특이 사항', noSpec: true } ];
+var M1 = { bricks: B1, runs: [
+  { title: '1회차 (오전)', values: { look: '흰색 분말', water: '1.2%', assay: '99.6%', imp: '0.1%', note: '없음' } },
+  { title: '2회차 (오후)', values: { look: '흰색 분말', water: '1.3%', assay: '99.4%', imp: '0.1%', note: '없음' } } ] };
+function makeM2() {
+  var B2 = B1.slice(); B2[1] = { id: 'water', group: '물리', item: '수분', spec: '1.5% 이하' };
+  B2.splice(2, 0, { id: 'size', group: '물리', item: '입도', spec: '90% 이상' });          // 기준정보 추가 → 블록 하나 더
+  return { bricks: B2, runs: [
+    { title: '1회차 (오전)', values: { look: '흰색 분말', water: '1.2%', size: '94%', assay: '99.6%', imp: '0.1%', note: '없음' } },
+    { title: '재시험', values: { look: '흰색 분말', water: '1.1%', size: '95%', assay: '99.9%', imp: null, note: '수분 재측정' } },   // 실행 데이터 추가 → 표가 한 번 더 (가운데)
+    { title: '2회차 (오후)', values: { look: '흰색 분말', water: '1.3%', size: '93%', assay: '99.4%', imp: null, note: '없음' } } ] };   // 유연물질: 해당 없음 → 칸 합침
+}
+`;
+const bricks = `${head('블록 표', DESK)}<body><div id="desk"><div id="left"><div class="doc"><h3>시험 기록</h3><div class="grid"></div><p>끝.</p></div></div><div id="right"><div class="doc"><h3>시험 기록</h3><div class="grid"></div><p>끝.</p></div></div></div>${SDK}
+<script>${BRICK_JS}
+window.M1 = M1; window.makeM2 = makeM2; window.drawSheet = drawSheet;
+window.ctrl = SgCompare.createCompare({ left, right, leftScroller: desk, rightScroller: desk, watch: true, debounce: 100 });
+setTimeout(function () { drawSheet(document.querySelector('#left .grid'), M1); }, 200);
+setTimeout(function () { drawSheet(document.querySelector('#right .grid'), makeM2()); }, 350);
+</script></body></html>`;
+
+export const PAGES = { bricks, jsontable, basic, viewer, legacy, portal, inner, widgets, blank, pages, hidden, tables };

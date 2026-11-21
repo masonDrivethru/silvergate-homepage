@@ -526,6 +526,8 @@ export function createCompare(options) {
     const cs = el.ownerDocument.defaultView.getComputedStyle(el);
     const ch = parseFloat(cs.height);
     if (!Number.isFinite(ch)) { const z = zoomOf(el) || 1; return el.getBoundingClientRect().height / z; }
+    // 표 줄(tr)은 계산된 높이가 곧 줄 높이다. 테두리를 합친 표(border-collapse)에서 줄 테두리 두께를 또 더하면 그만큼 어긋난다
+    if (cs.display === 'table-row') return ch;
     return cs.boxSizing === 'border-box' ? ch : ch + px(cs.paddingTop) + px(cs.paddingBottom) + px(cs.borderTopWidth) + px(cs.borderBottomWidth);
   }
   function spaceOf(el) {
@@ -535,6 +537,8 @@ export function createCompare(options) {
     const cs = win.getComputedStyle(el);
     const ps = el.parentElement ? win.getComputedStyle(el.parentElement) : null;
     const h = layoutHeight(el);
+    // 표 줄: 줄 높이 그대로. (다음 줄까지 거리로 재면 칸 사이 간격(border-spacing)이 들어가는데, 빈 칸 줄에도 같은 간격이 또 붙어 그만큼 커진다)
+    if (cs.display === 'table-row') return h;
     if (ps && /flex|grid/.test(ps.display)) return h + px(cs.marginTop) + px(cs.marginBottom) + px(ps.rowGap);
     // 일반 흐름: 여백이 겹치므로 다음 형제까지 거리 (다음 형제가 없으면 자기 높이 + 여백)
     let next = el.nextElementSibling;
@@ -1101,7 +1105,8 @@ export function createCompare(options) {
                         : { from, t0: now, T: Math.min(480, 220 + dist * 0.3), fn: easeOut };
           // 아주 멀면(화면 4장 넘게): 출발 구간(화면 1.5장)과 도착 구간(화면 1.5장)만 실제로 흘러가고, 가장 빠른 순간에 그 사이를 건너뛴다.
           // 수천 쪽을 프레임마다 새로 그리지 않아도 돼서 무거운 문서에서도 프레임이 고르다 (눈에는 한 번에 흘러간 것처럼 보임)
-          if (main && dist > vh * 4) { it.seg.warp = vh * 1.5; it.seg.dir = Math.sign(d - from); }
+          // (이어 가기라도 멀면 같은 방식: 가운데 쪽들을 실제로 지나가면 그 쪽들이 높이 맞춤 없이 그려져 좌우가 어긋난다)
+          if (dist > vh * 4) { it.seg.warp = vh * 1.5; it.seg.dir = Math.sign(d - from); it.seg.fn = easeInOut; it.seg.T = Math.max(it.seg.T, 500); }
           it.dest = d; it.done = false;
         };
         /** 모두 도착할 때까지 흘러간다. main = 첫 이동(천천히 출발), 아니면 짧게 이어 가기. 움직였으면 true */
@@ -1119,7 +1124,12 @@ export function createCompare(options) {
                 // 목표 쪽이 화면에 들어오면 그 쪽의 높이 맞추기를 바로 시작 (도착 전에 끝나도록)
                 if (!asked && it.seen >= 1 && keys.length) { asked = true; ensureAligned(keys); }
                 if (!it.seg || it.done) { if (Math.abs(d - it.sc.top) > 2) begin(it, d, now, main && !it.seg); else { it.done = true; continue; } }
-                else if (Math.abs(d - it.dest) > 1) begin(it, d, now, false);
+                else if (Math.abs(d - it.dest) > 1) {
+                  // 아직 출발 구간이면(건너뛰기 전) 목표만 바꾼다: 출발 구간의 움직임은 목표와 상관없다
+                  const g0 = it.seg;
+                  if (g0.warp && g0.warp * 2 * g0.fn(Math.min(1, (now - g0.t0) / g0.T)) <= g0.warp) it.dest = d;
+                  else begin(it, d, now, false);
+                }
                 const g = it.seg, t = Math.min(1, (now - g.t0) / g.T);
                 let v;
                 if (g.warp) {

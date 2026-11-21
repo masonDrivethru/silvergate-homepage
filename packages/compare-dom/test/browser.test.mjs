@@ -276,6 +276,9 @@ await test('변경점으로 흘러가기: 멀어도 한 번에, 거꾸로 가거
     check(`${name}: 도착 직전에 튀지 않음`, f.bigStepsNearEnd === 0, JSON.stringify(f));
     check(`${name}: 도착하면 반짝`, f.flash, JSON.stringify(f));
   }
+  // 멀리 오간 뒤에도: 스쳐 지나간 쪽이 높이 맞춤 없이 그려져 좌우 쪽 높이가 달라지면 안 됨
+  const uneven = await page.evaluate(() => { const L = [...document.querySelectorAll('#left .page')], R = [...document.querySelectorAll('#right .page')]; const bad = []; for (let i = 0; i < L.length; i++) if (Math.abs(L[i].getBoundingClientRect().height - R[i].getBoundingClientRect().height) > 0.5) bad.push(i + 1); return bad; });
+  check('멀리 오간 뒤에도 좌우 쪽 높이가 모두 같음', uneven.length === 0, '다른 쪽: ' + uneven.slice(0, 10).join(','));
 });
 
 await test('연속 다시 비교: 앞 비교는 취소되고 마지막 결과만', async (page, check) => {
@@ -368,6 +371,50 @@ await test('JSON 으로 표를 그리는 바닐라 JS 컴포넌트 (늦게 그�
   // 같은 데이터로 양쪽을 그리면 변경 없음
   const same = await page.evaluate(async () => { window.drawTable(document.querySelector('#right .grid'), window.v1); await new Promise((r) => setTimeout(r, 700)); return { n: window.ctrl.changes.length, spacers: document.querySelectorAll('.sgc-spacer').length, marks: document.querySelectorAll('[data-sgc]').length }; });
   check('양쪽이 같아지면 변경 0건, 표시·빈 칸 없음', same.n === 0 && same.spacers === 0 && same.marks === 0, JSON.stringify(same));
+});
+
+await test('블록을 쌓아 만드는 표: 기준정보 추가 · 조건부 칸 합침 · 실행 데이터만큼 표 반복', async (page, check) => {
+  await page.goto(`${BASE}/t/bricks`);
+  await page.waitForTimeout(1200);
+  const info = () => page.evaluate(() => {
+    const c = window.ctrl;
+    const L = [...document.querySelectorAll('#left .grid > *')].filter((e) => !e.classList.contains('sgc-spacer'));
+    const R = [...document.querySelectorAll('#right .grid > *')].filter((e) => !e.classList.contains('sgc-spacer'));
+    const top = (e) => Math.round(e.getBoundingClientRect().top * 10) / 10;
+    const title = (h) => h.textContent;
+    // 같은 제목의 회차 표끼리 같은 높이에서 시작하나
+    const pairs = [];
+    for (const h of L.filter((e) => e.localName === 'h4')) { const m = R.find((e) => e.localName === 'h4' && title(e) === title(h)); if (m) pairs.push([title(h), top(h) - top(m), top(h.nextElementSibling) - top(m.nextElementSibling), h.nextElementSibling.offsetHeight - m.nextElementSibling.offsetHeight]); }
+    // 같은 항목 줄끼리 같은 높이
+    const rowDiff = [];
+    for (const [t] of pairs) { const lt = L.find((e) => e.textContent === t).nextElementSibling, rt = R.find((e) => e.textContent === t).nextElementSibling;
+      for (const r of rt.tBodies[0].rows) { if (r.classList.contains('sgc-spacer')) continue; const item = r.cells[r.cells.length >= 5 ? 1 : r.cells[0].rowSpan > 1 || r.cells.length === 5 ? 1 : 0]?.textContent; const key = [...r.cells].map((x) => x.textContent).find((x) => ['성상', '수분', '함량', '유연물질', '특이 사항'].includes(x)); if (!key) continue;
+        const l = [...lt.tBodies[0].rows].find((x) => [...x.cells].some((y) => y.textContent === key)); if (l) rowDiff.push(Math.abs(top(l) - top(r))); } }
+    return { n: c.changes.length, stats: c.stats, error: c.error ? String(c.error) : null, pairs, maxRow: Math.max(0, ...rowDiff), rows: rowDiff.length,
+      hL: document.getElementById('left').offsetHeight, hR: document.getElementById('right').offsetHeight,
+      texts: c.changes.map((x) => x.type + ':' + x.what + ':' + ((x.text.diffs ?? []).map((d) => d[1]).join('') || x.text.context || '') + (x.text.attr ? '[' + x.text.attr + ']' : '')) };
+  });
+  const r = await info();
+  const all = r.texts.join(' | ');
+  check('오류 없음', !r.error, r.error);
+  check('좌우 문서 높이 같음', Math.abs(r.hL - r.hR) <= 1, `${r.hL} / ${r.hR}`);
+  check('같은 회차 표끼리 같은 높이에서 시작하고 높이도 같음 (가운데 끼어든 "재시험" 표가 있어도)', r.pairs.length === 2 && r.pairs.every((p) => Math.abs(p[1]) <= 1 && Math.abs(p[2]) <= 1 && Math.abs(p[3]) <= 1), JSON.stringify(r.pairs));
+  check('같은 항목 줄끼리 같은 높이', r.rows >= 8 && r.maxRow <= 1, `${r.rows}줄, 최대 ${r.maxRow}px`);
+  check('가운데 끼어든 회차(재시험)는 통째로 추가', /added:node:[^|]*재시험/.test(all), all);
+  check('기준정보 추가(입도)는 줄 추가', /added:node:[^|]*입도/.test(all), all);
+  check('기준 수정(2.0 → 1.5)', /modified:text:[^|]*(2\.0|1\.5|2\.01\.5)/.test(all), all);
+  check('조건부 칸 합침(해당 없음)은 수정으로 — 줄 전체 삭제·추가가 아님', !/deleted:node:[^|]*유연물질/.test(all) && /해당 없음|colspan/.test(all), all);
+  // 실행 데이터가 더 들어와 표가 하나 더 늘고, 조건이 바뀌어 합쳤던 칸이 풀림 → 통째로 다시 그림
+  const again = await page.evaluate(async () => {
+    const c = window.ctrl; let updates = 0; c.on('update', () => updates++);
+    const m = window.makeM2(); m.runs[2].values.imp = '0.2%'; m.runs.push({ title: '3회차 (야간)', values: { look: '흰색 분말', water: '1.2%', size: '92%', assay: '99.5%', imp: '0.1%', note: '없음' } });
+    window.drawSheet(document.querySelector('#right .grid'), m);
+    for (let i = 0; i < 100 && !updates; i++) await new Promise((r) => setTimeout(r, 25));
+    await new Promise((r) => setTimeout(r, 400));
+  });
+  const r2 = await info();
+  check('다시 그린 뒤에도 좌우 높이 같음', Math.abs(r2.hL - r2.hR) <= 1 && r2.pairs.every((p) => Math.abs(p[1]) <= 1 && Math.abs(p[3]) <= 1), JSON.stringify([r2.hL, r2.hR, r2.pairs]));
+  check('새 회차(3회차)는 통째로 추가', /added:node:[^|]*3회차/.test(r2.texts.join(' | ')), r2.texts.join(' | '));
 });
 
 await browser.close();

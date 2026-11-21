@@ -93,6 +93,7 @@ select{height:36px;border:1px solid var(--line);border-radius:8px;background:var
     <button class="tab" role="tab" id="t-vue" aria-controls="p-vue" aria-selected="false">Vue 3</button>
     <button class="tab" role="tab" id="t-react" aria-controls="p-react" aria-selected="false">React 18</button>
     <button class="tab" role="tab" id="t-cases" aria-controls="p-cases" aria-selected="false">복잡한 표</button>
+    <button class="tab" role="tab" id="t-json" aria-controls="p-json" aria-selected="false">JSON 표</button>
     <button class="tab" role="tab" id="t-any" aria-controls="p-any" aria-selected="false">옛 화면·iframe</button>
     <button class="tab" role="tab" id="t-perf" aria-controls="p-perf" aria-selected="false">대용량 성능</button>
   </nav>
@@ -125,6 +126,14 @@ select{height:36px;border:1px solid var(--line);border-radius:8px;background:var
       <p>표 구조가 바뀌는 경우들입니다. 칸 병합(colspan·rowspan), 열 추가, 줄 순서 바뀜, 구조 전체 변경을 각각 비교합니다. 맨 위는 머리글 2단과 설비별 묶음 칸이 섞인 실제 결과표 모양입니다.</p>
     </div>
     <div id="cases-host" class="cases"></div>
+  </section>
+
+  <section class="panel" id="p-json" role="tabpanel" aria-labelledby="t-json" hidden>
+    <div class="panel-head">
+      <p>서버에서 받은 <b>JSON 데이터로 표를 그리는 바닐라 JS 컴포넌트</b>입니다. <b>기준정보가 하나 늘면 블록(줄)이 하나 쌓이고</b>, 조건에 맞으면 <b>칸을 합치고</b>, <b>실행 데이터(회차) 수만큼 표를 반복</b>해서 그립니다. 컴포넌트는 비교 모듈을 전혀 모르고(고유 ID 도 달지 않음) 부를 때마다 통째로 새로 그립니다. 새 버전에는 블록 추가, 기준 수정, 가운데 끼어든 회차 표, 조건부 칸 합침이 들어 있습니다. 버튼을 누르면 새 버전 데이터가 바뀌어 다시 그려지고, 비교도 자동으로 다시 됩니다.</p>
+      <div class="actions"><button class="btn btn-primary" id="json-edit" type="button">새 버전 데이터 바꿔 다시 그리기</button><button class="btn" id="json-reset" type="button">처음으로</button><span class="toast" id="json-toast" aria-live="polite"></span></div>
+    </div>
+    <div id="json-stage" class="stage"></div>
   </section>
 
   <section class="panel" id="p-any" role="tabpanel" aria-labelledby="t-any" hidden>
@@ -350,6 +359,80 @@ select{height:36px;border:1px solid var(--line);border-radius:8px;background:var
         .finally(function () { btn.disabled = false; btn.textContent = '그리고 비교하기'; });
     }, 30);
   }
+  // ---------- JSON 으로 표를 그리는 바닐라 JS 컴포넌트 (블록 쌓기 · 조건부 칸 합침 · 실행 데이터만큼 반복) ----------
+  START['t-json'] = function () {
+    // 고객사 컴포넌트 흉내. 비교 모듈은 모른다(고유 ID 도 달지 않음). 부를 때마다 통째로 새로 그린다
+    //   model.bricks = 기준정보 목록 (하나가 블록 하나 = 줄 하나), model.runs = 실행 데이터 (회차마다 표 하나)
+    function drawSheet(host, model) {
+      host.replaceChildren();
+      model.runs.forEach(function (run) {
+        var cap = document.createElement('h4'); cap.textContent = run.title; cap.style.margin = '14px 0 6px'; host.appendChild(cap);
+        var t = document.createElement('table'); t.className = 'pg-table'; var hr = t.createTHead().insertRow();
+        ['구분', '시험 항목', '기준', '결과', '판정'].forEach(function (x) { var th = document.createElement('th'); th.textContent = x; hr.appendChild(th); });
+        var body = t.createTBody(), last = null, lastCell = null;
+        model.bricks.forEach(function (b) {
+          var tr = body.insertRow(), v = run.values[b.id];
+          if (b.group === last && lastCell) lastCell.rowSpan += 1;            // 같은 구분이 이어지면 세로로 합침
+          else { lastCell = tr.insertCell(); lastCell.textContent = b.group; last = b.group; }
+          tr.insertCell().textContent = b.item;
+          if (v === undefined || v === null) {                                // 조건: 해당 없음 → 기준·결과·판정을 한 칸으로
+            var c = tr.insertCell(); c.colSpan = 3; c.textContent = '해당 없음';
+          } else if (b.noSpec) {                                              // 조건: 기준이 없는 항목 → 기준·결과를 한 칸으로
+            var c2 = tr.insertCell(); c2.colSpan = 2; c2.textContent = v; tr.insertCell().textContent = '-';
+          } else {
+            tr.insertCell().textContent = b.spec; tr.insertCell().textContent = v;
+            tr.insertCell().textContent = b.bad && b.bad(v) ? '부적합' : '적합';
+          }
+        });
+        host.appendChild(t);
+      });
+    }
+    var B1 = [
+      { id: 'look', group: '물리', item: '성상', spec: '흰색 분말' },
+      { id: 'water', group: '물리', item: '수분', spec: '2.0% 이하' },
+      { id: 'ph', group: '물리', item: 'pH', spec: '6.0 ~ 7.5', bad: function (v) { return parseFloat(v) > 7.5 || parseFloat(v) < 6; } },
+      { id: 'assay', group: '화학', item: '함량', spec: '98.0 ~ 102.0%' },
+      { id: 'imp', group: '화학', item: '유연물질', spec: '0.5% 이하' },
+      { id: 'endo', group: '미생물', item: '엔도톡신', spec: '0.25 EU/mg 이하' },
+      { id: 'note', group: '기타', item: '특이 사항', noSpec: true } ];
+    var M1 = { bricks: B1, runs: [
+      { title: '1회차 (오전 배치)', values: { look: '흰색 분말', water: '1.2%', ph: '6.8', assay: '99.6%', imp: '0.1%', endo: '0.05 미만', note: '없음' } },
+      { title: '2회차 (오후 배치)', values: { look: '흰색 분말', water: '1.3%', ph: '6.9', assay: '99.4%', imp: '0.1%', endo: '0.05 미만', note: '없음' } } ] };
+    function makeM2() {
+      var B2 = B1.slice(); B2[1] = { id: 'water', group: '물리', item: '수분', spec: '1.5% 이하' };
+      B2.splice(3, 0, { id: 'size', group: '물리', item: '입도', spec: '90% 이상 통과' });     // 기준정보 추가 → 블록 하나 더
+      return { bricks: B2, runs: [
+        { title: '1회차 (오전 배치)', values: { look: '흰색 분말', water: '1.2%', ph: '6.8', size: '94%', assay: '99.6%', imp: '0.1%', endo: '0.05 미만', note: '없음' } },
+        { title: '재시험', values: { look: '흰색 분말', water: '1.1%', ph: '6.8', size: '95%', assay: '99.9%', imp: null, endo: '0.05 미만', note: '수분 재측정' } },
+        { title: '2회차 (오후 배치)', values: { look: '흰색 분말', water: '1.3%', ph: '6.9', size: '93%', assay: '99.4%', imp: null, endo: '0.05 미만', note: '없음' } } ] };
+    }
+    var M2 = makeM2();
+    var s = stage(document.getElementById('json-stage'), '시험 기록 v1', '시험 기록 v2', true);
+    function frame(mount, title) {
+      mount.innerHTML = '<div class="case-paper"><h3 style="margin:0 0 4px;font-size:16px">시험 기록 — 원료 A (' + title + ')</h3><div class="json-grid"></div><p style="margin:12px 0 0">비고: 모든 항목은 승인된 시험법에 따라 수행함.</p></div>';
+      return mount.querySelector('.json-grid');
+    }
+    var gl = frame(s.left.mount, 'v1'), gr = frame(s.right.mount, 'v2');
+    // 비교는 먼저 걸어 두고, 표는 조금 뒤에(서버에서 JSON 이 온 것처럼) 그린다 → 그려지는 순간 자동으로 비교
+    s.attach(C.createCompare({ left: s.left.mount, right: s.right.mount, leftScroller: s.left.scroll, rightScroller: s.right.scroll, watch: true, debounce: 150 }));
+    setTimeout(function () { drawSheet(gl, M1); }, 300);
+    setTimeout(function () { drawSheet(gr, M2); }, 500);
+    var step = 0, toast = document.getElementById('json-toast');
+    var edits = [
+      ['실행 데이터 추가 — 3회차 표가 하나 더 그려짐', function (m) { m.runs.push({ title: '3회차 (야간 배치)', values: { look: '흰색 분말', water: '1.2%', ph: '7.0', size: '92%', assay: '99.5%', imp: '0.1%', endo: '0.05 미만', note: '없음' } }); }],
+      ['기준정보 추가 — 모든 표에 "잔류 용매" 블록이 하나씩 쌓임', function (m) { m.bricks.splice(6, 0, { id: 'solv', group: '화학', item: '잔류 용매', spec: '0.3% 이하' }); m.runs.forEach(function (r) { r.values.solv = '0.1%'; }); }],
+      ['조건 변경 — 2회차 유연물질 값이 들어와 합쳤던 칸이 풀림', function (m) { m.runs[2].values.imp = '0.2%'; }],
+      ['값 변경 — 1회차 pH 가 기준을 벗어나 판정이 부적합으로', function (m) { m.runs[0].values.ph = '7.8'; }],
+    ];
+    document.getElementById('json-edit').textContent = '새 버전 데이터 바꾸기 (누를 때마다 다른 변경)';
+    document.getElementById('json-edit').onclick = function () {
+      var e = edits[step % edits.length]; step++;
+      e[1](M2); drawSheet(gr, M2);
+      toast.textContent = e[0];
+    };
+    document.getElementById('json-reset').onclick = function () { M2 = makeM2(); step = 0; drawSheet(gr, M2); toast.textContent = '처음 데이터로 다시 그렸습니다'; };
+  };
+
   // ---------- 옛 화면 · 문서 안 iframe · 웹 컴포넌트 · 입력칸 ----------
   START['t-any'] = function () {
     var q = function (t) { return t.replace(/&/g, '&amp;').replace(/"/g, '&quot;'); };

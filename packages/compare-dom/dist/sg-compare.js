@@ -3530,6 +3530,7 @@ tr.sgc-spacer::after{content:none}
         const z = zoomOf(el) || 1;
         return el.getBoundingClientRect().height / z;
       }
+      if (cs.display === "table-row") return ch;
       return cs.boxSizing === "border-box" ? ch : ch + px(cs.paddingTop) + px(cs.paddingBottom) + px(cs.borderTopWidth) + px(cs.borderBottomWidth);
     }
     function spaceOf(el) {
@@ -3539,6 +3540,7 @@ tr.sgc-spacer::after{content:none}
       const cs = win.getComputedStyle(el);
       const ps = el.parentElement ? win.getComputedStyle(el.parentElement) : null;
       const h2 = layoutHeight(el);
+      if (cs.display === "table-row") return h2;
       if (ps && /flex|grid/.test(ps.display)) return h2 + px(cs.marginTop) + px(cs.marginBottom) + px(ps.rowGap);
       let next = el.nextElementSibling;
       while (next && (next.classList.contains("sgc-spacer") || next.hasAttribute("data-sgc-ignore"))) next = next.nextElementSibling;
@@ -4146,9 +4148,11 @@ tr.sgc-spacer::after{content:none}
           const begin = (it, d, now2, main) => {
             const from = it.sc.top, dist = Math.abs(d - from), vh = Math.max(1, it.sc.height());
             it.seg = main ? { from, t0: now2, T: Math.min(700, 380 + 110 * Math.log2(1 + dist / vh)), fn: easeInOut } : { from, t0: now2, T: Math.min(480, 220 + dist * 0.3), fn: easeOut };
-            if (main && dist > vh * 4) {
+            if (dist > vh * 4) {
               it.seg.warp = vh * 1.5;
               it.seg.dir = Math.sign(d - from);
+              it.seg.fn = easeInOut;
+              it.seg.T = Math.max(it.seg.T, 500);
             }
             it.dest = d;
             it.done = false;
@@ -4174,7 +4178,11 @@ tr.sgc-spacer::after{content:none}
                       it.done = true;
                       continue;
                     }
-                  } else if (Math.abs(d - it.dest) > 1) begin(it, d, now2, false);
+                  } else if (Math.abs(d - it.dest) > 1) {
+                    const g0 = it.seg;
+                    if (g0.warp && g0.warp * 2 * g0.fn(Math.min(1, (now2 - g0.t0) / g0.T)) <= g0.warp) it.dest = d;
+                    else begin(it, d, now2, false);
+                  }
                   const g = it.seg, t = Math.min(1, (now2 - g.t0) / g.T);
                   let v;
                   if (g.warp) {
