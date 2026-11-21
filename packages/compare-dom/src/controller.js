@@ -926,8 +926,8 @@ export function createCompare(options) {
       }
       if (keys.length) await ensureAligned(keys);
       if (token !== goToken) return;
-      // 부드럽게 가고 → 멈추면 다시 재서(그사이 새로 그려진 쪽·빈 칸 때문에 자리가 바뀌었으면) 다시 부드럽게, 최대 4번
-      for (let round = 0; round < 4 && !userMoved; round++) {
+      // 부드럽게 가고 → 멈추면 다시 재서(그사이 새로 그려진 쪽·빈 칸 때문에 자리가 바뀌었으면) 다시 부드럽게, 최대 7번
+      for (let round = 0; round < 7 && !userMoved; round++) {
         if (keys.length) await ensureAligned(keys);
         if (token !== goToken) return;
         let moving = false;

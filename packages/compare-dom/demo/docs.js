@@ -81,15 +81,15 @@
     var stamp = c.status === 'review' ? ['is-draft', '검토 중'] : c.status === 'superseded' ? ['is-old', '대체됨'] : ['is-ok', '승인'];
     function frame(no, kids, extraClass) {
       // 머리말: 첫 쪽만 비교 (나머지 쪽은 같은 내용 반복이라 뺌)
-      var headProps = { className: 'sheet__head', key: 'h' };
+      var headProps = { className: 'mbr-head', key: 'h' };
       if (no > 0) headProps['data-sgc-ignore'] = '';
       return el('article', { className: 'page' + (extraClass ? ' ' + extraClass : ''), 'data-page': String(no), key: 'pg' + no }, [
         el('header', headProps, [
-          el('div', { className: 'sheet__brand' }, [
+          el('div', { className: 'mbr-brand' }, [
             el('span', null, ORG), el('b', null, TITLE),
-            el('span', { className: 'sheet__stamp ' + stamp[0], 'data-sgc-ignore': '' }, stamp[1]),
+            el('span', { className: 'mbr-stamp ' + stamp[0], 'data-sgc-ignore': '' }, stamp[1]),
           ]),
-          el('dl', { className: 'sheet__meta' }, [
+          el('dl', { className: 'mbr-meta' }, [
             el('div', null, [el('dt', null, '문서명'), el('dd', null, TITLE)]),
             el('div', null, [el('dt', null, '문서 번호'), el('dd', null, DOCNO)]),
             el('div', null, [el('dt', null, '개정'), el('dd', null, c.ver)]),
@@ -132,36 +132,33 @@
 
   /** 문서 용지 모양 (A4 통제 문서). 비교 모듈과 상관없는 "고객사 화면" CSS 역할 */
   var CSS = [
-    /* 홈페이지 /compare(운영 중인 비교 화면)와 같은 문서 디자인: 흰 A4, 굵은 머리 줄, 가는 줄 표 */
-    '.doc-root{--p-ink:#1d1f23;--p-ink-2:#4a4e56;--p-ink-3:#7b8089;--p-line:#d9dce1;--p-line-2:#aeb3bb;color:var(--p-ink);font:16px/1.5 Pretendard,"Pretendard Variable",-apple-system,"Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif}',
-    '.page{position:relative;width:794px;min-height:1123px;margin:0 auto 24px;padding:48px 56px 40px;background:#fff;box-shadow:0 1px 2px rgb(0 0 0/.25),0 12px 28px -12px rgb(0 0 0/.45);display:flex;flex-direction:column;gap:8px;content-visibility:auto;contain-intrinsic-size:auto 682px auto 1035px;box-sizing:border-box}',
-    '.sheet__head{margin-bottom:6px}',
-    '.sheet__brand{display:flex;align-items:baseline;gap:10px;padding-bottom:8px;border-bottom:2px solid var(--p-ink)}',
-    '.sheet__brand span:first-child{font-size:.78em;font-weight:700;letter-spacing:.06em;color:var(--p-ink-3)}',
-    '.sheet__brand b{font-size:1.25em;margin-right:auto}',
-    '.sheet__stamp{font-size:.78em;font-weight:700;padding:1px 8px;border:1.5px solid currentColor;border-radius:3px}',
-    '.sheet__stamp.is-ok{color:#1e7f4f}.sheet__stamp.is-draft{color:#b26b00}.sheet__stamp.is-old{color:var(--p-ink-3)}',
-    '.sheet__meta{margin:0;display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,.7fr) minmax(0,1.1fr);column-gap:12px;border-bottom:1px solid var(--p-line-2)}',
-    '.sheet__meta div:first-child{grid-column:1/-1}',
-    '.sheet__meta div{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px;padding:5px 0;border-bottom:1px solid var(--p-line);font-size:.88em}',
-    '.sheet__meta div:nth-last-child(-n+3){border-bottom:0}',
-    '.sheet__meta dt{color:var(--p-ink-3)}.sheet__meta dd{margin:0;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
-    '.pg-title{margin:10px 0 2px;font-size:1.05em;font-weight:700;padding-bottom:4px;border-bottom:1px solid var(--p-line-2)}',
-    '.page p{margin:0}.pg-p{color:var(--p-ink-2)}',
-    '.pg-table{width:100%;border-collapse:collapse;font-size:.88em}',
-    '.pg-table th,.pg-table td{padding:5px 6px;border-bottom:1px solid var(--p-line);text-align:left;font-variant-numeric:tabular-nums}',
-    '.pg-table thead th{font-size:.9em;font-weight:700;color:var(--p-ink-2);border-bottom:1.5px solid var(--p-ink)}',
-    '.cv-meta th{width:18%;color:var(--p-ink-3);font-weight:400}',
-    '.pg-sub{margin:6px 0 0;font-size:.92em;font-weight:700;color:var(--p-ink-2)}',
-    '.pg-checks{margin:0;padding-left:20px;color:var(--p-ink-2)}',
-    '.pg-note{border-left:3px solid #b26b00;background:#fdf6e9;padding:6px 10px;font-size:.9em}',
-    '.pg-foot{margin-top:auto;display:flex;justify-content:space-between;gap:8px;padding-top:8px;border-top:1px solid var(--p-line-2);font-size:.75em;color:var(--p-ink-3)}',
+    /* 홈페이지 /compare 운영 화면과 같은 문서 디자인 (Noto Sans 14px, 칸 4개 문서 정보, 회색 머리줄 표) */
+    '.doc-root{--ink-1:#1b2130;--ink-2:#5b6474;--rule:#d3d8df;--head:#eff1f4;color:var(--ink-1);font:14px/1.6 "Noto Sans KR","Pretendard",system-ui,sans-serif}',
+    '.page{position:relative;width:794px;min-height:1123px;margin:0 auto 18px;padding:52px 60px 40px;background:#fff;box-shadow:0 1px 3px rgba(16,24,40,.14),0 0 0 1px rgba(16,24,40,.05);display:flex;flex-direction:column;gap:12px;box-sizing:border-box;content-visibility:auto;contain-intrinsic-size:auto 674px auto 1031px}',
+    '.mbr-head{border-bottom:1.5px solid var(--ink-1);padding-bottom:10px;margin-bottom:6px}',
+    '.mbr-brand{display:flex;align-items:center;gap:12px;font-size:12px;color:var(--ink-2);letter-spacing:.04em}',
+    '.mbr-brand b{flex:1;font-size:17px;color:var(--ink-1);letter-spacing:0}',
+    '.mbr-stamp{font-size:11px;font-weight:700;padding:2px 8px;border:1.5px solid;border-radius:4px}',
+    '.mbr-stamp.is-ok{color:#0e8a5f}.mbr-stamp.is-draft{color:#a86a00}.mbr-stamp.is-old{color:var(--ink-2)}',
+    '.mbr-meta{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin:10px 0 0;border:1px solid var(--rule)}',
+    '.mbr-meta div{padding:6px 10px;border-left:1px solid var(--rule)}.mbr-meta div:first-child{border-left:0}',
+    '.mbr-meta dt{font-size:11px;color:var(--ink-2)}.mbr-meta dd{margin:0;font-weight:600;font-size:13px}',
+    '.pg-title{margin:10px 0 0;font-size:16px;font-weight:700;padding-bottom:4px;border-bottom:1px solid var(--rule)}',
+    '.page p{margin:0}',
+    '.pg-table{width:100%;border-collapse:collapse;font-size:13px}',
+    '.pg-table th,.pg-table td{border:1px solid var(--rule);padding:4px 8px;text-align:left;font-variant-numeric:tabular-nums}',
+    '.pg-table th{background:var(--head);font-weight:600;font-size:12px;color:var(--ink-2)}',
+    '.cv-meta th{width:18%}',
+    '.pg-sub{margin:4px 0 0;font-size:14.5px;font-weight:600}',
+    '.pg-checks{margin:0;padding-left:20px}',
+    '.pg-note{border:1px solid #e9b949;background:#fff8e6;padding:8px 12px;font-size:13px}',
+    '.pg-foot{margin-top:auto;display:flex;justify-content:space-between;font-size:11px;color:var(--ink-2);border-top:1px solid var(--rule);padding-top:8px}',
   ].join('\n');
 
   /** JSP 화면처럼 완성된 HTML 문서 한 장 (iframe 에 그대로 넣음) */
   function serverPage(d, title) {
     return '<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>' + esc(title) + '</title>' +
-      '<style>body{margin:0;padding:24px 0;background:#2a2c31}' + CSS + '</style>' +
+      '<style>body{margin:0;padding:16px 0;background:#2a2c31}' + CSS + '</style>' +
       '<script>function z(){var w=document.documentElement.clientWidth;document.body.style.zoom=Math.min(1,(w-24)/794)}addEventListener("resize",z);addEventListener("DOMContentLoaded",z)<\/script>' +
       '</head><body><main class="doc-root">' + toHtml(d) + '</main></body></html>';
   }

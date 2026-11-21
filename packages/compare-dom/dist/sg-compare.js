@@ -3804,7 +3804,7 @@ tr.sgc-spacer::after{content:none}
         }
         if (keys.length) await ensureAligned(keys);
         if (token !== goToken) return;
-        for (let round = 0; round < 4 && !userMoved; round++) {
+        for (let round = 0; round < 7 && !userMoved; round++) {
           if (keys.length) await ensureAligned(keys);
           if (token !== goToken) return;
           let moving = false;

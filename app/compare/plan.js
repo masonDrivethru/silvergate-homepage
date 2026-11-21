@@ -7,16 +7,14 @@
 
 /** @param {import('./types.js').MbrDocument} doc */
 export function itemsOf(doc) {
-  // 높이 (px, 문서 글자 16px 기준, 실제 잰 값 + 여유). 머리말·표 머리·꼬리말(약 240px)은 쪽마다 따로라 빼고, 쪽 본문 약 790px
-  const out = [];
-  const perLine = (text) => (/[\uac00-\ud7a3]/.test(text ?? '') ? 36 : 66);   // 한 줄에 들어가는 글자 수 (한글 / 영문)
-  if (doc.materials?.length) out.push({ key: 'mat', cost: 75 + doc.materials.length * 33 + (doc.materialsLayout === 'detailed' ? 32 : 0) });
+  const out = [{ key: 'head', cost: 3 }];
+  if (doc.materials?.length) out.push({ key: 'mat', cost: 1.4 + doc.materials.length * 0.5 + (doc.materialsLayout === 'detailed' ? 1.1 : 0) });   // 실제 높이에 맞춤 (상세 표는 머리글 2단)
   doc.groups.forEach((g) => {
     const gid = g.groupId ?? g.title;
-    out.push({ key: `g:${gid}`, cost: 48 });
+    out.push({ key: `g:${gid}`, cost: 1.2 });
     for (const s of g.steps ?? []) {
-      const lines = Math.max(1, Math.ceil((s.instruction?.length ?? 0) / perLine(s.instruction)));
-      out.push({ key: `s:${gid}:${s.stepId ?? s.title}`, cost: 100 + (lines - 1) * 24 + (s.params?.length ?? 0) * 33 });
+      const len = (s.instruction?.length ?? 0) / 90;
+      out.push({ key: `s:${gid}:${s.stepId ?? s.title}`, cost: 1.7 + Math.ceil(len) * 0.35 + (s.params?.length ? 0.5 + s.params.length * 0.42 : 0) });
     }
   });
   return out;
@@ -25,12 +23,12 @@ export function itemsOf(doc) {
 /**
  * @returns {string[][]} 쪽마다 항목 키 목록 (양쪽 공통)
  */
-export function planPages(left, right, pageCost = 740) {
+export function planPages(left, right, pageCost = 17) {
   const L = itemsOf(left), R = itemsOf(right);
   const lpos = new Map(L.map((x, i) => [x.key, i]));
   const rset = new Set(R.map((x) => x.key));
-  const cost = new Map(), fresh = new Set();
-  for (const x of [...L, ...R]) { cost.set(x.key, Math.max(cost.get(x.key) ?? 0, x.cost)); if (x.newPage) fresh.add(x.key); }
+  const cost = new Map();
+  for (const x of [...L, ...R]) cost.set(x.key, Math.max(cost.get(x.key) ?? 0, x.cost));
   // 합친 순서: 오른쪽 순서를 기준으로, 왼쪽에만 있는 항목은 왼쪽에서 앞에 있던 공통 항목 바로 뒤에
   const merged = [];
   let li = 0;
@@ -49,7 +47,7 @@ export function planPages(left, right, pageCost = 740) {
   merged.forEach((k, i) => {
     const c = cost.get(k) ?? 1;
     const need = k.startsWith('g:') ? c + (cost.get(merged[i + 1]) ?? 0) : c;
-    if (cur.length && (used + need > pageCost || fresh.has(k))) { pages.push(cur); cur = []; used = 0; }
+    if (cur.length && used + need > pageCost) { pages.push(cur); cur = []; used = 0; }
     cur.push(k); used += c;
   });
   if (cur.length || !pages.length) pages.push(cur);
