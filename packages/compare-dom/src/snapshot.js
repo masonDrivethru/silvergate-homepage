@@ -24,7 +24,8 @@ export function hashStr(str, seed = 0) {
   }
   h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
   h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
-  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
+  // 숫자 그대로 (글자로 바꾸는 비용이 수십만 노드에서 컸음). 53비트라 충돌 걱정 없음
+  return 4294967296 * (2097151 & h2) + (h1 >>> 0);
 }
 
 export const normText = (s) => s.replace(/\s+/g, ' ').trim();
@@ -159,9 +160,11 @@ function* walk(root, opt) {
   const top = open(rootEl, -1);
   const stack = [top];
   while (stack.length) {
-    const f = stack[stack.length - 1];
-    if (f.x < f.kids.length) {
-      const ch = f.kids[f.x++];
+    const fr = stack[stack.length - 1];
+    // 건너뛰는 감싸개(쪽) 안쪽은 바깥 요소(f)에 바로 붙인다
+    const f = fr.into ?? fr;
+    if (fr.x < fr.kids.length) {
+      const ch = fr.kids[fr.x++];
       if (++count % 512 === 0) yield;
       if (ch.virt) {
         // rowspan 으로 내려온 칸: 원래 칸과 같은 내용(자식 공유), 같은 DOM 요소를 가리킴
@@ -188,18 +191,20 @@ function* walk(root, opt) {
         f.sig += '\u0003' + h;
       } else if (t === 1) {
         if (SKIP_TAGS.has(ch.tagName) || (ignoreSel && ch.matches(ignoreSel))) continue;
-        if (flattenSel && ch.matches(flattenSel)) { f.kids.splice(f.x, 0, ...Array.from(ch.childNodes)); continue; }
+        // (예전엔 부모 목록에 끼워 넣었는데(splice) 수천 쪽이면 목록 전체를 매번 밀어 느렸다)
+        if (flattenSel && ch.matches(flattenSel)) { stack.push({ into: f, kids: Array.from(ch.childNodes), x: 0 }); continue; }
         const sub = open(ch, f.out.i);
         f.out.c.push(sub.out);
         stack.push(sub);
       }
       continue;
     }
+    if (fr.into) { stack.pop(); continue; }
     // 이 요소 끝: 지문 계산 후 부모에 반영
     f.out.h = f.rec.h = hashStr(f.sig);
     if (f.ai >= 0) anchorHashes[f.ai] = f.out.h;
     stack.pop();
-    if (stack.length) stack[stack.length - 1].sig += '\u0003' + f.out.h;
+    if (stack.length) { const pf = stack[stack.length - 1]; (pf.into ?? pf).sig += '\u0003' + f.out.h; }
   }
   return { tree: top.out, nodes, anchors, anchorHashes, flat };
 }

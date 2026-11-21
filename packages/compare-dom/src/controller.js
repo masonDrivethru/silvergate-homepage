@@ -912,15 +912,15 @@ export function createCompare(options) {
           const sc = scrollers[side];
           const d = topIn(pg, sc.doc) - sc.viewTop();
           if (d > sc.height() * 1.5 || d + pg.getBoundingClientRect().height < -sc.height() * 0.5) {
-            const v = Math.max(0, Math.min(sc.top + d - sc.height() * 0.15, sc.max()));
+            // 멀리 있으면 부드럽게 수천 쪽을 지나가지 않고: 목표 바로 앞(한 화면 거리)까지 순간 이동 → 남은 거리만 부드럽게
+            const v = Math.max(0, Math.min(sc.top + d - sc.height() * 0.15 - (soft ? Math.sign(d) * sc.height() * 0.8 : 0), sc.max()));
             const t = sc.target;
-            if (t.scrollTo) t.scrollTo({ top: v, behavior: soft ? 'smooth' : 'instant' }); else sc.top = v;
+            if (t.scrollTo) t.scrollTo({ top: v, behavior: 'instant' }); else sc.top = v;
             movedToPage = true;
           }
         }
         if (movedToPage) {
           link?.pause(2000);
-          await Promise.all(sides.map(({ side }) => settle(scrollers[side])));
           await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));   // 쪽이 그려질 시간
           if (token !== goToken) return;
         }
@@ -937,7 +937,19 @@ export function createCompare(options) {
         for (const { side, block } of sides) {
           if (!block.isConnected) continue;
           const sc = scrollers[side];
-          if (Math.abs(offBy(sc, block)) > 2) { scrollIntoScroller(sc, block, 0.3, soft); moving = true; }
+          const off = offBy(sc, block);
+          if (Math.abs(off) > 2) {
+            // 쪽 없는 긴 문서도 같은 방식: 멀면 한 화면 앞까지 순간 이동 후 부드럽게
+            if (soft && Math.abs(off) > sc.height() * 2) {
+              const t = sc.target, v = sc.top + off - Math.sign(off) * sc.height() * 0.8;
+              if (t.scrollTo) t.scrollTo({ top: v, behavior: 'instant' }); else sc.top = v;
+              await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+              if (token !== goToken) return;
+              if (keys.length) await ensureAligned(keys);
+              if (!block.isConnected) continue;
+            }
+            scrollIntoScroller(sc, block, 0.3, soft); moving = true;
+          }
         }
         if (!moving) break;
         link?.pause(2000);

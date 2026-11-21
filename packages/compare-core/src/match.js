@@ -11,25 +11,81 @@ const myers = new DiffMatchPatch();
 myers.Diff_Timeout = 0;      // 끝까지 (최소 편집)
 
 /**
- * 아주 긴 배열용 LCS: 항목 해시를 글자 하나로 바꿔 Myers diff (바뀐 곳이 적으면 거의 선형)
- * 서로 다른 해시가 65,000개를 넘으면 null
+ * 아주 긴 배열용 LCS (git 의 patience diff 와 같은 생각):
+ *  ① 양쪽에 딱 한 번씩만 나오는 항목을 기준점으로 잡고 (순서가 맞는 것만, LIS)
+ *  ② 기준점 사이의 작은 구간만 Myers diff → 수천 쪽에서도 거의 선형
  */
 function anchorsByMyers(hl, hr, pre, n, m) {
+  const out = [];
+  patience(hl, pre, n, hr, pre, m, out, 0);
+  return out;
+}
+
+function patience(hl, a0, n, hr, b0, m, out, depth) {
+  if (n <= 0 || m <= 0) return;
+  // 앞뒤 공통
+  let p = 0;
+  while (p < n && p < m && hl[a0 + p] === hr[b0 + p]) { out.push([a0 + p, b0 + p]); p++; }
+  let s = 0;
+  while (s < n - p && s < m - p && hl[a0 + n - 1 - s] === hr[b0 + m - 1 - s]) s++;
+  const tail = [];
+  for (let k = s; k > 0; k--) tail.push([a0 + n - k, b0 + m - k]);
+  a0 += p; b0 += p; n -= p + s; m -= p + s;
+  if (n > 0 && m > 0) {
+    if (n + m <= 3000 || depth > 8) myersRange(hl, a0, n, hr, b0, m, out);
+    else {
+      // 한 번씩만 나오는 항목
+      const cnt = new Map();
+      for (let i = 0; i < n; i++) { const h = hl[a0 + i]; const c = cnt.get(h); if (c) { c.l++; } else cnt.set(h, { l: 1, r: 0, li: a0 + i, ri: -1 }); }
+      for (let j = 0; j < m; j++) { const c = cnt.get(hr[b0 + j]); if (c) { c.r++; c.ri = b0 + j; } }
+      const uniq = [];
+      for (let i = 0; i < n; i++) { const c = cnt.get(hl[a0 + i]); if (c.l === 1 && c.r === 1) uniq.push(c); }
+      const lis = longestIncreasing(uniq);
+      if (!lis.length) myersRange(hl, a0, n, hr, b0, m, out);
+      else {
+        let pa = a0, pb = b0;
+        for (const u of lis) {
+          patience(hl, pa, u.li - pa, hr, pb, u.ri - pb, out, depth + 1);
+          out.push([u.li, u.ri]);
+          pa = u.li + 1; pb = u.ri + 1;
+        }
+        patience(hl, pa, a0 + n - pa, hr, pb, b0 + m - pb, out, depth + 1);
+      }
+    }
+  }
+  for (const t of tail) out.push(t);
+}
+
+/** ri 가 증가하는 가장 긴 부분열 (O(k log k)) */
+function longestIncreasing(arr) {
+  const tails = [], prev = new Int32Array(arr.length), idx = [];
+  for (let k = 0; k < arr.length; k++) {
+    const v = arr[k].ri;
+    let lo = 0, hi = tails.length;
+    while (lo < hi) { const mid = (lo + hi) >> 1; if (arr[tails[mid]].ri < v) lo = mid + 1; else hi = mid; }
+    prev[k] = lo > 0 ? tails[lo - 1] : -1;
+    tails[lo] = k;
+  }
+  let k = tails.length ? tails[tails.length - 1] : -1;
+  while (k >= 0) { idx.push(arr[k]); k = prev[k]; }
+  return idx.reverse();
+}
+
+/** 한 구간 Myers: 항목 해시를 글자 하나로 바꿔 diff (서로 다른 해시가 63,000개를 넘으면 기준점 없음) */
+function myersRange(hl, a0, n, hr, b0, m, out) {
   const code = new Map();
   const enc = (h) => { let c = code.get(h); if (c === undefined) { c = code.size + 1; if (c >= 0xd800) c += 0x800; code.set(h, c); } return c; };
   const a = [], b = [];
-  for (let i = 0; i < n; i++) a.push(enc(hl[pre + i]));
-  for (let j = 0; j < m; j++) b.push(enc(hr[pre + j]));
-  if (code.size > 63000) return null;
+  for (let i = 0; i < n; i++) a.push(enc(hl[a0 + i]));
+  for (let j = 0; j < m; j++) b.push(enc(hr[b0 + j]));
+  if (code.size > 63000) return;
   const d = myers.diff_main(chunked(a), chunked(b), false);
-  const out = [];
   let i = 0, j = 0;
   for (const [op, t] of d) {
-    if (op === 0) { for (let k = 0; k < t.length; k++) out.push([pre + i + k, pre + j + k]); i += t.length; j += t.length; }
+    if (op === 0) { for (let k = 0; k < t.length; k++) out.push([a0 + i + k, b0 + j + k]); i += t.length; j += t.length; }
     else if (op === -1) i += t.length;
     else j += t.length;
   }
-  return out;
 }
 function chunked(arr) { let s = ''; for (let i = 0; i < arr.length; i += 8192) s += String.fromCharCode(...arr.slice(i, i + 8192)); return s; }
 
@@ -141,7 +197,7 @@ export function matchKeyless(L, R, hashOf, similar = null) {
   const anchors = [];
   for (let i = 0; i < pre; i++) anchors.push([i, i]);
   const big = n > 0 && m > 0 && (n + 1) * (m + 1) > LCS_LIMIT ? anchorsByMyers(hl, hr, pre, n, m) : null;
-  if (big) anchors.push(...big);
+  if (big) for (const x of big) anchors.push(x);
   else if (n > 0 && m > 0 && (n + 1) * (m + 1) <= LCS_LIMIT) {
     const W = m + 1, dp = new Uint32Array((n + 1) * W);
     for (let i = n - 1; i >= 0; i--) {
