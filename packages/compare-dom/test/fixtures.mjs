@@ -151,10 +151,11 @@ setTimeout(function () { drawTable(document.querySelector('#right .grid'), v2); 
 // ---------- 기준정보(블록)를 쌓아 표를 만들고, 조건에 따라 칸을 합치고, 실행 데이터(회차)만큼 표를 반복하는 컴포넌트 ----------
 export const BRICK_JS = `
 // 고객사 컴포넌트 흉내 (바닐라 JS). 비교 모듈은 모른다. 부를 때마다 통째로 새로 그린다
-function drawSheet(host, model) {
+function drawSheet(host, model, opt) {
+  opt = opt || {};
   host.replaceChildren();
   model.runs.forEach(function (run) {
-    var cap = document.createElement('h4'); cap.textContent = run.title; cap.style.margin = '12px 0 4px'; host.appendChild(cap);
+    var cap = document.createElement('h4'); cap.textContent = opt.sameTitle ? '시험 결과' : run.title; cap.style.margin = '12px 0 4px'; host.appendChild(cap);
     var t = document.createElement('table'), hr = t.createTHead().insertRow();
     ['구분', '항목', '기준', '결과', '판정'].forEach(function (x) { var th = document.createElement('th'); th.textContent = x; hr.appendChild(th); });
     var body = t.createTBody(), last = null, lastCell = null;
@@ -173,6 +174,8 @@ function drawSheet(host, model) {
       }
     });
     host.appendChild(t);
+    // 표마다 고유 ID: 제목과 표를 한 묶음으로 감싸고 그 묶음에 실행 ID 를 단다
+    if (opt.keys && run.id) { var box = document.createElement('section'); box.setAttribute('data-sgc-key', run.id); host.insertBefore(box, cap); box.append(cap, t); }
   });
 }
 var B1 = [
@@ -201,4 +204,16 @@ setTimeout(function () { drawSheet(document.querySelector('#left .grid'), M1); }
 setTimeout(function () { drawSheet(document.querySelector('#right .grid'), makeM2()); }, 350);
 </script></body></html>`;
 
-export const PAGES = { bricks, jsontable, basic, viewer, legacy, portal, inner, widgets, blank, pages, hidden, tables };
+// 제목이 모두 같고 내용도 거의 같은 표가 반복되는데, 가운데에 하나가 끼어든 경우. keys=1 이면 표마다 data-sgc-key
+const brickkeys = (q) => `${head('블록 표 (고유 ID)', DESK)}<body><div id="desk"><div id="left"><div class="doc"><div class="grid"></div></div></div><div id="right"><div class="doc"><div class="grid"></div></div></div></div>${SDK}
+<script>${BRICK_JS}
+var val = function (w, a) { return { look: '흰색 분말', water: w, assay: a, imp: '0.1%', note: '없음' }; };
+var A = { bricks: B1, runs: [ { id: 'RUN-001', title: 'a', values: val('1.2%', '99.6%') }, { id: 'RUN-002', title: 'b', values: val('1.3%', '99.4%') }, { id: 'RUN-003', title: 'c', values: val('1.1%', '99.5%') } ] };
+// 새 버전: RUN-002 앞에 RUN-002A 가 끼어듦 (RUN-002 와 값이 거의 같음), RUN-002 는 함량만 바뀜
+var B = { bricks: B1, runs: [ A.runs[0], { id: 'RUN-002A', title: 'x', values: val('1.3%', '99.3%') }, { id: 'RUN-002', title: 'b', values: val('1.3%', '99.7%') }, A.runs[2] ] };
+var o = { sameTitle: true, keys: ${q.get('keys') === '1'} };
+drawSheet(document.querySelector('#left .grid'), A, o); drawSheet(document.querySelector('#right .grid'), B, o);
+window.ctrl = SgCompare.createCompare({ left, right, leftScroller: desk, rightScroller: desk });
+</script></body></html>`;
+
+export const PAGES = { brickkeys, bricks, jsontable, basic, viewer, legacy, portal, inner, widgets, blank, pages, hidden, tables };

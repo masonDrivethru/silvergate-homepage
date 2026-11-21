@@ -417,6 +417,23 @@ await test('블록을 쌓아 만드는 표: 기준정보 추가 · 조건부 칸
   check('새 회차(3회차)는 통째로 추가', /added:node:[^|]*3회차/.test(r2.texts.join(' | ')), r2.texts.join(' | '));
 });
 
+await test('똑같이 생긴 표가 반복될 때: 표마다 고유 ID(data-sgc-key)를 달면 정확히 짝지음', async (page, check) => {
+  const read = () => page.evaluate(() => window.ctrl.changes.map((x) => { const n = x.right ?? x.left; const el = n.nodeType === 1 ? n : n.parentElement; const t = el.closest('table') ?? el.querySelector?.('table'); const idx = t ? [...el.closest('.grid').querySelectorAll('table')].indexOf(t) + 1 : 0; return idx + ':' + x.type + ':' + (x.text.diffs ?? []).map((d) => d[1]).join(''); }));
+  await page.goto(`${BASE}/t/brickkeys?keys=1`);
+  await done(page);
+  const k = await read();
+  // 새 버전: 2번째 표(RUN-002A)가 새로 끼어들었고, 3번째 표(RUN-002)는 함량만 99.4 → 99.7
+  check('끼어든 표(2번째)는 제목까지 한 묶음으로 추가 (변경 2건뿐)', k.includes('2:added:') && k.length === 2, k.join(' | '));
+  check('원래 있던 표(3번째)는 함량 수정만 (99.4 → 99.7)', k.some((x) => /^3:modified:99\.47%$/.test(x)) && !k.some((x) => x.startsWith('3:added')), k.join(' | '));
+  const h = await page.evaluate(() => { const L = [...document.querySelectorAll('#left table')], R = [...document.querySelectorAll('#right table')]; const top = (e) => e.getBoundingClientRect().top; return { doc: document.getElementById('left').offsetHeight - document.getElementById('right').offsetHeight, same: [[0, 0], [1, 2], [2, 3]].map(([a, b]) => Math.round(top(L[a]) - top(R[b]))) }; });
+  check('같은 ID 표끼리 같은 높이, 문서 높이도 같음', h.doc === 0 && h.same.every((d) => d === 0), JSON.stringify(h));
+  // ID 가 없으면: 내용이 비슷한 정도로만 판단 → 끼어든 표를 "수정된 옛 표"로 볼 수 있다 (틀린 것은 아니지만 뜻과 다름)
+  await page.goto(`${BASE}/t/brickkeys?keys=0`);
+  await done(page);
+  const n = await read();
+  check('ID 가 없어도 오류 없이 비교되고 높이는 맞음', n.length > 0 && await page.evaluate(() => document.getElementById('left').offsetHeight === document.getElementById('right').offsetHeight), n.join(' | '));
+});
+
 await browser.close();
 server.close();
 const bad = results.filter((r) => !r.ok);

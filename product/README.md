@@ -18,7 +18,7 @@
 | `dist/sg-compare.esm.js` | 번들러(Vite·Webpack·Angular CLI)용 ES 모듈 |
 | `dist/sg-compare.d.ts` | TypeScript 타입 |
 | `packages/*.tgz` | npm 패키지 (오프라인 설치용): compare-dom(본체) · compare-vue · compare-react |
-| `examples/` | plain-html · jsp · vue3 · react · angular 연동 예제 |
+| `examples/` | plain-html(기본 · 주소 두 개 · JSON 으로 표를 그리는 컴포넌트) · jsp · vue3 · react · angular 연동 예제 |
 | `docs/` | 설치·연동, API, 보안(CSP), 문서 작성 요령, 제약 사항 |
 | `LICENSE` · `THIRD_PARTY_NOTICES.md` · `CHANGELOG.md` | 라이선스·고지·변경 이력 |
 

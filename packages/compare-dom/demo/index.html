@@ -138,6 +138,11 @@ select{height:36px;border:1px solid var(--line);border-radius:8px;background:var
       <div class="actions"><button class="btn btn-primary" id="json-edit" type="button">새 버전 데이터 바꿔 다시 그리기</button><button class="btn" id="json-reset" type="button">처음으로</button><span class="toast" id="json-toast" aria-live="polite"></span></div>
     </div>
     <div id="json-stage" class="stage"></div>
+    <div class="panel-head" style="margin-top:28px">
+      <p><b>표마다 고유 ID 달기.</b> 제목도 내용도 거의 같은 표가 반복되는데 가운데에 하나가 끼어든 경우입니다(새 버전의 <b>2번째 표</b>가 새로 생긴 것이고, 3번째 표는 함량만 99.4 → 99.7 로 바뀜). ID 가 없으면 모듈은 내용이 비슷한 정도로만 짝을 짓기 때문에, 끼어든 표를 "수정된 옛 표"로 보고 원래 있던 표를 "추가"로 표시합니다. 컴포넌트가 제목과 표를 한 묶음으로 감싸고 그 묶음에 <code>data-sgc-key="실행ID"</code> 를 달면 정확히 짝지어집니다 (표에만 달아도 표는 정확히 짝지어집니다). 아래 스위치로 바로 비교해 보세요.</p>
+      <div class="actions"><label class="note" style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="key-on"> 표마다 고유 ID(data-sgc-key) 달기</label><span class="toast" id="key-toast" aria-live="polite"></span></div>
+    </div>
+    <div id="key-stage" class="stage"></div>
   </section>
 
   <section class="panel" id="p-any" role="tabpanel" aria-labelledby="t-any" hidden>
@@ -371,7 +376,8 @@ select{height:36px;border:1px solid var(--line);border-radius:8px;background:var
   START['t-json'] = function () {
     // 고객사 컴포넌트 흉내. 비교 모듈은 모른다(고유 ID 도 달지 않음). 부를 때마다 통째로 새로 그린다
     //   model.bricks = 기준정보 목록 (하나가 블록 하나 = 줄 하나), model.runs = 실행 데이터 (회차마다 표 하나)
-    function drawSheet(host, model) {
+    function drawSheet(host, model, opt) {
+      opt = opt || {};
       host.replaceChildren();
       model.runs.forEach(function (run) {
         var cap = document.createElement('h4'); cap.textContent = run.title; cap.style.margin = '14px 0 6px'; host.appendChild(cap);
@@ -393,6 +399,8 @@ select{height:36px;border:1px solid var(--line);border-radius:8px;background:var
           }
         });
         host.appendChild(t);
+        // ★ 표마다 고유 ID: 제목과 표를 한 묶음으로 감싸고 그 묶음에 실행 ID 를 단다
+        if (opt.keys && run.id) { var box = document.createElement('section'); box.setAttribute('data-sgc-key', run.id); host.insertBefore(box, cap); box.append(cap, t); }
       });
     }
     var B1 = [
@@ -439,6 +447,29 @@ select{height:36px;border:1px solid var(--line);border-radius:8px;background:var
       toast.textContent = e[0];
     };
     document.getElementById('json-reset').onclick = function () { M2 = makeM2(); step = 0; drawSheet(gr, M2); toast.textContent = '처음 데이터로 다시 그렸습니다'; };
+    // ---- 표마다 고유 ID 달기 ----
+    var KB = B1.filter(function (b) { return b.id !== 'ph' && b.id !== 'endo'; });
+    var kv = function (w, a) { return { look: '흰색 분말', water: w, assay: a, imp: '0.1%', note: '없음' }; };
+    var KA = { bricks: KB, runs: [
+      { id: 'RUN-001', title: '시험 결과', values: kv('1.2%', '99.6%') },
+      { id: 'RUN-002', title: '시험 결과', values: kv('1.3%', '99.4%') },
+      { id: 'RUN-003', title: '시험 결과', values: kv('1.1%', '99.5%') } ] };
+    var KN = { bricks: KB, runs: [ KA.runs[0],
+      { id: 'RUN-002A', title: '시험 결과', values: kv('1.3%', '99.3%') },         // 새로 끼어든 표 (RUN-002 와 거의 같음)
+      { id: 'RUN-002', title: '시험 결과', values: kv('1.3%', '99.7%') },          // 원래 있던 표: 함량만 바뀜
+      KA.runs[2] ] };
+    var ks = stage(document.getElementById('key-stage'), '이전 (표 3개)', '새 버전 (표 4개)', true);
+    function kframe(mount) { mount.innerHTML = '<div class="case-paper"><div class="json-grid"></div></div>'; return mount.querySelector('.json-grid'); }
+    var kl = kframe(ks.left.mount), kr = kframe(ks.right.mount);
+    ks.attach(C.createCompare({ left: ks.left.mount, right: ks.right.mount, leftScroller: ks.left.scroll, rightScroller: ks.right.scroll, watch: true, debounce: 150 }));
+    var keyBox = document.getElementById('key-on'), keyToast = document.getElementById('key-toast');
+    function drawKeys() {
+      var o = { keys: keyBox.checked };
+      drawSheet(kl, KA, o); drawSheet(kr, KN, o);
+      keyToast.textContent = keyBox.checked ? 'ID 있음 → 2번째 표가 제목까지 통째로 "추가", 3번째 표는 함량 수정만' : 'ID 없음 → 2번째 표를 "수정"으로, 3번째 표를 "추가"로 봄 (뜻과 다름)';
+    }
+    keyBox.onchange = drawKeys;
+    drawKeys();
   };
 
   // ---------- 옛 화면 · 문서 안 iframe · 웹 컴포넌트 · 입력칸 ----------
