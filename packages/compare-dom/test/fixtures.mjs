@@ -111,4 +111,41 @@ ${(v === 1 ? ['가열 후 30분 유지', '냉각수 순환 시작', '시료 채�
 const tables = `${head('표', DESK)}<body><div id="desk"><div id="left">${tableDoc(1)}</div><div id="right">${tableDoc(2)}</div></div>${SDK}
 <script>window.ctrl = SgCompare.createCompare({ left, right, leftScroller: desk, rightScroller: desk });</script></body></html>`;
 
-export const PAGES = { basic, viewer, legacy, portal, inner, widgets, blank, pages, hidden, tables };
+// ---------- JSON 을 받아 바닐라 JS 로 표를 그리는 컴포넌트 (늦게 그리고, 데이터가 바뀌면 표 전체를 새로 그림) ----------
+const jsontable = `${head('JSON 표', DESK)}<body><div id="desk"><div id="left"><div class="doc"><h3>시험 결과</h3><div class="grid"></div><p>비고: 없음</p></div></div><div id="right"><div class="doc"><h3>시험 결과</h3><div class="grid"></div><p>비고: 없음</p></div></div></div>${SDK}
+<script>
+// 고객사 표 컴포넌트 흉내: 키(data-sgc-key) 같은 것은 모른다. 부를 때마다 표를 통째로 새로 만든다
+function drawTable(host, data) {
+  var t = document.createElement('table'), thead = t.createTHead().insertRow();
+  data.columns.forEach(function (c) { var th = document.createElement('th'); th.textContent = c.title; thead.appendChild(th); });
+  var body = t.createTBody();
+  data.rows.forEach(function (r) {
+    var tr = body.insertRow();
+    data.columns.forEach(function (c) {
+      var v = r[c.field];
+      if (v && v.skip) return;                                   // 위 칸이 병합해서 내려옴
+      var td = tr.insertCell(); td.textContent = v && v.text !== undefined ? v.text : v;
+      if (v && v.rowspan) td.rowSpan = v.rowspan;
+    });
+  });
+  host.replaceChildren(t);
+}
+var cols = [{ field: 'grp', title: '구분' }, { field: 'item', title: '항목' }, { field: 'spec', title: '기준' }, { field: 'val', title: '결과' }];
+window.v1 = { columns: cols, rows: [
+  { grp: { text: '물리', rowspan: 2 }, item: '성상', spec: '흰색 분말', val: '적합' },
+  { grp: { skip: 1 }, item: '수분', spec: '2.0% 이하', val: '1.2%' },
+  { grp: { text: '화학', rowspan: 2 }, item: '함량', spec: '98.0 ~ 102.0%', val: '99.6%' },
+  { grp: { skip: 1 }, item: '유연물질', spec: '0.5% 이하', val: '0.1%' } ] };
+window.v2 = { columns: cols.concat([{ field: 'by', title: '시험자' }]), rows: [
+  { grp: { text: '물리', rowspan: 3 }, item: '성상', spec: '흰색 분말', val: '적합', by: '가' },
+  { grp: { skip: 1 }, item: '수분', spec: '1.5% 이하', val: '1.2%', by: '가' },
+  { grp: { skip: 1 }, item: '입도', spec: '90% 이상', val: '94%', by: '나' },
+  { grp: { text: '화학', rowspan: 1 }, item: '함량', spec: '98.0 ~ 102.0%', val: '99.8%', by: '나' } ] };
+window.drawTable = drawTable;
+// 비교는 먼저 걸어 두고, 표는 나중에(서버에서 JSON 이 온 뒤) 그려진다
+window.ctrl = SgCompare.createCompare({ left, right, leftScroller: desk, rightScroller: desk, watch: true, debounce: 100 });
+setTimeout(function () { drawTable(document.querySelector('#left .grid'), v1); }, 250);
+setTimeout(function () { drawTable(document.querySelector('#right .grid'), v2); }, 400);
+</script></body></html>`;
+
+export const PAGES = { jsontable, basic, viewer, legacy, portal, inner, widgets, blank, pages, hidden, tables };

@@ -341,6 +341,35 @@ await test('복잡한 표: 병합 · 열 추가 · 줄 순서 바뀜', async (pa
   check('표 높이 좌우 같음', g.every((d) => d <= 1), g.join(','));
 });
 
+await test('JSON 으로 표를 그리는 바닐라 JS 컴포넌트 (늦게 그림 · 통째로 다시 그림 · 키 없음)', async (page, check) => {
+  await page.goto(`${BASE}/t/jsontable`);
+  await page.waitForTimeout(1200);
+  const r = await done(page, `, cols: c.changes.filter((x) => x.what === 'column').map((x) => x.count), texts: c.changes.map((x) => x.type + ':' + (x.text.diffs ?? []).map((d) => d[1]).join('') + (x.text.context ?? '') + (x.text.attr ?? ''))`);
+  check('오류 없음', !r.error, r.error);
+  const all = r.texts.join(' | ');
+  check('표가 늦게 그려져도 자동으로 비교됨', r.n > 0, String(r.n));
+  check('열 추가(시험자)는 한 건으로', r.cols.length === 1, JSON.stringify(r.cols) + ' ' + all);
+  check('칸 값 수정 (기준 2.0 → 1.5, 결과 99.6 → 99.8)', /1\.|2\.0/.test(all) && /99\./.test(all), all);
+  check('줄 추가(입도) · 줄 삭제(유연물질)', r.stats.added >= 1 && r.stats.deleted >= 1, JSON.stringify(r.stats) + ' ' + all);
+  check('병합(rowspan) 바뀜', /rowspan|병합/.test(all), all);
+  const h = await page.evaluate(() => [document.querySelector('#left table').offsetHeight, document.querySelector('#right table').offsetHeight, document.getElementById('left').offsetHeight, document.getElementById('right').offsetHeight]);
+  check('표·문서 높이 좌우 같음', Math.abs(h[0] - h[1]) <= 1 && Math.abs(h[2] - h[3]) <= 1, h.join(','));
+  // 데이터가 바뀌어 컴포넌트가 표를 통째로 다시 그림 → 자동으로 다시 비교, 옛 표시·빈 칸은 남지 않음
+  const again = await page.evaluate(async () => {
+    const c = window.ctrl; let updates = 0; c.on('update', () => updates++);
+    const d = JSON.parse(JSON.stringify(window.v2)); d.rows[3].val = '100.1%';
+    window.drawTable(document.querySelector('#right .grid'), d);
+    for (let i = 0; i < 100 && !updates; i++) await new Promise((r) => setTimeout(r, 25));
+    await new Promise((r) => setTimeout(r, 300));
+    return { updates, has: c.changes.some((x) => (x.text.diffs ?? []).some((p) => /100/.test(p[1]))), spacersL: document.querySelectorAll('#left .sgc-spacer').length, spacersR: document.querySelectorAll('#right .sgc-spacer').length, hL: document.getElementById('left').offsetHeight, hR: document.getElementById('right').offsetHeight, error: c.error ? String(c.error) : null };
+  });
+  check('다시 그리면 자동으로 다시 비교', again.updates >= 1 && again.has && !again.error, JSON.stringify(again));
+  check('다시 그린 뒤에도 높이 같음', Math.abs(again.hL - again.hR) <= 1, JSON.stringify(again));
+  // 같은 데이터로 양쪽을 그리면 변경 없음
+  const same = await page.evaluate(async () => { window.drawTable(document.querySelector('#right .grid'), window.v1); await new Promise((r) => setTimeout(r, 700)); return { n: window.ctrl.changes.length, spacers: document.querySelectorAll('.sgc-spacer').length, marks: document.querySelectorAll('[data-sgc]').length }; });
+  check('양쪽이 같아지면 변경 0건, 표시·빈 칸 없음', same.n === 0 && same.spacers === 0 && same.marks === 0, JSON.stringify(same));
+});
+
 await browser.close();
 server.close();
 const bad = results.filter((r) => !r.ok);
