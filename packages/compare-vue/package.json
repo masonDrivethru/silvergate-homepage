@@ -1,6 +1,6 @@
 {
   "name": "@silvergate/compare-vue",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Vue 3 용 화면 비교 부품 (@silvergate/compare-dom 을 감싼 것). 기존 문서 컴포넌트를 그대로 두 번 그려 비교",
   "type": "module",
   "main": "./src/index.js",
@@ -13,15 +13,16 @@
   },
   "files": [
     "src",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "peerDependencies": {
     "vue": "^3.3.0"
   },
   "dependencies": {
-    "@silvergate/compare-dom": "0.1.0"
+    "@silvergate/compare-dom": "1.0.0"
   },
-  "license": "UNLICENSED",
+  "license": "SEE LICENSE IN LICENSE",
   "private": true,
   "peerDependenciesMeta": {
     "vue": {

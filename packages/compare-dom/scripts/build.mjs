@@ -3,8 +3,11 @@
 import { build } from 'esbuild';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { copyFileSync, readFileSync } from 'node:fs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
+const pkg = JSON.parse(readFileSync(path.join(here, '../package.json'), 'utf8'));
+const BANNER = `/*! SilverBio Compare SDK v${pkg.version} | (c) SilverGate Co., Ltd. ((주)실버게이트). All rights reserved. | Includes diff-match-patch (Apache-2.0, (c) Google) */`;
 const src = path.join(here, '../src');
 const out = path.join(here, '../dist');
 
@@ -33,11 +36,14 @@ for (const [file, minify] of [['sg-compare.js', false], ['sg-compare.min.js', tr
   await build({
     entryPoints: [path.join(src, 'index.js')], bundle: true, format: 'iife', globalName: 'SgCompare',
     outfile: path.join(out, file), minify, target: 'es2019', plugins: [blobSpawn], legalComments: 'none',
-    banner: { js: '/*! @silvergate/compare-dom — 화면 비교 (c) SilverGate */' },
+    banner: { js: BANNER },
   });
 }
 await build({
-  entryPoints: [path.join(src, 'index.js')], bundle: true, format: 'esm',
+  entryPoints: [path.join(src, 'index.js')], bundle: true, format: 'esm', minify: true,
   outfile: path.join(out, 'sg-compare.esm.js'), target: 'es2020', plugins: [blobSpawn], legalComments: 'none',
+  banner: { js: BANNER },
 });
+// 타입 정의도 dist 에 (npm 으로 설치했을 때 타입스크립트 자동 완성)
+copyFileSync(path.join(src, 'index.d.ts'), path.join(out, 'sg-compare.d.ts'));
 console.log('built dist/sg-compare.js, sg-compare.min.js, sg-compare.esm.js (worker', (workerCode.length / 1024).toFixed(1), 'KB)');

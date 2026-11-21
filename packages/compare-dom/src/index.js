@@ -4,3 +4,5 @@ export { mountToolbar, mountChangeList, mountViewer, ensureUiStyle } from './ui.
 export { snapshot } from './snapshot.js';
 export { diffTrees, DOM_RULES } from './engine.js';
 export { messages, getMessages } from './messages.js';
+/** SDK 버전 */
+export const version = '1.0.0';

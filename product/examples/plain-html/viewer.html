@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SilverBio Compare — 주소 두 개 비교 (mountViewer)</title>
+<style>body{margin:0;font:14px/1.6 system-ui,sans-serif;background:#f4f5f7}.wrap{max-width:1280px;margin:0 auto;padding:16px}</style>
+</head>
+<body>
+<div class="wrap">
+  <h1 style="font-size:18px">이미 있는 화면 두 개(주소)를 그대로 비교</h1>
+  <div id="viewer"></div>
+</div>
+<script src="../../dist/sg-compare.min.js"></script>
+<script>
+  // 같은 도메인의 화면 주소 두 개 (JSP·서버 화면·SPA 어떤 것이든). 다른 도메인은 브라우저가 막음
+  const v = SgCompare.mountViewer(document.getElementById('viewer'), {
+    left:  { url: 'docs/v1.html', label: 'v1.0' },
+    right: { url: 'docs/v2.html', label: 'v1.1' },
+    page: '.page',          // 쪽 요소가 있으면: 변경 목록에 "n쪽" + 보이는 쪽만 가볍게 처리
+    locale: 'ko',
+    height: '80vh',
+  });
+  v.ready.then((ctrl) => console.log('변경', ctrl.stats));
+</script>
+</body>
+</html>

@@ -22,18 +22,20 @@ export const SgCompare = forwardRef(function SgCompare(props, ref) {
   const { left, right, renderDoc, leftLabel = '', rightLabel = '', locale = 'ko', labels, page = null, height = '80vh',
     options = {}, toolbar = true, list = true, onUpdate, onFocus } = props;
   const [mode, setMode] = useState(props.mode ?? 'side');
-  const lM = useRef(), rM = useRef(), xM = useRef(), lS = useRef(), rS = useRef(), bar = useRef(), listEl = useRef();
+  const [phoneSide, setPhoneSide] = useState('right');
+  // 두 문서를 한 스크롤 영역(desk)에 나란히 → 좌우가 한 장처럼 함께 움직인다
+  const lM = useRef(), rM = useRef(), xM = useRef(), desk = useRef(), bar = useRef(), listEl = useRef();
   const ctrlRef = useRef(null), modeRef = useRef(mode), dirty = useRef(true), tbRef = useRef(null);
   modeRef.current = mode;
 
   useEffect(() => {
-    const c = createCompare({ ...options, left: lM.current, right: rM.current, leftScroller: lS.current, rightScroller: rS.current, page, watch: true });
+    const c = createCompare({ ...options, left: lM.current, right: rM.current, leftScroller: desk.current, rightScroller: desk.current, page, watch: true, locale });
     ctrlRef.current = c;
     c.on('update', () => { dirty.current = true; if (modeRef.current === 'redline') { c.renderRedline(xM.current); dirty.current = false; } onUpdate?.(c); });
     c.on('focus', (ch) => onFocus?.(ch));
-    const tb = toolbar ? mountToolbar(bar.current, c, { locale, labels, modes: true, mode: modeRef.current, onMode: setMode }) : null;
+    const tb = toolbar ? mountToolbar(bar.current, c, { locale, labels, modes: true, mode: modeRef.current, onMode: setMode, nonce: options.nonce }) : null;
     tbRef.current = tb;
-    const cl = list ? mountChangeList(listEl.current, c, { locale, labels }) : null;
+    const cl = list ? mountChangeList(listEl.current, c, { locale, labels, nonce: options.nonce }) : null;
     return () => { tb?.destroy(); cl?.destroy(); c.destroy(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -50,19 +52,25 @@ export const SgCompare = forwardRef(function SgCompare(props, ref) {
 
   const ko = locale !== 'en';
   const red = mode === 'redline';
-  const pane = (side, label, badge, mRef, sRef, data, hidden) => h('section', { className: 'sgc-pane', hidden },
-    h('header', { className: 'sgc-pane-head' }, h('span', { className: `sgc-badge sgc-badge-${side === 'left' ? 'old' : 'new'}` }, badge), label),
-    h('div', { ref: sRef, style: { flex: 1, minHeight: 0, overflow: 'auto' } },
-      // 한 장 보기 칸은 모듈이 직접 채운다 (React 가 손대지 않게 자식 없음)
-      h('div', { ref: mRef, className: 'sgc-doc' }, side === 'merged' ? null : renderDoc?.(data, side))));
+  const head = (side, badge, cls, label) => h('button', {
+    type: 'button', className: 'sgc-pane-head', 'aria-pressed': phoneSide === side ? 'true' : 'false', onClick: () => setPhoneSide(side),
+  }, h('span', { className: `sgc-badge ${cls}` }, badge), label);
 
   return h('div', { className: 'sgc-viewer', 'data-mode': mode, style: { '--sgc-height': height } },
     toolbar ? h('div', { ref: bar }) : null,
     h('div', { className: 'sgc-body', style: list ? undefined : { gridTemplateColumns: '1fr' } },
-      h('div', { className: 'sgc-panes' },
-        pane('left', leftLabel, ko ? '이전' : 'Before', lM, lS, left, red),
-        pane('right', rightLabel, ko ? '새 버전' : 'After', rM, rS, right, red),
-        pane('merged', `${leftLabel} → ${rightLabel}`, ko ? '한 장 보기' : 'Redline', xM, undefined, undefined, !red)),
+      h('div', { className: 'sgc-panes sgc-panes--one' },
+        h('section', { className: 'sgc-pane sgc-both', hidden: red },
+          h('div', { className: 'sgc-heads', role: 'group' },
+            head('left', ko ? '이전' : 'Before', 'sgc-badge-old', leftLabel),
+            head('right', ko ? '새 버전' : 'After', 'sgc-badge-new', rightLabel)),
+          h('div', { ref: desk, className: 'sgc-shared', 'data-phone': phoneSide, tabIndex: 0 },
+            h('div', { className: 'sgc-col sgc-col--left' }, h('div', { ref: lM, className: 'sgc-doc' }, renderDoc?.(left, 'left'))),
+            h('div', { className: 'sgc-col sgc-col--right' }, h('div', { ref: rM, className: 'sgc-doc' }, renderDoc?.(right, 'right'))))),
+        // 한 장 보기 칸은 모듈이 직접 채운다 (React 가 손대지 않게 자식 없음)
+        h('section', { className: 'sgc-pane', hidden: !red },
+          h('header', { className: 'sgc-pane-head' }, `${leftLabel} → ${rightLabel}`),
+          h('div', { style: { flex: 1, minHeight: 0, overflow: 'auto' } }, h('div', { ref: xM, className: 'sgc-doc' })))),
       list ? h('aside', { ref: listEl }) : null));
 });
 

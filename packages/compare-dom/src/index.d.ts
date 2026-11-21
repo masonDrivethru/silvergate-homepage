@@ -42,6 +42,8 @@ export interface CompareOptions {
   scrollbars?: 'one' | 'both';
   /** 만들자마자 비교. 기본 true */
   auto?: boolean;
+  /** 보안 정책(CSP)이 엄격한 사이트: 모듈이 넣는 <style> 에 붙일 nonce */
+  nonce?: string;
   /** 엔진(compare-core) 규칙 덮어쓰기 (고급) */
   rules?: Record<string, unknown>;
 }
@@ -99,7 +101,7 @@ export interface CompareController {
 
 export function createCompare(options: CompareOptions): CompareController;
 
-export interface UiOptions { locale?: 'ko' | 'en' | string; labels?: Record<string, unknown> }
+export interface UiOptions { locale?: 'ko' | 'en' | string; labels?: Record<string, unknown>; /** CSP nonce */ nonce?: string }
 export function mountToolbar(el: HTMLElement, ctrl: CompareController, o?: UiOptions & { modes?: boolean; mode?: 'side' | 'redline'; onMode?: (m: 'side' | 'redline') => void }): { setMode(m: string): void; destroy(): void };
 export function mountChangeList(el: HTMLElement, ctrl: CompareController, o?: UiOptions & { max?: number }): { destroy(): void };
 
@@ -112,9 +114,12 @@ export function mountViewer(host: HTMLElement, o: Omit<CompareOptions, 'left' | 
   setMode(m: 'side' | 'redline'): void;
   destroy(): void;
 };
-export function ensureUiStyle(doc?: Document): void;
+export function ensureUiStyle(doc?: Document, nonce?: string): void;
 export function snapshot(root: Source, opt?: { attrs?: string[]; ignore?: string; anchors?: string; keyAttrs?: string[] }): { tree: unknown; nodes: Node[]; anchors: number[]; anchorHashes: string[] };
 export function diffTrees(job: unknown): unknown;
 export const DOM_RULES: Record<string, unknown>;
 export const messages: Record<string, Record<string, unknown>>;
 export function getMessages(locale?: string, overrides?: Record<string, unknown>): Record<string, any>;
+
+/** SDK 버전 */
+export const version: string;

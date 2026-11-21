@@ -5,7 +5,7 @@
 import { snapshot, snapshotAsync, resolveRoot, locate, normText, yieldToBrowser, unflatten, DEFAULT_ATTRS } from './snapshot.js';
 import { diffTrees } from './engine.js';
 import { spawnWorker } from './spawn.js';
-import { SideMarks, ensureMarkStyle, sideSpans, blockOf, hasHighlightApi } from './marks.js';
+import { SideMarks, ensureMarkStyle, sideSpans, blockOf, hasHighlightApi, styleConfig } from './marks.js';
 import { makeScroller, scrollIntoScroller, linkScroll, topIn } from './scroll.js';
 import { getMessages } from './messages.js';
 
@@ -67,6 +67,7 @@ export function createCompare(options) {
     attrs: DEFAULT_ATTRS, worker: 'auto', watch: false, debounce: 300, syncScroll: true, page: null, align: true, locale: 'ko',
     ...options,
   };
+  if (opt.nonce) styleConfig.nonce = opt.nonce;
   const name = `sgc${++seq}`;
   const marks = { left: new SideMarks(name + 'l'), right: new SideMarks(name + 'r') };
   const listeners = new Map();

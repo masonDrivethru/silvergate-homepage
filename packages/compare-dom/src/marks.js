@@ -104,6 +104,10 @@ export class SideMarks {
 const RANKS = { added: 4, deleted: 4, modified: 3, moved: 2, before: 1, end: 1 };
 const rank = (v) => RANKS[v] ?? 0;
 
+/** 보안 정책(CSP)이 엄격한 사이트: 모듈이 넣는 <style> 에 붙일 nonce (createCompare·mountViewer 의 nonce 옵션) */
+export const styleConfig = { nonce: null };
+export function applyNonce(st) { if (styleConfig.nonce) { st.nonce = styleConfig.nonce; st.setAttribute('nonce', styleConfig.nonce); } }
+
 /** 화면 문서에 표시용 CSS 넣기 (문서마다 한 번, 컨트롤러 이름마다 하이라이트 규칙) */
 export function ensureMarkStyle(doc, name) {
   if (!doc) return;
@@ -111,6 +115,7 @@ export function ensureMarkStyle(doc, name) {
   if (!st) {
     st = doc.createElement('style');
     st.id = 'sgc-mark-style';
+    applyNonce(st);
     st.textContent = MARK_CSS;
     (doc.head ?? doc.documentElement).appendChild(st);
   }

@@ -6,13 +6,16 @@
  */
 import { createCompare } from './controller.js';
 import { getMessages } from './messages.js';
+import { styleConfig, applyNonce } from './marks.js';
 
 const TYPES = ['added', 'modified', 'deleted', 'moved'];
 
-export function ensureUiStyle(doc = document) {
+export function ensureUiStyle(doc = document, nonce) {
+  if (nonce) styleConfig.nonce = nonce;
   if (doc.getElementById('sgc-ui-style')) return;
   const st = doc.createElement('style');
   st.id = 'sgc-ui-style';
+  applyNonce(st);
   st.textContent = UI_CSS;
   (doc.head ?? doc.documentElement).appendChild(st);
 }
@@ -37,7 +40,7 @@ const fmt = (n, locale) => n.toLocaleString(locale === 'ko' ? 'ko-KR' : 'en-US')
  */
 export function mountToolbar(el, ctrl, o = {}) {
   const doc = el.ownerDocument;
-  ensureUiStyle(doc);
+  ensureUiStyle(doc, o.nonce);
   const m = getMessages(o.locale, o.labels);
   let mode = o.mode ?? 'side';
   el.classList.add('sgc-toolbar');
@@ -90,7 +93,7 @@ function timingTitle(t, m) {
  */
 export function mountChangeList(el, ctrl, o = {}) {
   const doc = el.ownerDocument;
-  ensureUiStyle(doc);
+  ensureUiStyle(doc, o.nonce);
   const m = getMessages(o.locale, o.labels);
   el.classList.add('sgc-list');
   const PAGE = o.max ?? 300;   // 한 번에 그리는 개수 (수천 건이면 "더 보기")
@@ -175,7 +178,7 @@ export function mountChangeList(el, ctrl, o = {}) {
  */
 export function mountViewer(host, o) {
   const doc = host.ownerDocument;
-  ensureUiStyle(doc);
+  ensureUiStyle(doc, o.nonce);
   const m = getMessages(o.locale, o.labels);
   const frame = (src) => {
     const f = h(doc, 'iframe', { class: 'sgc-frame', title: src.label ?? '' });

@@ -1,4 +1,4 @@
-/*! @silvergate/compare-dom — 화면 비교 (c) SilverGate */
+/*! SilverBio Compare SDK v1.0.0 | (c) SilverGate Co., Ltd. ((주)실버게이트). All rights reserved. | Includes diff-match-patch (Apache-2.0, (c) Google) */
 var SgCompare = (() => {
   var __create = Object.create;
   var __defProp = Object.defineProperty;
@@ -1507,7 +1507,8 @@ var SgCompare = (() => {
     mountChangeList: () => mountChangeList,
     mountToolbar: () => mountToolbar,
     mountViewer: () => mountViewer,
-    snapshot: () => snapshot
+    snapshot: () => snapshot,
+    version: () => version
   });
 
   // src/snapshot.js
@@ -2509,6 +2510,13 @@ var SgCompare = (() => {
     var _a;
     return (_a = RANKS[v]) != null ? _a : 0;
   };
+  var styleConfig = { nonce: null };
+  function applyNonce(st) {
+    if (styleConfig.nonce) {
+      st.nonce = styleConfig.nonce;
+      st.setAttribute("nonce", styleConfig.nonce);
+    }
+  }
   function ensureMarkStyle(doc, name) {
     var _a;
     if (!doc) return;
@@ -2516,6 +2524,7 @@ var SgCompare = (() => {
     if (!st) {
       st = doc.createElement("style");
       st.id = "sgc-mark-style";
+      applyNonce(st);
       st.textContent = MARK_CSS;
       ((_a = doc.head) != null ? _a : doc.documentElement).appendChild(st);
     }
@@ -2857,6 +2866,7 @@ tr.sgc-spacer::after{content:none}
       locale: "ko",
       ...options
     };
+    if (opt.nonce) styleConfig.nonce = opt.nonce;
     const name = `sgc${++seq}`;
     const marks = { left: new SideMarks(name + "l"), right: new SideMarks(name + "r") };
     const listeners = /* @__PURE__ */ new Map();
@@ -4088,11 +4098,13 @@ tr.sgc-spacer::after{content:none}
 
   // src/ui.js
   var TYPES = ["added", "modified", "deleted", "moved"];
-  function ensureUiStyle(doc = document) {
+  function ensureUiStyle(doc = document, nonce) {
     var _a;
+    if (nonce) styleConfig.nonce = nonce;
     if (doc.getElementById("sgc-ui-style")) return;
     const st = doc.createElement("style");
     st.id = "sgc-ui-style";
+    applyNonce(st);
     st.textContent = UI_CSS;
     ((_a = doc.head) != null ? _a : doc.documentElement).appendChild(st);
   }
@@ -4111,7 +4123,7 @@ tr.sgc-spacer::after{content:none}
   function mountToolbar(el, ctrl, o = {}) {
     var _a;
     const doc = el.ownerDocument;
-    ensureUiStyle(doc);
+    ensureUiStyle(doc, o.nonce);
     const m = getMessages(o.locale, o.labels);
     let mode = (_a = o.mode) != null ? _a : "side";
     el.classList.add("sgc-toolbar");
@@ -4205,7 +4217,7 @@ tr.sgc-spacer::after{content:none}
   function mountChangeList(el, ctrl, o = {}) {
     var _a;
     const doc = el.ownerDocument;
-    ensureUiStyle(doc);
+    ensureUiStyle(doc, o.nonce);
     const m = getMessages(o.locale, o.labels);
     el.classList.add("sgc-list");
     const PAGE = (_a = o.max) != null ? _a : 300;
@@ -4320,7 +4332,7 @@ tr.sgc-spacer::after{content:none}
   function mountViewer(host, o) {
     var _a, _b, _c, _d;
     const doc = host.ownerDocument;
-    ensureUiStyle(doc);
+    ensureUiStyle(doc, o.nonce);
     const m = getMessages(o.locale, o.labels);
     const frame = (src) => {
       var _a2, _b2;
@@ -4551,5 +4563,8 @@ tr.sgc-spacer::after{content:none}
 @media (max-width:640px){.sgc-panes{grid-template-columns:1fr;grid-template-rows:1fr 1fr}.sgc-viewer[data-mode="redline"] .sgc-panes{grid-template-rows:1fr}}
 @media (max-width:560px){.sgc-chip{height:28px;padding:0 9px}.sgc-pane-head{padding:6px 10px}}
 `;
+
+  // src/index.js
+  var version = "1.0.0";
   return __toCommonJS(index_exports);
 })();

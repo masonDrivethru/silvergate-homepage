@@ -8,6 +8,8 @@
 import { defineComponent, h, ref, onMounted, onBeforeUnmount, watch, shallowRef, nextTick } from 'vue';
 import { createCompare, mountToolbar, mountChangeList } from '@silvergate/compare-dom';
 
+
+
 export const SgCompare = defineComponent({
   name: 'SgCompare',
   props: {
@@ -19,18 +21,20 @@ export const SgCompare = defineComponent({
     mode: { type: String, default: 'side' },
     locale: { type: String, default: 'ko' },
     labels: { type: Object, default: undefined },
-    /** 쪽 요소 선택자 (변경 목록에 "n쪽" 표시) */
+    /** 쪽 요소 선택자 (변경 목록에 "n쪽" 표시, 보이는 쪽만 높이 맞춤) */
     page: { type: String, default: null },
     height: { type: String, default: '80vh' },
-    /** compare-dom 의 나머지 옵션 (attrs, ignore, anchors, rules, worker ...) */
+    /** compare-dom 의 나머지 옵션 (attrs, ignore, keyAttrs, nonce ...) */
     options: { type: Object, default: () => ({}) },
     toolbar: { type: Boolean, default: true },
     list: { type: Boolean, default: true },
   },
   emits: ['update', 'focus', 'update:mode'],
   setup(props, { slots, emit, expose }) {
-    const lMount = ref(), rMount = ref(), xMount = ref(), lScroll = ref(), rScroll = ref(), bar = ref(), listEl = ref();
+    // 두 문서를 한 스크롤 영역(desk)에 나란히 → 좌우가 한 장처럼 함께 움직인다
+    const lMount = ref(), rMount = ref(), xMount = ref(), desk = ref(), bar = ref(), listEl = ref();
     const mode = ref(props.mode);
+    const phoneSide = ref('right');
     const ctrl = shallowRef(null);
     let tb = null, cl = null, redlineDirty = true;
 
@@ -41,12 +45,12 @@ export const SgCompare = defineComponent({
     onMounted(() => {
       const c = createCompare({
         ...props.options, left: lMount.value, right: rMount.value,
-        leftScroller: lScroll.value, rightScroller: rScroll.value, page: props.page, watch: true,
+        leftScroller: desk.value, rightScroller: desk.value, page: props.page, watch: true, locale: props.locale,
       });
       c.on('update', () => { redlineDirty = true; if (mode.value === 'redline') drawRedline(); emit('update', c); });
       c.on('focus', (ch) => emit('focus', ch));
-      if (props.toolbar) tb = mountToolbar(bar.value, c, { locale: props.locale, labels: props.labels, modes: true, mode: mode.value, onMode: setMode });
-      if (props.list) cl = mountChangeList(listEl.value, c, { locale: props.locale, labels: props.labels });
+      if (props.toolbar) tb = mountToolbar(bar.value, c, { locale: props.locale, labels: props.labels, modes: true, mode: mode.value, onMode: setMode, nonce: props.options?.nonce });
+      if (props.list) cl = mountChangeList(listEl.value, c, { locale: props.locale, labels: props.labels, nonce: props.options?.nonce });
       ctrl.value = c;
     });
     onBeforeUnmount(() => { tb?.destroy(); cl?.destroy(); ctrl.value?.destroy(); });
@@ -57,23 +61,32 @@ export const SgCompare = defineComponent({
       goTo: (i) => ctrl.value?.goTo(i),
     });
 
-    const pane = (side, label, badge, mountRef, scrollRef, data, hidden) => h('section', { class: 'sgc-pane', hidden },
-      [
-        h('header', { class: 'sgc-pane-head' }, [h('span', { class: `sgc-badge sgc-badge-${side === 'left' ? 'old' : 'new'}` }, badge), label]),
-        h('div', { class: 'sgc-doc-scroll', ref: scrollRef, style: 'flex:1;min-height:0;overflow:auto' },
-          [h('div', { ref: mountRef, class: 'sgc-doc' }, side === 'merged' ? [] : slots.doc?.({ data, side }))]),
-      ]);
+    const ko = () => props.locale !== 'en';
+    const head = (side, badge, cls, label) => h('button', {
+      type: 'button', class: 'sgc-pane-head', 'aria-pressed': phoneSide.value === side ? 'true' : 'false',
+      onClick: () => { phoneSide.value = side; },
+    }, [h('span', { class: `sgc-badge ${cls}` }, badge), label]);
 
     return () => {
       const red = mode.value === 'redline';
-      const ko = props.locale !== 'en';
       return h('div', { class: 'sgc-viewer', 'data-mode': mode.value, style: { '--sgc-height': props.height } }, [
         props.toolbar ? h('div', { ref: bar }) : null,
         h('div', { class: 'sgc-body', style: props.list ? null : 'grid-template-columns:1fr' }, [
-          h('div', { class: 'sgc-panes' }, [
-            pane('left', props.leftLabel, ko ? '이전' : 'Before', lMount, lScroll, props.left, red),
-            pane('right', props.rightLabel, ko ? '새 버전' : 'After', rMount, rScroll, props.right, red),
-            pane('merged', `${props.leftLabel} → ${props.rightLabel}`, ko ? '한 장 보기' : 'Redline', xMount, undefined, undefined, !red),
+          h('div', { class: 'sgc-panes sgc-panes--one' }, [
+            h('section', { class: 'sgc-pane sgc-both', hidden: red }, [
+              h('div', { class: 'sgc-heads', role: 'group' }, [
+                head('left', ko() ? '이전' : 'Before', 'sgc-badge-old', props.leftLabel),
+                head('right', ko() ? '새 버전' : 'After', 'sgc-badge-new', props.rightLabel),
+              ]),
+              h('div', { ref: desk, class: 'sgc-shared', 'data-phone': phoneSide.value, tabindex: '0' }, [
+                h('div', { class: 'sgc-col sgc-col--left' }, [h('div', { ref: lMount, class: 'sgc-doc' }, slots.doc?.({ data: props.left, side: 'left' }))]),
+                h('div', { class: 'sgc-col sgc-col--right' }, [h('div', { ref: rMount, class: 'sgc-doc' }, slots.doc?.({ data: props.right, side: 'right' }))]),
+              ]),
+            ]),
+            h('section', { class: 'sgc-pane', hidden: !red }, [
+              h('header', { class: 'sgc-pane-head' }, `${props.leftLabel} → ${props.rightLabel}`),
+              h('div', { style: 'flex:1;min-height:0;overflow:auto' }, [h('div', { ref: xMount, class: 'sgc-doc' })]),
+            ]),
           ]),
           props.list ? h('aside', { ref: listEl }) : null,
         ]),

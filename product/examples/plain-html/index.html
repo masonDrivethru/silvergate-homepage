@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SilverBio Compare — 기본 예제 (script 태그)</title>
+<style>
+  body { margin: 0; font: 14px/1.6 system-ui, sans-serif; background: #f4f5f7; color: #1f2328; }
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 16px; }
+  /* 문서 모양은 고객 화면 그대로 — 모듈은 색만 입히고 구조를 바꾸지 않는다 */
+  .doc { background: #fff; padding: 24px 28px; margin: 12px; border: 1px solid #e3e5e8; }
+  .doc table { border-collapse: collapse; width: 100%; }
+  .doc th, .doc td { border: 1px solid #cfd3d8; padding: 4px 8px; text-align: left; }
+  .doc th { background: #f1f3f5; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1 style="font-size:18px">기본 예제 — 같은 화면 안의 두 문서 비교</h1>
+
+  <!-- 모듈이 쓰는 뼈대: 도구 막대 / (두 문서가 한 스크롤 영역에 나란히) / 변경 목록 -->
+  <div class="sgc-viewer" style="--sgc-height:75vh">
+    <div id="bar"></div>
+    <div class="sgc-body">
+      <div class="sgc-panes sgc-panes--one">
+        <section class="sgc-pane sgc-both">
+          <div id="desk" class="sgc-shared" tabindex="0">
+            <div class="sgc-col sgc-col--left"><div id="left"></div></div>
+            <div class="sgc-col sgc-col--right"><div id="right"></div></div>
+          </div>
+        </section>
+      </div>
+      <aside id="list"></aside>
+    </div>
+  </div>
+</div>
+
+<!-- 문서 원본 (실제로는 서버 화면·JSP·Vue·React 가 그린 결과 그대로) -->
+<template id="v1">
+  <div class="doc">
+    <h2>작업 지시서 v1.0</h2>
+    <p>원료를 칭량한 뒤 혼합기에 투입한다. 혼합 시간은 10분으로 한다.</p>
+    <table>
+      <tr><th>원료</th><th>규격</th><th>양</th></tr>
+      <tr data-sgc-key="A"><td>원료 A</td><td>USP</td><td>12.0 kg</td></tr>
+      <tr data-sgc-key="B"><td>원료 B</td><td>EP</td><td>3.5 kg</td></tr>
+      <tr data-sgc-key="C"><td>원료 C</td><td>USP</td><td>0.8 kg</td></tr>
+    </table>
+    <p>혼합 후 균일성을 확인한다.</p>
+  </div>
+</template>
+<template id="v2">
+  <div class="doc">
+    <h2>작업 지시서 v1.1</h2>
+    <p>원료를 칭량한 뒤 혼합기에 투입한다. 혼합 시간은 15분으로 한다.</p>
+    <table>
+      <tr><th>원료</th><th>규격</th><th>양</th></tr>
+      <tr data-sgc-key="A"><td>원료 A</td><td>USP</td><td>12.5 kg</td></tr>
+      <tr data-sgc-key="C"><td>원료 C</td><td>USP</td><td>0.8 kg</td></tr>
+      <tr data-sgc-key="D"><td>원료 D</td><td>KP</td><td>1.2 kg</td></tr>
+    </table>
+    <p>혼합 후 균일성을 확인한다.</p>
+    <p>확인 결과를 기록지에 남긴다.</p>
+  </div>
+</template>
+
+<!-- 1) 파일 하나만 넣으면 됨 (외부 접속·설치 없음). 전역 window.SgCompare -->
+<script src="../../dist/sg-compare.min.js"></script>
+<script>
+  const $ = (id) => document.getElementById(id);
+  $('left').append($('v1').content.cloneNode(true));
+  $('right').append($('v2').content.cloneNode(true));
+
+  // 2) 비교 시작: 두 문서 + 같은 스크롤 영역(desk) → 좌우가 한 장처럼 함께 움직임
+  const ctrl = SgCompare.createCompare({
+    left: $('left'), right: $('right'),
+    leftScroller: $('desk'), rightScroller: $('desk'),
+    locale: 'ko',
+    watch: true,          // 화면이 바뀌면 자동으로 다시 비교
+  });
+  // 3) (선택) 기본 도구 막대·변경 목록
+  SgCompare.mountToolbar($('bar'), ctrl, { locale: 'ko' });
+  SgCompare.mountChangeList($('list'), ctrl, { locale: 'ko' });
+
+  ctrl.on('update', () => console.log('변경', ctrl.stats, ctrl.timing));
+</script>
+</body>
+</html>
