@@ -8,6 +8,7 @@ const jobs = new Map();
 self.onmessage = (e) => {
   const d = e.data;
   try {
+    if (d.cancel) { jobs.delete(d.id); return; }
     if (d.part) {
       let j = jobs.get(d.id);
       if (!j) { j = { left: [], right: [] }; jobs.set(d.id, j); }

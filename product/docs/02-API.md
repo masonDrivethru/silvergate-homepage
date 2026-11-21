@@ -18,6 +18,9 @@
 | `keyAttrs` | `['data-sgc-key','data-key']` | 반복 항목 짝 맞춤 키 |
 | `worker` | `'auto'` | Web Worker 사용 (큰 문서만). 막히면 자동으로 메인 스레드 |
 | `locale` | `'ko'` | `'ko'` · `'en'` |
+| `frames` | `true` | 문서 안에 든 iframe(같은 도메인)의 안쪽 내용도 비교 |
+| `visibleOnly` | `false` | 눈에 안 보이는(display:none) 요소는 빼기 — 접힌 탭·숨긴 영역 |
+| `virtualize` | `false` | 쪽 건너뛰기를 모듈이 걸어 줌. 쪽이 무거운 수천 쪽 문서에서 스크롤이 끊길 때만 (`04` 참고) |
 | `nonce` | – | CSP nonce (`03-보안-CSP.md`) |
 | `auto` | `true` | 만들자마자 비교 |
 
@@ -43,9 +46,23 @@
 - `shared`: 두 iframe 을 내용 높이만큼 늘려 한 스크롤 영역에 → 가장 자연스러움
 - `split`: iframe 마다 스크롤 + 스크롤 맞춤. 수천 쪽짜리 서버 화면처럼 아주 큰 경우 이쪽이 가벼움
 
+## mountLayout(host, options)
+
+비교 화면 뼈대(도구 막대 · 두 문서가 나란히 든 한 스크롤 영역 · 변경 목록)만 만듭니다. 문서는 `left` / `right` 안에 직접 그립니다.
+
+```js
+const lay = SgCompare.mountLayout(host, { leftLabel: 'v1.0', rightLabel: 'v1.1', height: '80vh' });
+lay.left.append(이전문서); lay.right.append(새문서);
+const ctrl = SgCompare.createCompare({ left: lay.left, right: lay.right, leftScroller: lay.desk, rightScroller: lay.desk });
+lay.attach(ctrl);   // 도구 막대·변경 목록·한 장 보기 연결
+```
+
+반환 `{ root, left, right, desk, bar, list, redline, attach(ctrl), setMode(), destroy() }`. 옵션 `toolbar: false`, `list: false` 로 일부만.
+
 ## mountToolbar · mountChangeList
 
 기본 도구 막대(개수·이전/다음·종류 거르기)와 변경 목록. `{ locale, labels, nonce }`.
+단축키 F7 / Shift+F7 = 다음 / 이전 변경 (한 화면에 비교 창이 여러 개면 초점이 든 창만).
 
 ## 색 바꾸기 (CSS 변수)
 

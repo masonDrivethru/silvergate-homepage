@@ -18,21 +18,8 @@
 <div class="wrap">
   <h1 style="font-size:18px">기본 예제 — 같은 화면 안의 두 문서 비교</h1>
 
-  <!-- 모듈이 쓰는 뼈대: 도구 막대 / (두 문서가 한 스크롤 영역에 나란히) / 변경 목록 -->
-  <div class="sgc-viewer" style="--sgc-height:75vh">
-    <div id="bar"></div>
-    <div class="sgc-body">
-      <div class="sgc-panes sgc-panes--one">
-        <section class="sgc-pane sgc-both">
-          <div id="desk" class="sgc-shared" tabindex="0">
-            <div class="sgc-col sgc-col--left"><div id="left"></div></div>
-            <div class="sgc-col sgc-col--right"><div id="right"></div></div>
-          </div>
-        </section>
-      </div>
-      <aside id="list"></aside>
-    </div>
-  </div>
+  <!-- 비교 화면이 들어갈 자리 (뼈대는 모듈이 만든다) -->
+  <div id="viewer"></div>
 </div>
 
 <!-- 문서 원본 (실제로는 서버 화면·JSP·Vue·React 가 그린 결과 그대로) -->
@@ -68,19 +55,20 @@
 <script src="../../dist/sg-compare.min.js"></script>
 <script>
   const $ = (id) => document.getElementById(id);
-  $('left').append($('v1').content.cloneNode(true));
-  $('right').append($('v2').content.cloneNode(true));
 
-  // 2) 비교 시작: 두 문서 + 같은 스크롤 영역(desk) → 좌우가 한 장처럼 함께 움직임
+  // 2) 뼈대: 도구 막대 · 두 문서가 나란히 든 한 스크롤 영역 · 변경 목록
+  const lay = SgCompare.mountLayout($('viewer'), { leftLabel: 'v1.0', rightLabel: 'v1.1', locale: 'ko', height: '75vh' });
+  lay.left.append($('v1').content.cloneNode(true));     // 이전 문서를 왼쪽에
+  lay.right.append($('v2').content.cloneNode(true));    // 새 문서를 오른쪽에
+
+  // 3) 비교 시작: 두 문서 + 같은 스크롤 영역(desk) → 좌우가 한 장처럼 함께 움직임
   const ctrl = SgCompare.createCompare({
-    left: $('left'), right: $('right'),
-    leftScroller: $('desk'), rightScroller: $('desk'),
+    left: lay.left, right: lay.right,
+    leftScroller: lay.desk, rightScroller: lay.desk,
     locale: 'ko',
     watch: true,          // 화면이 바뀌면 자동으로 다시 비교
   });
-  // 3) (선택) 기본 도구 막대·변경 목록
-  SgCompare.mountToolbar($('bar'), ctrl, { locale: 'ko' });
-  SgCompare.mountChangeList($('list'), ctrl, { locale: 'ko' });
+  lay.attach(ctrl);       // 도구 막대·변경 목록 연결
 
   ctrl.on('update', () => console.log('변경', ctrl.stats, ctrl.timing));
 </script>

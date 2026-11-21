@@ -39,6 +39,19 @@ export function blockOf(node) {
 
 export const hasHighlightApi = (win) => !!(win && win.CSS && win.CSS.highlights && win.Highlight);
 
+/**
+ * 글자 구간 하나. 고정형(StaticRange)을 쓴다:
+ * 보통 Range 는 문서가 바뀔 때마다 브라우저가 전부 따라 고쳐서, 표시가 수천 개면 화면을 고치는 일(빈 칸 넣기·React/Vue 다시 그리기)이 몇 배 느려진다.
+ */
+export function makeRange(node, start, end) {
+  const win = node.ownerDocument.defaultView;
+  if (win.StaticRange) return new win.StaticRange({ startContainer: node, startOffset: start, endContainer: node, endOffset: end });
+  const r = node.ownerDocument.createRange();
+  r.setStart(node, start); r.setEnd(node, end);
+  return r;
+}
+export const wholeRange = (textNode) => makeRange(textNode, 0, textNode.data.length);
+
 /** 한 쪽(왼쪽/오른쪽) 표시 모음. clear() 로 깨끗이 지운다 */
 export class SideMarks {
   constructor(name) {
@@ -46,33 +59,37 @@ export class SideMarks {
     this.attrs = [];               // [el, 속성 이름]
     this.ranges = { add: [], ins: [], del: [], focus: [] };
     this.wins = new Set();
+    this.docs = new Set();         // 표시용 CSS 를 넣은 문서 (문서 안의 iframe 문서 포함)
+  }
+  /** 이 문서에 표시용 CSS 가 있게 (안쪽 iframe 문서에 처음 표시할 때) */
+  useDoc(doc) {
+    if (!doc || this.docs.has(doc)) return;
+    this.docs.add(doc);
+    ensureMarkStyle(doc, this.name);
+    if (doc.defaultView) this.wins.add(doc.defaultView);
   }
   attr(el, name, value) {
     if (!el || el.nodeType !== 1) return;
     const cur = el.getAttribute(name);
     // 더 중요한 표시가 이미 있으면 유지 (추가·삭제 > 수정 > 이동)
     if (cur && rank(cur) >= rank(value)) return;
+    this.useDoc(el.ownerDocument);
     el.setAttribute(name, value);
     this.attrs.push([el, name]);
   }
   textRange(textNode, start, end, kind) {
-    const doc = textNode.ownerDocument;
-    const r = doc.createRange();
     const map = normIndexMap(textNode.data);
     if (!map.length) return null;
     const s = map[Math.min(start, map.length - 1)];
     const e = end > start ? map[Math.min(end, map.length) - 1] + 1 : s;
-    r.setStart(textNode, s);
-    r.setEnd(textNode, Math.min(e, textNode.data.length));
+    const r = makeRange(textNode, s, Math.max(s, Math.min(e, textNode.data.length)));
     this.ranges[kind].push(r);
-    this.wins.add(doc.defaultView);
+    this.useDoc(textNode.ownerDocument);
     return r;
   }
   wholeText(textNode, kind) {
-    const r = textNode.ownerDocument.createRange();
-    r.selectNodeContents(textNode);
-    this.ranges[kind].push(r);
-    this.wins.add(textNode.ownerDocument.defaultView);
+    this.ranges[kind].push(wholeRange(textNode));
+    this.useDoc(textNode.ownerDocument);
   }
   flush() {
     for (const win of this.wins) {
@@ -87,7 +104,7 @@ export class SideMarks {
   }
   setFocus(ranges) {
     this.ranges.focus = ranges;
-    for (const r of ranges) this.wins.add(r.startContainer.ownerDocument.defaultView);
+    for (const r of ranges) this.useDoc(r.startContainer.ownerDocument);
     this.flush();
   }
   clear() {

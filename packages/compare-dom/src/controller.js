@@ -2,10 +2,10 @@
  * createCompare: 이미 그려진 두 화면(왼쪽=이전, 오른쪽=새 버전)을 비교해 원본 위에 표시한다.
  * JSP·Vue·React·일반 HTML 어떤 것이 그렸든 상관없다 (브라우저 DOM 만 본다).
  */
-import { snapshot, snapshotAsync, resolveRoot, locate, normText, yieldToBrowser, unflatten, DEFAULT_ATTRS } from './snapshot.js';
+import { snapshot, snapshotAsync, resolveRoot, locate, normText, yieldToBrowser, unflatten, frameBody, DEFAULT_ATTRS } from './snapshot.js';
 import { diffTrees } from './engine.js';
 import { spawnWorker } from './spawn.js';
-import { SideMarks, ensureMarkStyle, sideSpans, blockOf, hasHighlightApi, styleConfig } from './marks.js';
+import { SideMarks, ensureMarkStyle, sideSpans, blockOf, hasHighlightApi, styleConfig, wholeRange } from './marks.js';
 import { makeScroller, scrollIntoScroller, linkScroll, topIn } from './scroll.js';
 import { getMessages } from './messages.js';
 
@@ -13,6 +13,10 @@ let seq = 0;
 let sharedWorker = null, workerBroken = false, jobSeq = 0;
 const waiting = new Map();
 
+function dropWorker() {
+  try { sharedWorker?.terminate(); } catch {}
+  sharedWorker = null;
+}
 function getWorker() {
   if (workerBroken) return null;
   if (sharedWorker) return sharedWorker;
@@ -22,14 +26,18 @@ function getWorker() {
       const w = waiting.get(e.data.id);
       if (!w) return;
       waiting.delete(e.data.id);
-      e.data.ok ? w.resolve(e.data.out) : w.reject(new Error(e.data.error));
+      clearTimeout(w.timer);
+      // Worker 안에서 실패하면 화면 스레드에서 한 번 더 (그래도 실패하면 그 오류를 알림)
+      e.data.ok ? w.resolve(e.data.out) : w.fallback(new Error(e.data.error));
     };
-    sharedWorker.onerror = (e) => {
-      workerBroken = true; sharedWorker = null;
-      for (const w of waiting.values()) w.fallback();
+    const broken = (e) => {
+      workerBroken = true; dropWorker();
+      for (const w of waiting.values()) { clearTimeout(w.timer); w.fallback(); }
       waiting.clear();
-      e.preventDefault?.();
+      e?.preventDefault?.();
     };
+    sharedWorker.onerror = broken;
+    sharedWorker.onmessageerror = broken;
     return sharedWorker;
   } catch {
     workerBroken = true;
@@ -37,24 +45,61 @@ function getWorker() {
   }
 }
 
+/** 진행 중인 일 그만두기 (새 비교가 시작됐을 때). 이미 계산 중이면 Worker 를 새로 띄운다: 필요 없는 계산이 뒤 일을 막지 않게 */
+function cancelJob(id) {
+  const w = waiting.get(id);
+  if (!w) return;
+  waiting.delete(id);
+  clearTimeout(w.timer);
+  w.resolve(null);
+  if (w.computing) {
+    dropWorker();
+    for (const [, o] of waiting) { clearTimeout(o.timer); o.fallback(); }   // 같은 Worker 를 쓰던 다른 비교는 화면 스레드에서 이어서
+    waiting.clear();
+  } else {
+    try { sharedWorker?.postMessage({ id, cancel: true }); } catch {}
+  }
+}
+
 /**
  * 비교 맡기기. Worker 로 보낼 때는 평평한 목록을 조금씩 나눠 보낸다:
  * 한 번에 수십만 개를 보내면 복사하는 동안(0.2초 이상) 화면이 멈추기 때문
+ * @param {{ id: number }} [handle] 진행 중인 일 번호를 적어 둔다 (취소용)
+ * @returns {Promise<any|null>} 취소되면 null
  */
-async function runJob(sl, sr, extra, useWorker) {
+async function runJob(sl, sr, extra, useWorker, handle = {}) {
   const w = useWorker ? getWorker() : null;
   const local = () => diffTrees({ left: sl.tree, right: sr.tree, leftAnchors: sl.anchorHashes, rightAnchors: sr.anchorHashes, options: extra });
   if (!w) return local();
   const id = ++jobSeq;
-  const done = new Promise((resolve, reject) => waiting.set(id, { resolve, reject, fallback: () => resolve(local()) }));
+  handle.id = id;
+  let entry;
+  const done = new Promise((resolve, reject) => {
+    entry = { resolve, reject, computing: false, timer: 0,
+      fallback: (err) => { try { resolve(local()); } catch (e) { reject(err ?? e); } } };
+    waiting.set(id, entry);
+  });
   const CHUNK = 15000;
-  for (const [side, s] of [['left', sl], ['right', sr]]) {
-    for (let k = 0; k < s.flat.length; k += CHUNK) {
-      w.postMessage({ id, part: side, at: k, recs: s.flat.slice(k, k + CHUNK) });
-      await yieldToBrowser();
+  try {
+    for (const [side, s] of [['left', sl], ['right', sr]]) {
+      for (let k = 0; k < s.flat.length; k += CHUNK) {
+        if (!waiting.has(id)) return done;          // 취소됨
+        w.postMessage({ id, part: side, at: k, recs: s.flat.slice(k, k + CHUNK) });
+        await yieldToBrowser();
+      }
     }
+    if (!waiting.has(id)) return done;
+    entry.computing = true;
+    // 응답이 끝내 없으면(Worker 멈춤) 화면 스레드에서 계산: 30초 + 노드 10만 개마다 10초
+    entry.timer = setTimeout(() => {
+      if (!waiting.has(id)) return;
+      waiting.delete(id); dropWorker(); entry.fallback();
+    }, 30000 + (sl.flat.length + sr.flat.length) / 10);
+    w.postMessage({ id, go: true, leftAnchors: sl.anchorHashes, rightAnchors: sr.anchorHashes, options: extra });
+  } catch (err) {
+    // 보내다 실패 (복사할 수 없는 값 등)
+    if (waiting.delete(id)) { clearTimeout(entry.timer); entry.fallback(err); }
   }
-  w.postMessage({ id, go: true, leftAnchors: sl.anchorHashes, rightAnchors: sr.anchorHashes, options: extra });
   return done;
 }
 
@@ -65,6 +110,7 @@ async function runJob(sl, sr, extra, useWorker) {
 export function createCompare(options) {
   const opt = {
     attrs: DEFAULT_ATTRS, worker: 'auto', watch: false, debounce: 300, syncScroll: true, page: null, align: true, locale: 'ko',
+    virtualize: false, frames: true, visibleOnly: false,
     ...options,
   };
   if (opt.nonce) styleConfig.nonce = opt.nonce;
@@ -82,6 +128,84 @@ export function createCompare(options) {
   const scrollers = {};
 
   const root = (side) => resolveRoot(side === 'left' ? opt.left : opt.right);
+  /** 문서 안 iframe 속 노드 → 바깥(비교 대상) 문서에서 그 자리의 요소 (그 iframe). 바깥 문서 노드면 자기 요소 */
+  const hostEl = (n, side) => {
+    let el = n ? (n.nodeType === 1 ? n : n.parentElement) : null;
+    const d = root(side).ownerDocument;
+    for (let k = 0; el && el.ownerDocument !== d && k < 20; k++) el = el.ownerDocument.defaultView?.frameElement ?? null;
+    return el;
+  };
+  const job = { id: 0 };
+
+  // ---------- 쪽 건너뛰기 (화면 밖 쪽은 브라우저가 그리지 않게). 옵션 virtualize: true 일 때만 ----------
+  // 쪽 하나하나가 무거운(그림자·복잡한 배치) 수천 쪽 문서에서 스크롤이 끊길 때 쓴다. 가벼운 쪽에는 오히려 손해라 기본은 끔.
+  // (가장 좋은 것은 고객 화면 CSS 에 처음부터 넣는 것: 그러면 처음 그리는 시간까지 줄어든다. docs/04 참고)
+  // 쪽마다 지금 크기를 재서 "안 그릴 때의 크기"로 적어 두므로 스크롤 길이는 그대로. 모양이 조금이라도 달라지면 되돌린다.
+  let virt = [];   // [el, 옛 contentVisibility, 옛 containIntrinsicSize, style 속성이 원래 있었나]
+  let virtToken = 0, virtBusy = false;
+  const restoreVirt = ([el, cv, cis, had]) => { el.style.contentVisibility = cv; el.style.containIntrinsicSize = cis; if (!had && el.getAttribute('style') === '') el.removeAttribute('style'); };
+  function unvirtualize() {
+    virtToken++;
+    for (const v of virt) restoreVirt(v);
+    virt = [];
+  }
+  const nextFrame = (win) => new Promise((res) => win.requestAnimationFrame(res));
+  /**
+   * 뒤쪽부터 100쪽씩, 한 프레임에 한 묶음 (한꺼번에 걸면 브라우저가 수 초 동안 멈춘다 — 3,000쪽에서 7초 → 나누면 1초, 그동안 화면은 계속 움직임).
+   * 비교를 기다리게 하지 않고 뒤에서 조용히 진행한다.
+   */
+  async function virtualize() {
+    if (!opt.page || !opt.virtualize || virtBusy) return;
+    virtBusy = true;
+    const token = virtToken;
+    const alive = () => token === virtToken && !destroyed;
+    try {
+      const have = new Set(virt.map((v) => v[0]));
+      for (const side of ['left', 'right']) {
+        const r = root(side);
+        const win = r.ownerDocument.defaultView;
+        if (!win.CSS?.supports?.('content-visibility', 'auto')) continue;
+        const pages = Array.from(r.querySelectorAll(opt.page));
+        if (!pages.length || (opt.virtualize === 'auto' && pages.length < 20)) continue;
+        // 이미 걸려 있거나(고객 CSS) 쪽 안에 쪽이 든 구조면 손대지 않는다
+        const todo = pages.filter((p) => !have.has(p) && win.getComputedStyle(p).contentVisibility === 'visible' && !p.parentElement?.closest(opt.page));
+        if (!todo.length) continue;
+        const px = (v) => parseFloat(v) || 0;
+        // 재기 (한 번에, 쓰기 전에)
+        const sizes = todo.map((p) => {
+          const cs = win.getComputedStyle(p);
+          const w = parseFloat(cs.width), h = parseFloat(cs.height);
+          const pad = cs.boxSizing === 'border-box';
+          return [pad ? w - px(cs.paddingLeft) - px(cs.paddingRight) - px(cs.borderLeftWidth) - px(cs.borderRightWidth) : w,
+                  pad ? h - px(cs.paddingTop) - px(cs.paddingBottom) - px(cs.borderTopWidth) - px(cs.borderBottomWidth) : h];
+        });
+        if (sizes.some(([w, h]) => !(w > 0) || !(h > 0))) continue;
+        // 모양이 달라지지 않는지 볼 기준: 끝에서 두 쪽의 간격·높이 (여백 겹침 구조면 여기서 달라진다)
+        const pa = todo[todo.length - 1], pb = todo[Math.max(0, todo.length - 2)];
+        const shape = () => { const a = pa.getBoundingClientRect(), b = pb.getBoundingClientRect(); return [a.height, b.height, a.top - b.top]; };
+        const before = shape();
+        const mine = [];
+        let first = true;
+        for (let k = todo.length; k > 0 && alive(); k -= 100) {
+          for (let i = k - 1; i >= Math.max(0, k - 100); i--) {
+            const p = todo[i];
+            const rec = [p, p.style.contentVisibility, p.style.containIntrinsicSize, p.hasAttribute('style')];
+            mine.push(rec);
+            p.style.contentVisibility = 'auto';
+            p.style.containIntrinsicSize = `auto ${sizes[i][0]}px auto ${sizes[i][1]}px`;
+          }
+          if (first) {
+            first = false;
+            const after = shape();
+            if (before.some((v, i) => Math.abs(v - after[i]) >= 1)) { for (const m of mine) restoreVirt(m); mine.length = 0; break; }
+          }
+          await nextFrame(win);
+        }
+        if (!alive()) { for (const m of mine) restoreVirt(m); return; }
+        virt.push(...mine);
+      }
+    } finally { virtBusy = false; }
+  }
 
   function setupScroll() {
     scrollers.left = makeScroller(root('left'), opt.leftScroller);
@@ -108,14 +232,17 @@ export function createCompare(options) {
   async function run() {
     if (destroyed) return;
     const id = ++runId;
+    cancelJob(job.id);            // 아직 끝나지 않은 앞 비교는 그만둔다 (입력이 이어질 때 결과가 밀리지 않게)
     state.running = true; state.error = null;
     emit('start');
     try {
       const L = root('left'), R = root('right');
+      await virtualize();
+      if (id !== runId || destroyed) return;
       ensureMarkStyle(L.ownerDocument, name + 'l');
       ensureMarkStyle(R.ownerDocument, name + 'r');
       const t0 = performance.now();
-      const sopt = { attrs: opt.attrs, ignore: opt.ignore, anchors: opt.anchors, keyAttrs: opt.keyAttrs, flatten: opt.flatten ?? opt.page };
+      const sopt = { attrs: opt.attrs, ignore: opt.ignore, anchors: opt.anchors, keyAttrs: opt.keyAttrs, flatten: opt.flatten ?? opt.page, frames: opt.frames, visibleOnly: opt.visibleOnly };
       // 작은 문서는 한 번에, 큰 문서는 나눠 읽으며 화면에 차례를 넘김 (스크롤·입력이 멈추지 않게)
       const big = (L.getElementsByTagName('*').length + R.getElementsByTagName('*').length) > 6000;
       const sl = big ? await snapshotAsync(L, sopt) : snapshot(L, sopt);
@@ -125,15 +252,15 @@ export function createCompare(options) {
       const t1 = performance.now();
       const size = sl.nodes.length + sr.nodes.length;
       const useWorker = opt.worker === true || (opt.worker === 'auto' && size > 4000);
-      const out = await runJob(sl, sr, opt.rules, useWorker);
-      if (id !== runId || destroyed) return;
+      const out = await runJob(sl, sr, opt.rules, useWorker, job);
+      if (!out || id !== runId || destroyed) return;
+      watchFrames([...sl.frames, ...sr.frames]);
       const t2 = performance.now();
       snaps = { left: sl, right: sr };
       await apply(out, id);
       if (id !== runId || destroyed) return;
       // 다 썼으면 읽은 문서 사본은 버린다 (수십만 개 객체를 들고 있으면 스크롤 중 메모리 정리가 길어짐).
-      // 한 장 보기에 필요한 오른쪽 노드 목록만 남김
-      snaps = { right: { nodes: sr.nodes } };
+      snaps = { done: true };
       sl.tree = sr.tree = sl.flat = sr.flat = null;
       const t3 = performance.now();
       state.timing = { snapshot: t1 - t0, compare: t2 - t1, paint: t3 - t2, total: t3 - t0, nodes: size, worker: useWorker && !workerBroken, engine: out.ms };
@@ -161,7 +288,7 @@ export function createCompare(options) {
     state.pages[side] = list.length;
     const m = new Map(list.map((el, i) => [el, i + 1]));
     return (node) => {
-      const el = node?.nodeType === 1 ? node : node?.parentElement;
+      const el = hostEl(node, side);
       const p = el?.closest(opt.page);
       return p ? m.get(p) ?? null : null;
     };
@@ -374,7 +501,7 @@ export function createCompare(options) {
     for (const sp of spacers) sp.remove();
     // 지운 빈 칸을 변경이 계속 가리키지 않게 (이동할 때 없어진 빈 칸을 목표로 잡는 문제)
     for (const ch of state.changes) ch.spacer = null;
-    for (const [el, prop, old] of padded) el.style[prop] = old;
+    for (const [el, prop, old, had] of padded) { el.style[prop] = old; if (!had && el.getAttribute('style') === '') el.removeAttribute('style'); }
     spacers = []; padded = [];
   }
   const zoomOf = (el) => {
@@ -385,7 +512,7 @@ export function createCompare(options) {
   let pageIdx = null;   // { left: Map(쪽 요소 → 번호), right: ... } 높이 맞추기 한 번에 한 번만 만든다
   const pageNo = (n, side) => {
     if (!opt.page || !n) return -1;
-    const el = n.nodeType === 1 ? n : n.parentElement;
+    const el = hostEl(n, side);
     const pg = el?.closest(opt.page);
     if (!pg) return -1;
     if (!pageIdx) pageIdx = {};
@@ -440,6 +567,7 @@ export function createCompare(options) {
       sp.style.height = Math.max(0, height - (gapPx ?? parentGap(end ? ref.lastElementChild ?? ref : ref))) + 'px';
     }
     sp.className = 'sgc-spacer';
+    marks.left.useDoc(doc);   // 문서 안 iframe 에 처음 넣을 때 빈 칸 모양(CSS)도 함께
     sp.setAttribute('data-sgc-ignore', '');
     sp.setAttribute('aria-hidden', 'true');
     // 그사이 화면이 다시 그려져 기준 요소가 없어졌으면 넣지 않는다 (다시 비교하면서 새로 넣음)
@@ -460,6 +588,7 @@ export function createCompare(options) {
   function topUnit(n, side) {
     const r = root(side);
     let el = n?.nodeType === 1 ? n : n?.parentElement;
+    if (el && el.ownerDocument !== r.ownerDocument) return null;   // iframe 안쪽은 그 안에서만 맞춘다
     while (el && el.parentElement && el.parentElement !== r && !(opt.page && el.parentElement.matches(opt.page))) el = el.parentElement;
     return el && el !== r ? el : null;
   }
@@ -637,7 +766,7 @@ export function createCompare(options) {
     return { el: lo, prop: 'paddingBottom', value: (px(cs.paddingBottom) + diff) + 'px' };
   }
   function applyFixes(fixes) {
-    for (const { el, prop, value } of fixes) { padded.push([el, prop, el.style[prop]]); el.style[prop] = value; }
+    for (const { el, prop, value } of fixes) { padded.push([el, prop, el.style[prop], el.hasAttribute('style')]); el.style[prop] = value; }
   }
 
   /** 글꼴이 늦게 내려오거나 칸 폭이 바뀌면 줄 높이가 달라지므로 높이만 다시 맞춘다 (다시 비교하지 않음) */
@@ -901,13 +1030,28 @@ export function createCompare(options) {
       };
       requestAnimationFrame(tick);
     });
+    // 목표가 문서 안 iframe 속에 있고 그 iframe 이 따로 스크롤되면, 그 안에서 먼저 보이게
+    for (const { side, block } of sides) {
+      let el = block;
+      const rootDoc = root(side).ownerDocument;
+      for (let k = 0; el && el.ownerDocument !== rootDoc && k < 20; k++) {
+        const w = el.ownerDocument.defaultView;
+        if (!w) break;
+        const se = el.ownerDocument.scrollingElement ?? el.ownerDocument.documentElement;
+        if (se.scrollHeight > w.innerHeight + 1) {
+          const want = se.scrollTop + el.getBoundingClientRect().top - w.innerHeight * 0.3;
+          w.scrollTo({ top: Math.max(0, want), behavior: 'instant' });
+        }
+        el = w.frameElement;
+      }
+    }
     try {
       // 먼저 목표가 든 "쪽"으로: 화면 밖(아직 그려지지 않은) 쪽 안 요소는 위치를 물으면 0 이 나올 수 있지만,
       // 쪽 상자 자체의 위치는 늘 정확하다. 쪽이 화면에 그려진 뒤에 높이 맞추기 → 목표 줄에 정확히
       if (opt.page) {
         let movedToPage = false;
         for (const { side, block } of sides) {
-          const pg = block.closest?.(opt.page);
+          const pg = hostEl(block, side)?.closest?.(opt.page);
           if (!pg) continue;
           const sc = scrollers[side];
           const d = topIn(pg, sc.doc) - sc.viewTop();
@@ -967,7 +1111,7 @@ export function createCompare(options) {
     }
     for (const side of ['left', 'right']) {
       const fr = [];
-      if (ch[side]?.nodeType === 3) { const r = ch[side].ownerDocument.createRange(); r.selectNodeContents(ch[side]); fr.push(r); }
+      if (ch[side]?.nodeType === 3 && ch[side].isConnected) fr.push(wholeRange(ch[side]));
       marks[side].setFocus(fr);
     }
     // 한 스크롤 영역일 때 반대쪽 짝도 반짝 (양쪽에서 같은 자리가 보이게)
@@ -1013,7 +1157,31 @@ export function createCompare(options) {
       observers.push(() => { mo.disconnect(); r.removeEventListener('input', kick, true); r.removeEventListener('change', kick, true); });
     }
   }
-  function unwatch() { for (const f of observers) f(); observers = []; }
+  function unwatch() { for (const f of observers) f(); observers = []; watchedFrames = new WeakSet(); }
+  /** 문서 안 iframe 의 안쪽도 감시 (안쪽 내용이 바뀌거나 다른 주소로 바뀌면 다시 비교) */
+  let watchedFrames = new WeakSet();
+  function watchFrames(frames) {
+    if (!opt.watch || destroyed) return;
+    const kick = () => { clearTimeout(debounceTimer); debounceTimer = setTimeout(run, opt.debounce); };
+    for (const f of frames) {
+      const body = f.contentDocument?.body;
+      if (!body || watchedFrames.has(body)) continue;
+      watchedFrames.add(body);
+      const MO = f.contentWindow?.MutationObserver;
+      if (!MO) continue;
+      const mo = new MO((recs) => {
+        const real = recs.some((m) => m.type !== 'childList'
+          ? !(m.target.nodeType === 1 ? m.target : m.target.parentElement)?.closest?.('.sgc-spacer')
+          : [...m.addedNodes, ...m.removedNodes].some((n) => !(n.nodeType === 1 && n.classList?.contains('sgc-spacer'))));
+        if (real) kick();
+      });
+      mo.observe(body, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: [...opt.attrs, 'data-sgc-key', 'data-key', 'hidden', 'data-sgc-ignore'] });
+      body.addEventListener('input', kick, true);
+      body.addEventListener('change', kick, true);
+      f.addEventListener('load', kick);
+      observers.push(() => { mo.disconnect(); try { body.removeEventListener('input', kick, true); body.removeEventListener('change', kick, true); } catch {} f.removeEventListener('load', kick); });
+    }
+  }
 
   /** 한 장 보기: 새 버전을 복사해서 삭제된 것을 제자리에 끼워 넣고 바뀐 글자를 지운 글자/넣은 글자로 (원본은 그대로) */
   function renderRedline(target) {
@@ -1022,12 +1190,39 @@ export function createCompare(options) {
     const doc = target.ownerDocument;
     ensureMarkStyle(doc, name + 'x');
     const clone = doc.importNode(R, true);
+    // 원본 노드 → 복사본 노드 (같은 모양이므로 나란히 내려가며 짝짓는다)
+    const cloneOf = new Map();
+    const pairUp = (x, y) => {
+      const st = [[x, y]];
+      while (st.length) {
+        const [p, q] = st.pop();
+        cloneOf.set(p, q);
+        const pc = p.childNodes, qc = q.childNodes;
+        for (let i = 0; i < pc.length && i < qc.length; i++) st.push([pc[i], qc[i]]);
+      }
+    };
+    pairUp(R, clone);
+    // 문서 안 iframe: 복사본에서는 안쪽 문서가 비어 있으므로, 원본 안쪽 내용을 그 자리에 복사해 넣는다
+    const fillFrames = (srcRoot) => {
+      if (opt.frames === false) return;
+      for (const f of srcRoot.querySelectorAll('iframe,frame')) {
+        const body = frameBody(f), t = cloneOf.get(f);
+        if (!body || !t) continue;
+        const box = doc.createElement('div');
+        box.setAttribute('data-sgc-frame', '');
+        for (const kid of body.childNodes) { const k = doc.importNode(kid, true); box.appendChild(k); pairUp(kid, k); }
+        cloneOf.set(body, box);
+        t.replaceWith(box);
+        cloneOf.set(f, box);
+        fillFrames(body);
+      }
+    };
+    fillFrames(R);
+    // 모듈이 넣은 것(빈 칸·높이 맞춤 여백·쪽 건너뛰기)은 복사본에서 뺀다
+    for (const [el, prop, old] of padded) { const c = cloneOf.get(el); if (c?.style) c.style[prop] = old; }
+    for (const [el, cv, cis] of virt) { const c = cloneOf.get(el); if (c?.style) { c.style.contentVisibility = cv; c.style.containIntrinsicSize = cis; } }
     for (const sp of clone.querySelectorAll('.sgc-spacer')) sp.remove();
-    for (const el of clone.querySelectorAll('[style]')) { if (padded.some(([p]) => p === el)) el.removeAttribute('style'); }
-    const cs = snapshot(clone, { attrs: opt.attrs, ignore: opt.ignore, anchors: '', keyAttrs: opt.keyAttrs, flatten: opt.flatten ?? opt.page });
-    if (cs.nodes.length !== snaps.right.nodes.length) console.warn('[sg-compare] 한 장 보기: 복사본 구조가 달라 일부 표시가 어긋날 수 있습니다');
     const inserts = [];
-    const idx = new Map(snaps.right.nodes.map((n, i) => [n, i]));
     // 묶인 열(column)은 칸마다 하나씩 펼쳐서
     const flatList = state.changes.flatMap((c) => !c.extra ? [c] : [
       { ...c, what: 'node' },
@@ -1035,8 +1230,7 @@ export function createCompare(options) {
     ]);
     for (const ch of flatList) {
       if (ch.what === 'text' && ch.type === 'modified' && ch.diffs && ch.right) {
-        const i = idx.get(ch.right);
-        const tn = cs.nodes[i];
+        const tn = cloneOf.get(ch.right);
         if (!tn?.parentNode) continue;
         const frag = doc.createDocumentFragment();
         for (const [op, t] of ch.diffs) {
@@ -1048,11 +1242,11 @@ export function createCompare(options) {
         if (trail) frag.append(trail);
         tn.replaceWith(frag);
       } else if (ch.what === 'attr' || ch.type === 'moved') {
-        const n = ch.right ? cs.nodes[idx.get(ch.right)] : null;
+        const n = ch.right ? cloneOf.get(ch.right) : null;
         const el = n?.nodeType === 1 ? n : n?.parentElement;
         el?.setAttribute('data-sgc', ch.type === 'moved' ? 'moved' : 'modified');
       } else if (ch.type === 'added' && ch.right) {
-        const n = cs.nodes[idx.get(ch.right)];
+        const n = cloneOf.get(ch.right);
         if (!n) continue;
         if (n.nodeType === 3) { const e = doc.createElement('ins'); e.className = 'sgc-add'; n.replaceWith(e); e.append(n); }
         else n.setAttribute('data-sgc', 'added');
@@ -1060,8 +1254,7 @@ export function createCompare(options) {
         let n = doc.importNode(ch.left, true);
         if (n.nodeType === 3) { const e = doc.createElement('del'); e.className = 'sgc-del'; e.append(n); n = e; }
         else n.setAttribute('data-sgc', 'deleted');
-        const gi = idx.get(ch.gap.node);
-        inserts.push({ ref: cs.nodes[gi], end: ch.gap.end, n });
+        inserts.push({ ref: cloneOf.get(ch.gap.node), end: ch.gap.end, n });
       }
     }
     for (const { ref, end, n } of inserts) {
@@ -1100,8 +1293,9 @@ export function createCompare(options) {
     clear() { unalign(); marks.left.clear(); marks.right.clear(); state.changes = []; emit('update', api); },
     destroy() {
       destroyed = true; runId++;
+      cancelJob(job.id);
       clearTimeout(debounceTimer); clearTimeout(focusTimer);
-      unwatch(); link?.destroy(); unalign();
+      unwatch(); link?.destroy(); unalign(); unvirtualize();
       try { const sc = scrollers.left; (sc?.target.nodeType === 1 ? sc.target : sc?.doc.documentElement)?.removeAttribute('data-sgc-noscrollbar'); } catch {}
       marks.left.clear(); marks.right.clear();
       listeners.clear();

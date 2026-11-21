@@ -6,7 +6,7 @@
 //
 // 사용자의 문서 컴포넌트를 왼쪽·오른쪽에 그대로 그리고, 그려진 화면을 비교한다. 문서 컴포넌트는 고칠 필요 없음.
 import { defineComponent, h, ref, onMounted, onBeforeUnmount, watch, shallowRef, nextTick } from 'vue';
-import { createCompare, mountToolbar, mountChangeList } from '@silvergate/compare-dom';
+import { createCompare, mountToolbar, mountChangeList, getMessages } from '@silvergate/compare-dom';
 
 
 
@@ -61,7 +61,7 @@ export const SgCompare = defineComponent({
       goTo: (i) => ctrl.value?.goTo(i),
     });
 
-    const ko = () => props.locale !== 'en';
+    const msg = () => getMessages(props.locale, props.labels);
     const head = (side, badge, cls, label) => h('button', {
       type: 'button', class: 'sgc-pane-head', 'aria-pressed': phoneSide.value === side ? 'true' : 'false',
       onClick: () => { phoneSide.value = side; },
@@ -75,8 +75,8 @@ export const SgCompare = defineComponent({
           h('div', { class: 'sgc-panes sgc-panes--one' }, [
             h('section', { class: 'sgc-pane sgc-both', hidden: red }, [
               h('div', { class: 'sgc-heads', role: 'group' }, [
-                head('left', ko() ? '이전' : 'Before', 'sgc-badge-old', props.leftLabel),
-                head('right', ko() ? '새 버전' : 'After', 'sgc-badge-new', props.rightLabel),
+                head('left', msg().before, 'sgc-badge-old', props.leftLabel),
+                head('right', msg().after, 'sgc-badge-new', props.rightLabel),
               ]),
               h('div', { ref: desk, class: 'sgc-shared', 'data-phone': phoneSide.value, tabindex: '0' }, [
                 h('div', { class: 'sgc-col sgc-col--left' }, [h('div', { ref: lMount, class: 'sgc-doc' }, slots.doc?.({ data: props.left, side: 'left' }))]),

@@ -42,6 +42,17 @@ export interface CompareOptions {
   scrollbars?: 'one' | 'both';
   /** 만들자마자 비교. 기본 true */
   auto?: boolean;
+  /**
+   * 쪽 건너뛰기: 화면 밖 쪽을 브라우저가 그리지 않게 모듈이 걸어 준다 (page 가 있을 때). 기본 false.
+   * 쪽 하나하나가 무거운 수천 쪽 문서에서 스크롤이 끊길 때만 켠다 (가벼운 쪽에는 오히려 손해).
+   * true = 켬, 'auto' = 쪽이 20장 이상일 때만. 고객 CSS 에 이미 있으면 손대지 않고, 모양이 달라지면 스스로 되돌림.
+   * 가장 좋은 방법은 화면 CSS 에 처음부터 넣는 것 (docs/04-문서-작성-요령.md)
+   */
+  virtualize?: boolean | 'auto';
+  /** 문서 안에 든 iframe(같은 도메인)의 안쪽 내용도 비교. 기본 true */
+  frames?: boolean;
+  /** 눈에 안 보이는(display:none) 요소는 비교에서 뺌 (접힌 탭·숨긴 영역). 기본 false */
+  visibleOnly?: boolean;
   /** 보안 정책(CSP)이 엄격한 사이트: 모듈이 넣는 <style> 에 붙일 nonce */
   nonce?: string;
   /** 엔진(compare-core) 규칙 덮어쓰기 (고급) */
@@ -115,6 +126,15 @@ export function mountViewer(host: HTMLElement, o: Omit<CompareOptions, 'left' | 
   destroy(): void;
 };
 export function ensureUiStyle(doc?: Document, nonce?: string): void;
+/** 비교 화면 뼈대 (도구 막대 · 두 문서가 나란히 든 한 스크롤 영역 · 변경 목록). 문서는 left / right 안에 그린다 */
+export function mountLayout(host: HTMLElement, o?: UiOptions & { leftLabel?: string; rightLabel?: string; height?: string; toolbar?: boolean; list?: boolean; modes?: boolean }): {
+  root: HTMLElement; left: HTMLElement; right: HTMLElement; desk: HTMLElement; bar: HTMLElement; list: HTMLElement; redline: HTMLElement;
+  attach(ctrl: CompareController): CompareController;
+  setMode(m: 'side' | 'redline'): void;
+  destroy(): void;
+};
+/** 비교할 화면 주소 검사 (같은 도메인 http/https 만). 문제가 있으면 오류 */
+export function safeUrl(doc: Document, url: string): string;
 export function snapshot(root: Source, opt?: { attrs?: string[]; ignore?: string; anchors?: string; keyAttrs?: string[] }): { tree: unknown; nodes: Node[]; anchors: number[]; anchorHashes: string[] };
 export function diffTrees(job: unknown): unknown;
 export const DOM_RULES: Record<string, unknown>;

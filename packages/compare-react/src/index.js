@@ -4,7 +4,7 @@
 //
 // 사용자의 문서 컴포넌트를 왼쪽·오른쪽에 그대로 그리고, 그려진 화면을 비교한다.
 import { createElement as h, useEffect, useRef, useState, forwardRef, useImperativeHandle } from 'react';
-import { createCompare, mountToolbar, mountChangeList } from '@silvergate/compare-dom';
+import { createCompare, mountToolbar, mountChangeList, getMessages } from '@silvergate/compare-dom';
 
 /** 레이아웃은 직접, 비교만: const ctrl = useCompare(leftRef, rightRef, { page: '.page' }) */
 export function useCompare(leftRef, rightRef, options = {}) {
@@ -50,7 +50,7 @@ export const SgCompare = forwardRef(function SgCompare(props, ref) {
     run: () => ctrlRef.current?.run(), next: () => ctrlRef.current?.next(), prev: () => ctrlRef.current?.prev(), goTo: (i) => ctrlRef.current?.goTo(i),
   }), []);
 
-  const ko = locale !== 'en';
+  const msg = getMessages(locale, labels);
   const red = mode === 'redline';
   const head = (side, badge, cls, label) => h('button', {
     type: 'button', className: 'sgc-pane-head', 'aria-pressed': phoneSide === side ? 'true' : 'false', onClick: () => setPhoneSide(side),
@@ -62,8 +62,8 @@ export const SgCompare = forwardRef(function SgCompare(props, ref) {
       h('div', { className: 'sgc-panes sgc-panes--one' },
         h('section', { className: 'sgc-pane sgc-both', hidden: red },
           h('div', { className: 'sgc-heads', role: 'group' },
-            head('left', ko ? '이전' : 'Before', 'sgc-badge-old', leftLabel),
-            head('right', ko ? '새 버전' : 'After', 'sgc-badge-new', rightLabel)),
+            head('left', msg.before, 'sgc-badge-old', leftLabel),
+            head('right', msg.after, 'sgc-badge-new', rightLabel)),
           h('div', { ref: desk, className: 'sgc-shared', 'data-phone': phoneSide, tabIndex: 0 },
             h('div', { className: 'sgc-col sgc-col--left' }, h('div', { ref: lM, className: 'sgc-doc' }, renderDoc?.(left, 'left'))),
             h('div', { className: 'sgc-col sgc-col--right' }, h('div', { ref: rM, className: 'sgc-doc' }, renderDoc?.(right, 'right'))))),

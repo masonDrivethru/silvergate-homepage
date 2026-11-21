@@ -7,25 +7,38 @@
  * i 는 nodes[i] = 실제 DOM 노드. h 는 안쪽까지 포함한 지문이라 같으면 비교를 건너뛴다(큰 문서용).
  */
 
-const SKIP_TAGS = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEMPLATE', 'LINK', 'META', 'HEAD', 'IFRAME', 'OBJECT']);
+const SKIP_TAGS = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEMPLATE', 'LINK', 'META', 'HEAD', 'OBJECT']);
 /** 기본으로 비교하는 속성 (class·style 같은 꾸밈은 기본 제외: 화면 프레임워크마다 달라지는 잡음) */
 export const DEFAULT_ATTRS = ['src', 'href', 'alt', 'colspan', 'rowspan', 'type'];
 /** 스크롤 맞춤 기준점으로 쓸 덩어리 */
 export const DEFAULT_ANCHORS = 'p,li,tr,h1,h2,h3,h4,h5,h6,dt,dd,pre,blockquote,figcaption,caption,img,[data-sgc-key]';
 const KEY_ATTRS = ['data-sgc-key', 'data-key'];
 
-/** 32비트 두 개를 섞은 문자열 해시 (cyrb53) */
+/**
+ * 글자 → 지문 (96비트, 6글자 문자열). 32비트 셋을 따로 섞는다.
+ * "지문이 같으면 내용이 같다"로 보고 안쪽 비교를 건너뛰므로, 다른 내용이 우연히 같은 지문이 될 확률을 사실상 0 으로 (수천 쪽 문서에서 10^-18 수준).
+ * 숫자를 글자로 바꾸는(진법 변환) 비용 없이 16비트씩 그대로 글자로 만든다.
+ */
 export function hashStr(str, seed = 0) {
-  let h1 = 0xdeadbeef ^ seed, h2 = 0x41c6ce57 ^ seed;
+  let h1 = 0xdeadbeef ^ seed, h2 = 0x41c6ce57 ^ seed, h3 = 0x9e3779b9 ^ seed;
   for (let i = 0; i < str.length; i++) {
     const ch = str.charCodeAt(i);
     h1 = Math.imul(h1 ^ ch, 2654435761);
     h2 = Math.imul(h2 ^ ch, 1597334677);
+    h3 = Math.imul(h3 ^ ch, 0x85ebca6b) ^ (h3 >>> 15);
   }
   h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
   h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
-  // 숫자 그대로 (글자로 바꾸는 비용이 수십만 노드에서 컸음). 53비트라 충돌 걱정 없음
-  return 4294967296 * (2097151 & h2) + (h1 >>> 0);
+  h3 = Math.imul(h3 ^ (h3 >>> 16), 0xc2b2ae35) ^ str.length;
+  return String.fromCharCode(h1 & 0xffff, h1 >>> 16, h2 & 0xffff, h2 >>> 16, h3 & 0xffff, h3 >>> 16);
+}
+
+/** 문서 안에 들어 있는 iframe 의 안쪽 문서 (같은 도메인이고 다 열렸을 때만). 다른 도메인이면 null → 주소(src)만 비교 */
+export function frameBody(el) {
+  try {
+    const d = el.contentDocument;
+    return d && d.body && d.readyState !== 'loading' ? d.body : null;
+  } catch { return null; }
 }
 
 export const normText = (s) => s.replace(/\s+/g, ' ').trim();
@@ -75,6 +88,11 @@ function* walk(root, opt) {
   const keyAttrs = opt.keyAttrs ?? KEY_ATTRS;
   /** 이 요소(예: 쪽)는 없는 것처럼 안쪽을 부모에 바로 붙인다: 쪽 경계가 달라도 내용끼리 비교 */
   const flattenSel = opt.flatten || '';
+  /** 눈에 안 보이는(display:none) 요소는 빼기 (접힌 탭·숨긴 영역). 기본은 포함 */
+  const visibleOnly = !!opt.visibleOnly;
+  /** 안쪽 문서까지 읽은 iframe 들 (바뀜 감시·표시용) */
+  const frames = [];
+  let frameDepth = 0;
   /** @type {Node[]} */
   const nodes = [];
   const anchors = [], anchorHashes = [];
@@ -147,13 +165,21 @@ function* walk(root, opt) {
     if (hasA) rec.a = a;
     if (out.k) rec.k = out.k;
     flat[i] = rec;
-    const ai = anchorSel && e.matches(anchorSel) ? anchors.push(i) - 1 : -1;
+    // 스크롤 맞춤 기준점은 바깥 문서의 요소만 (iframe 안쪽은 좌표계가 다름)
+    const ai = anchorSel && !frameDepth && e.matches(anchorSel) ? anchors.push(i) - 1 : -1;
     let kids = tag === 'TEXTAREA' || tag === 'SELECT' ? [] : Array.from(e.childNodes);
+    let isFrame = false;
+    // 문서 안의 iframe (같은 도메인): 안쪽 문서 내용을 이 요소의 자식으로 읽는다
+    if (tag === 'IFRAME' || tag === 'FRAME') {
+      const body = opt.frames === false ? null : frameBody(e);
+      kids = body ? Array.from(body.childNodes) : [];
+      if (body) { frames.push(e); isFrame = true; frameDepth++; }
+    } else if (e.hasAttribute('data-sgc-frame')) { isFrame = true; frameDepth++; }   // 한 장 보기용 복사본에서 iframe 자리
     // 열린 shadow DOM (웹 컴포넌트) 안쪽도 읽는다
     if (e.shadowRoot && e.shadowRoot.mode === 'open') kids = kids.concat(Array.from(e.shadowRoot.children));
     if (tag === 'TD' || tag === 'TH') cellOut.set(e, out);
     else if (tag === 'TR') kids = layoutRow(e, kids);
-    return { out, sig, kids, x: 0, ai, rec };
+    return { out, sig, kids, x: 0, ai, rec, isFrame };
   }
 
   const rootEl = resolveRoot(root);
@@ -191,6 +217,7 @@ function* walk(root, opt) {
         f.sig += '\u0003' + h;
       } else if (t === 1) {
         if (SKIP_TAGS.has(ch.tagName) || (ignoreSel && ch.matches(ignoreSel))) continue;
+        if (visibleOnly && ch.ownerDocument.defaultView.getComputedStyle(ch).display === 'none') continue;
         // (예전엔 부모 목록에 끼워 넣었는데(splice) 수천 쪽이면 목록 전체를 매번 밀어 느렸다)
         if (flattenSel && ch.matches(flattenSel)) { stack.push({ into: f, kids: Array.from(ch.childNodes), x: 0 }); continue; }
         const sub = open(ch, f.out.i);
@@ -200,13 +227,14 @@ function* walk(root, opt) {
       continue;
     }
     if (fr.into) { stack.pop(); continue; }
+    if (f.isFrame) frameDepth--;
     // 이 요소 끝: 지문 계산 후 부모에 반영
     f.out.h = f.rec.h = hashStr(f.sig);
     if (f.ai >= 0) anchorHashes[f.ai] = f.out.h;
     stack.pop();
     if (stack.length) { const pf = stack[stack.length - 1]; (pf.into ?? pf).sig += '\u0003' + f.out.h; }
   }
-  return { tree: top.out, nodes, anchors, anchorHashes, flat };
+  return { tree: top.out, nodes, anchors, anchorHashes, flat, frames };
 }
 
 /** 평평한 목록 → 트리 (Worker 쪽에서). 번호 i 와 자식 c 를 다시 만든다 */

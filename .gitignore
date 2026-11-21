@@ -20,3 +20,4 @@ packages/compare-dom/demo/adapters.bundle.js
 # 모듈 묶음 파일은 저장소에 둔다 (JSP 에서 파일 하나로 바로 쓰도록)
 !packages/compare-dom/dist/
 /release
+/undefined

@@ -73,8 +73,17 @@ export function mountToolbar(el, ctrl, o = {}) {
     );
   }
   const offs = ['update', 'filter', 'focus', 'start', 'sync'].map((ev) => ctrl.on(ev, render));
+  // F7 / Shift+F7. 한 화면에 비교 창이 여러 개면: 초점이 든 창만, 초점이 어느 창에도 없으면 첫 번째 창만
   const key = (e) => {
-    if (e.key === 'F7') { e.preventDefault(); e.shiftKey ? ctrl.prev() : ctrl.next(); }
+    if (e.key !== 'F7') return;
+    const bars = Array.from(doc.querySelectorAll('.sgc-toolbar'));
+    if (bars.length > 1) {
+      const scope = (b) => b.closest('.sgc-viewer') ?? b.parentElement ?? b;
+      const act = doc.activeElement;
+      const owner = bars.find((b) => act && act !== doc.body && scope(b).contains(act)) ?? bars[0];
+      if (owner !== el) return;
+    }
+    e.preventDefault(); e.shiftKey ? ctrl.prev() : ctrl.next();
   };
   doc.addEventListener('keydown', key);
   render();
@@ -176,13 +185,80 @@ export function mountChangeList(el, ctrl, o = {}) {
  *     page: '.page', locale: 'ko',
  *   })
  */
+/**
+ * 비교할 화면 주소 검사: 같은 도메인의 http(s) 주소만 (javascript: 같은 주소는 스크립트가 실행되므로 거부).
+ * 다른 도메인은 브라우저가 안쪽을 읽지 못하게 막으므로 미리 알려 준다.
+ */
+export function safeUrl(doc, url) {
+  let u;
+  try { u = new URL(String(url), doc.baseURI); } catch { throw new Error(`[sg-compare] 주소가 올바르지 않습니다: ${url}`); }
+  const here = doc.defaultView?.location;
+  if (!['http:', 'https:', 'file:', 'blob:'].includes(u.protocol)) throw new Error(`[sg-compare] 이 주소는 열 수 없습니다 (http/https 만 가능): ${u.protocol}`);
+  if ((u.protocol === 'http:' || u.protocol === 'https:') && here && /^https?:$/.test(here.protocol) && u.origin !== here.origin) {
+    throw new Error(`[sg-compare] 다른 도메인 화면은 비교할 수 없습니다 (${u.origin}). 같은 도메인 주소로 열리게 해 주세요 (리버스 프록시 등)`);
+  }
+  return u.href;
+}
+
+/**
+ * 비교 화면 뼈대만 만든다 (도구 막대 · 두 문서가 나란히 든 한 스크롤 영역 · 변경 목록).
+ * 문서는 left / right 안에 직접 그리고, createCompare 에 left·right·desk 를 넘긴다.
+ *
+ *   const L = SgCompare.mountLayout(host, { leftLabel: 'v1.0', rightLabel: 'v1.1' });
+ *   L.left.append(이전문서); L.right.append(새문서);
+ *   const ctrl = SgCompare.createCompare({ left: L.left, right: L.right, leftScroller: L.desk, rightScroller: L.desk });
+ *   L.attach(ctrl);   // 도구 막대·변경 목록 연결
+ */
+export function mountLayout(host, o = {}) {
+  const doc = host.ownerDocument;
+  ensureUiStyle(doc, o.nonce);
+  const m = getMessages(o.locale, o.labels);
+  const left = h(doc, 'div', { class: 'sgc-doc' }), right = h(doc, 'div', { class: 'sgc-doc' }), redline = h(doc, 'div', { class: 'sgc-doc' });
+  const bar = h(doc, 'div'), list = h(doc, 'aside');
+  const pick = (side) => {
+    desk.dataset.phone = side;
+    for (const b of heads.querySelectorAll('button')) b.setAttribute('aria-pressed', b.dataset.side === side ? 'true' : 'false');
+  };
+  const head = (side, badge, cls, label) => h(doc, 'button', { type: 'button', class: 'sgc-pane-head', 'data-side': side, 'aria-pressed': side === 'right' ? 'true' : 'false', onclick: () => pick(side) },
+    h(doc, 'span', { class: `sgc-badge ${cls}` }, badge), label ?? '');
+  const heads = h(doc, 'div', { class: 'sgc-heads', role: 'group' }, head('left', m.before, 'sgc-badge-old', o.leftLabel), head('right', m.after, 'sgc-badge-new', o.rightLabel));
+  const desk = h(doc, 'div', { class: 'sgc-shared', 'data-phone': 'right', tabindex: '0' },
+    h(doc, 'div', { class: 'sgc-col sgc-col--left' }, left), h(doc, 'div', { class: 'sgc-col sgc-col--right' }, right));
+  const both = h(doc, 'section', { class: 'sgc-pane sgc-both' }, heads, desk);
+  const paneX = h(doc, 'section', { class: 'sgc-pane', hidden: true },
+    h(doc, 'header', { class: 'sgc-pane-head' }, `${o.leftLabel ?? ''} → ${o.rightLabel ?? ''}`), h(doc, 'div', { style: 'flex:1;min-height:0;overflow:auto' }, redline));
+  const body = h(doc, 'div', { class: 'sgc-body' }, h(doc, 'div', { class: 'sgc-panes sgc-panes--one' }, both, paneX), o.list === false ? null : list);
+  if (o.list === false) body.style.gridTemplateColumns = '1fr';
+  const root = h(doc, 'div', { class: 'sgc-viewer' }, o.toolbar === false ? null : bar, body);
+  if (o.height) root.style.setProperty('--sgc-height', o.height);
+  host.replaceChildren(root);
+  let tb = null, cl = null, ctrl = null, dirty = true, off = null;
+  const setMode = (md) => {
+    const red = md === 'redline';
+    both.hidden = red; paneX.hidden = !red; root.dataset.mode = md;
+    if (red && dirty && ctrl?.changes) { ctrl.renderRedline(redline); dirty = false; }
+  };
+  return {
+    root, left, right, desk, bar, list, redline, setMode,
+    /** 도구 막대·변경 목록을 컨트롤러에 연결 */
+    attach(c) {
+      ctrl = c;
+      if (o.toolbar !== false) tb = mountToolbar(bar, c, { locale: o.locale, labels: o.labels, modes: o.modes !== false, onMode: setMode, nonce: o.nonce });
+      if (o.list !== false) cl = mountChangeList(list, c, { locale: o.locale, labels: o.labels, nonce: o.nonce });
+      off = c.on('update', () => { dirty = true; if (!paneX.hidden) { c.renderRedline(redline); dirty = false; } });
+      return c;
+    },
+    destroy() { off?.(); tb?.destroy(); cl?.destroy(); host.replaceChildren(); },
+  };
+}
+
 export function mountViewer(host, o) {
   const doc = host.ownerDocument;
   ensureUiStyle(doc, o.nonce);
   const m = getMessages(o.locale, o.labels);
   const frame = (src) => {
     const f = h(doc, 'iframe', { class: 'sgc-frame', title: src.label ?? '' });
-    if (src.url) f.src = src.url;
+    if (src.url) f.src = safeUrl(doc, src.url);
     else f.srcdoc = src.html ?? '';
     return f;
   };
@@ -248,10 +324,21 @@ export function mountViewer(host, o) {
 
   function drawRedline() {
     const src = fr.contentDocument;
-    const head = src.head ? src.head.innerHTML : '';
-    const base = src.baseURI ? `<base href="${src.baseURI.replace(/"/g, '&quot;')}">` : '';
-    fx.srcdoc = `<!doctype html><html lang="${src.documentElement.lang || ''}"><head>${base}${head}</head><body class="${src.body.className}"></body></html>`;
-    fx.addEventListener('load', () => { ctrl.renderRedline(fx.contentDocument.body); redlineDirty = false; }, { once: true });
+    const d = fx.contentDocument;
+    if (!d) return;
+    // 원본과 같은 모드로 다시 쓴다 (옛 화면은 doctype 이 없는 호환 모드인 경우가 많다. srcdoc 는 늘 표준 모드라 쓰지 않음)
+    d.open();
+    d.write(`${src.compatMode === 'BackCompat' ? '' : '<!doctype html>'}<html><head></head><body></body></html>`);
+    d.close();
+    // 글자를 이어 붙이지 않고 요소로 옮긴다. 모양(CSS)만 가져오고 스크립트는 가져오지 않는다 (한 번 더 실행되지 않게)
+    if (src.documentElement.lang) d.documentElement.lang = src.documentElement.lang;
+    const base = d.createElement('base'); base.href = src.baseURI; d.head.appendChild(base);
+    for (const n of src.head?.children ?? []) {
+      if (n.localName === 'style' || (n.localName === 'link' && /stylesheet/i.test(n.rel)) || (n.localName === 'meta' && n.hasAttribute('charset'))) d.head.appendChild(d.importNode(n, true));
+    }
+    d.body.className = src.body.className;
+    for (const a of ['style', 'bgcolor', 'text', 'link', 'dir']) { const v = src.body.getAttribute(a); if (v !== null) d.body.setAttribute(a, v); }
+    ctrl.renderRedline(d.body); redlineDirty = false;
   }
   function setMode(md) {
     const red = md === 'redline';
