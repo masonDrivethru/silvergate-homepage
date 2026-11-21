@@ -599,6 +599,8 @@ export function createCompare(options) {
   let lazyIO = [];
   /** 이동하기 전에 그 쪽들의 높이 맞추기를 먼저 끝낸다 (쪽 문서). 키: 'left:3' */
   let ensureAligned = async () => {};
+  /** 변경점으로 흘러가는 중 (그동안 스쳐 가는 쪽의 높이 맞추기는 미룸) */
+  let flying = false, afterFlight = () => {};
   /**
    * 쪽 문서(opt.page): 화면에 보이는 쪽과 그 앞뒤 몇 장만 맞춘다. 스크롤해서 새 쪽이 다가오면 그 쪽만.
    * 화면 밖 쪽은 브라우저가 그리지 않으므로(content-visibility) 높이를 잴 필요도 없고, 재면 억지로 그리느라 느려진다.
@@ -610,6 +612,7 @@ export function createCompare(options) {
     for (const io of lazyIO) io.disconnect();
     lazyIO = [];
     ensureAligned = async () => {};
+    afterFlight = () => {};
     if (!opt.page) return alignBatch(list, tick);
     const groups = new Map();   // 'left:3' → 그 쪽에 걸친 변경들
     const add = (side, n, ch) => {
@@ -639,6 +642,15 @@ export function createCompare(options) {
         }
       } finally { draining = false; }
     };
+    const passed = new Map();
+    afterFlight = () => {
+      for (const [key, pg] of passed) {
+        const r = pg.getBoundingClientRect(), vh = pg.ownerDocument.defaultView.innerHeight;
+        if (r.bottom > -vh * 1.5 && r.top < vh * 2.5) queue.add(key);
+      }
+      passed.clear();
+      drain();
+    };
     ensureAligned = async (keys) => {
       for (const k of keys) if (groups.has(k)) queue.add(k);
       while (draining) await yieldToBrowser();
@@ -655,6 +667,8 @@ export function createCompare(options) {
       // 스크롤 영역이 다른 문서(iframe 바깥)에 있으면 iframe 자기 화면 기준 (iframe 이 문서 높이만큼 늘어나 있으면 전부 보이는 것으로 봄)
       const ioRoot = scEl && scEl.nodeType === 1 && scEl.ownerDocument === r.ownerDocument ? scEl : null;
       const io = new win.IntersectionObserver((entries) => {
+        // 흘러가는 중에 스쳐 지나가는 쪽은 맞추지 않는다 (애니메이션이 끊기지 않게). 도착한 뒤에 화면 근처 쪽만
+        if (flying) { for (const e of entries) if (e.isIntersecting) passed.set(side + ':' + idx.get(e.target), e.target); return; }
         for (const e of entries) if (e.isIntersecting) queue.add(side + ':' + idx.get(e.target));
         drain();
       }, { root: ioRoot, rootMargin: '150% 0px 150% 0px' });
@@ -1045,10 +1059,89 @@ export function createCompare(options) {
         el = w.frameElement;
       }
     }
+    let glide = null;
     try {
-      // 먼저 목표가 든 "쪽"으로: 화면 밖(아직 그려지지 않은) 쪽 안 요소는 위치를 물으면 0 이 나올 수 있지만,
-      // 쪽 상자 자체의 위치는 늘 정확하다. 쪽이 화면에 그려진 뒤에 높이 맞추기 → 목표 줄에 정확히
-      if (opt.page) {
+      if (soft) {
+        // ---- 흘러가기: 거리와 상관없이 처음부터 끝까지 한 번에 미끄러지듯 (천천히 출발 → 빠르게 → 천천히 도착) ----
+        // 수천 쪽 떨어져 있어도 같은 느낌으로 1초 안에 도착한다. 가운데 구간은 빠르게 지나가고, 출발·도착 구간만 눈에 보인다.
+        // 화면 밖 쪽은 아직 그려지지 않아 목표 줄의 정확한 자리를 모르므로: 처음엔 "목표가 든 쪽"을 향해 가다가,
+        // 그 쪽이 화면에 들어와 그려지면 정확한 줄로 목표를 바꾼다 (속도가 줄어드는 구간이라 티가 나지 않는다).
+        const clampTo = (sc, v) => Math.max(0, Math.min(v, sc.max()));
+        const items = sides.map(({ side }) => {
+          const sc = scrollers[side];
+          const b0 = targetOf(side);
+          return { side, sc, from: sc.top, dest: null, seen: 0, pg: opt.page ? hostEl(b0, side)?.closest?.(opt.page) ?? null : null };
+        });
+        const aim = (it) => {
+          const sc = it.sc, vh = sc.height();
+          const block = targetOf(it.side);
+          if (!block?.isConnected) return it.dest;
+          if (it.pg) {
+            const top = topIn(it.pg, sc.doc) - sc.viewTop();
+            const ph = it.pg.getBoundingClientRect().height;
+            const inView = top < vh && top + ph > 0;
+            it.seen = inView ? it.seen + 1 : 0;
+            // 쪽이 화면에 들어온 다음 프레임부터 (그때는 안쪽이 그려져 있음), 줄 위치가 쪽 안에 있을 때만 정확한 자리로
+            if (it.seen >= 2) {
+              const bt = topIn(block, sc.doc) - sc.viewTop();
+              if (bt >= top - 2 && bt <= top + ph + 2) return sc.top + offBy(sc, block);
+            }
+            return clampTo(sc, sc.top + top - vh * 0.15);
+          }
+          return sc.top + offBy(sc, block);
+        };
+        // 한 구간 = 지금 자리에서 목표까지. 가는 도중 목표가 바뀌면(쪽이 그려져 정확한 줄을 알게 됨, 빈 칸이 생김)
+        // 멈추지 않고 그 자리에서 새 목표로 부드럽게 이어 간다 (위치가 끊기지 않음)
+        const easeInOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+        const easeOut = (t) => 1 - Math.pow(1 - t, 3);
+        const begin = (it, d, now, main) => {
+          const from = it.sc.top, dist = Math.abs(d - from), vh = Math.max(1, it.sc.height());
+          // 처음: 가까우면 0.4초, 멀수록 조금씩 길게(최대 0.7초). 이어 가기: 0.22 ~ 0.48초
+          it.seg = main ? { from, t0: now, T: Math.min(700, 380 + 110 * Math.log2(1 + dist / vh)), fn: easeInOut }
+                        : { from, t0: now, T: Math.min(480, 220 + dist * 0.3), fn: easeOut };
+          // 아주 멀면(화면 4장 넘게): 출발 구간(화면 1.5장)과 도착 구간(화면 1.5장)만 실제로 흘러가고, 가장 빠른 순간에 그 사이를 건너뛴다.
+          // 수천 쪽을 프레임마다 새로 그리지 않아도 돼서 무거운 문서에서도 프레임이 고르다 (눈에는 한 번에 흘러간 것처럼 보임)
+          if (main && dist > vh * 4) { it.seg.warp = vh * 1.5; it.seg.dir = Math.sign(d - from); }
+          it.dest = d; it.done = false;
+        };
+        /** 모두 도착할 때까지 흘러간다. main = 첫 이동(천천히 출발), 아니면 짧게 이어 가기. 움직였으면 true */
+        glide = async (main) => {
+          let moved = false, asked = false;
+          flying = true;
+          try {
+            for (let n = 0; n < 600; n++) {
+              const now = await new Promise((r) => requestAnimationFrame(r));
+              if (token !== goToken || userMoved) return moved;
+              let busy = false;
+              for (const it of items) {
+                const d = aim(it);
+                if (d === null) continue;
+                // 목표 쪽이 화면에 들어오면 그 쪽의 높이 맞추기를 바로 시작 (도착 전에 끝나도록)
+                if (!asked && it.seen >= 1 && keys.length) { asked = true; ensureAligned(keys); }
+                if (!it.seg || it.done) { if (Math.abs(d - it.sc.top) > 2) begin(it, d, now, main && !it.seg); else { it.done = true; continue; } }
+                else if (Math.abs(d - it.dest) > 1) begin(it, d, now, false);
+                const g = it.seg, t = Math.min(1, (now - g.t0) / g.T);
+                let v;
+                if (g.warp) {
+                  const vp = g.warp * 2 * g.fn(t);   // 줄인 길(화면 3장) 위의 위치
+                  v = vp <= g.warp ? g.from + g.dir * vp : it.dest - g.dir * (g.warp * 2 - vp);
+                } else v = g.from + (it.dest - g.from) * g.fn(t);
+                v = clampTo(it.sc, v);
+                const tg = it.sc.target;
+                if (tg.scrollTo) tg.scrollTo({ top: v, behavior: 'instant' }); else it.sc.top = v;
+                moved = true;
+                if (t >= 1) it.done = true; else busy = true;
+              }
+              if (!busy) break;
+            }
+          } finally { flying = false; afterFlight(); }
+          return moved;
+        };
+        link?.pause(2500);
+        await glide(true);
+        if (token !== goToken) return;
+      } else if (opt.page) {
+        // 움직임 줄이기 설정: 바로 그 쪽으로
         let movedToPage = false;
         for (const { side, block } of sides) {
           const pg = hostEl(block, side)?.closest?.(opt.page);
@@ -1056,8 +1149,7 @@ export function createCompare(options) {
           const sc = scrollers[side];
           const d = topIn(pg, sc.doc) - sc.viewTop();
           if (d > sc.height() * 1.5 || d + pg.getBoundingClientRect().height < -sc.height() * 0.5) {
-            // 멀리 있으면 부드럽게 수천 쪽을 지나가지 않고: 목표 바로 앞(한 화면 거리)까지 순간 이동 → 남은 거리만 부드럽게
-            const v = Math.max(0, Math.min(sc.top + d - sc.height() * 0.15 - (soft ? Math.sign(d) * sc.height() * 0.8 : 0), sc.max()));
+            const v = Math.max(0, Math.min(sc.top + d - sc.height() * 0.15, sc.max()));
             const t = sc.target;
             if (t.scrollTo) t.scrollTo({ top: v, behavior: 'instant' }); else sc.top = v;
             movedToPage = true;
@@ -1071,33 +1163,20 @@ export function createCompare(options) {
       }
       if (keys.length) await ensureAligned(keys);
       if (token !== goToken) return;
-      // 부드럽게 가고 → 멈추면 다시 재서(그사이 새로 그려진 쪽·빈 칸 때문에 자리가 바뀌었으면) 다시 부드럽게, 최대 7번
+      // 도착한 뒤 다시 재서(그사이 새로 그려진 쪽·빈 칸 때문에 자리가 바뀌었으면) 짧게 이어 간다, 최대 7번
       for (let round = 0; round < 7 && !userMoved; round++) {
         if (keys.length) await ensureAligned(keys);
         if (token !== goToken) return;
-        let moving = false;
         // 높이 맞추기로 빈 칸이 새로 생겼을 수 있으니 목표를 다시 찾는다
         sides = sides.map(({ side }) => ({ side, block: targetOf(side) })).filter((x) => x.block);
-        for (const { side, block } of sides) {
-          if (!block.isConnected) continue;
-          const sc = scrollers[side];
-          const off = offBy(sc, block);
-          if (Math.abs(off) > 2) {
-            // 쪽 없는 긴 문서도 같은 방식: 멀면 한 화면 앞까지 순간 이동 후 부드럽게
-            if (soft && Math.abs(off) > sc.height() * 2) {
-              const t = sc.target, v = sc.top + off - Math.sign(off) * sc.height() * 0.8;
-              if (t.scrollTo) t.scrollTo({ top: v, behavior: 'instant' }); else sc.top = v;
-              await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-              if (token !== goToken) return;
-              if (keys.length) await ensureAligned(keys);
-              if (!block.isConnected) continue;
-            }
-            scrollIntoScroller(sc, block, 0.3, soft); moving = true;
-          }
-        }
-        if (!moving) break;
+        const off = sides.filter(({ block }) => block.isConnected).map(({ side, block }) => [scrollers[side], block, offBy(scrollers[side], block)]).filter((x) => Math.abs(x[2]) > 2);
+        if (!off.length) break;
         link?.pause(2000);
-        await Promise.all(sides.map(({ side }) => settle(scrollers[side])));
+        if (glide) { if (!(await glide(false))) break; }
+        else {
+          for (const [sc, block] of off) scrollIntoScroller(sc, block, 0.3, false);
+          await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+        }
         if (token !== goToken) return;
       }
     } finally {

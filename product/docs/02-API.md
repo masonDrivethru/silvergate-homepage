@@ -31,7 +31,7 @@
 | `changes` | 변경 목록 `ChangeItem[]` (`type`: added·modified·deleted·moved, `page`, `left`/`right` 노드, `diffs`) |
 | `stats` | 종류별 개수 |
 | `timing` | 걸린 시간(ms)·노드 수·worker 여부 |
-| `goTo(i)` · `next()` · `prev()` | 변경점으로 부드럽게 이동 + 깜빡임 |
+| `goTo(i)` · `next()` · `prev()` | 변경점으로 흘러가듯 이동(0.4 ~ 0.8초, 수천 쪽 떨어져도 같음) + 도착하면 반짝. `goTo(i, { smooth: false })` 는 바로 이동. 사용자가 휠·터치·키를 쓰면 멈춤. OS 의 '움직임 줄이기' 설정이면 바로 이동 |
 | `setFilter(type\|null)` | 목록·이동을 한 종류로 |
 | `run()` | 다시 비교 |
 | `renderRedline(el)` | 한 장 보기(삭제까지 겹친 새 버전 복사본) |

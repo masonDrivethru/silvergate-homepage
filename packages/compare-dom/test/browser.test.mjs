@@ -246,6 +246,38 @@ await test('큰 문서 1,000쪽: 시간 · 멀리 이동 정확도', async (page
   check(`이동 2초 안 (가장 오래 ${worst}ms)`, worst < 2000);
 });
 
+await test('변경점으로 흘러가기: 멀어도 한 번에, 거꾸로 가거나 튀지 않게', async (page, check) => {
+  await page.goto(`${BASE}/t/pages?n=1000&cv=1`);
+  await page.evaluate(() => window.start());
+  const r0 = await done(page);
+  const fly = (k) => page.evaluate(async (k) => {
+    const c = window.ctrl, ys = [], ts = [];
+    let on = true;
+    const tick = (now) => { ys.push(desk.scrollTop); ts.push(now); if (on) requestAnimationFrame(tick); };
+    requestAnimationFrame(tick);
+    const t0 = performance.now();
+    await c.goTo(k);
+    const ms = Math.round(performance.now() - t0);
+    on = false;
+    const dir = Math.sign(ys.at(-1) - ys[0]) || 1;
+    let back = 0, moving = 0, bigStepsNearEnd = 0;
+    for (let i = 1; i < ys.length; i++) { const d = (ys[i] - ys[i - 1]) * dir; if (d < -1) back++; if (d > 0) moving++; }
+    // 도착 직전 8프레임: 한 프레임에 화면 절반 넘게 튀면 안 됨 (천천히 멈춰야 함)
+    const lastMove = ys.findLastIndex((v, i) => i > 0 && v !== ys[i - 1]);
+    for (let i = Math.max(1, lastMove - 7); i <= lastMove; i++) if (Math.abs(ys[i] - ys[i - 1]) > desk.clientHeight * 0.5) bigStepsNearEnd++;
+    const flash = !!document.querySelector('[data-sgc-focus]');
+    return { ms, dist: Math.round(Math.abs(ys.at(-1) - ys[0])), back, moving, bigStepsNearEnd, flash };
+  }, k);
+  for (const [name, k] of [['맨 끝으로', r0.n - 1], ['맨 처음으로', 0], ['바로 옆으로', 1], ['가운데로', Math.floor(r0.n / 2)]]) {
+    const f = await fly(k);
+    check(`${name}: 1.5초 안에 도착 (${f.ms}ms, ${f.dist}px)`, f.ms < 1500, JSON.stringify(f));
+    check(`${name}: 거꾸로 가지 않음`, f.back === 0, JSON.stringify(f));
+    check(`${name}: 여러 프레임에 걸쳐 흘러감`, f.moving >= 8, JSON.stringify(f));
+    check(`${name}: 도착 직전에 튀지 않음`, f.bigStepsNearEnd === 0, JSON.stringify(f));
+    check(`${name}: 도착하면 반짝`, f.flash, JSON.stringify(f));
+  }
+});
+
 await test('연속 다시 비교: 앞 비교는 취소되고 마지막 결과만', async (page, check) => {
   await page.goto(`${BASE}/t/pages?n=300&cv=1`);
   await page.evaluate(() => window.start());

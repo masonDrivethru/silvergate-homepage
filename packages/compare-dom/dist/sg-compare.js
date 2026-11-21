@@ -3602,6 +3602,8 @@ tr.sgc-spacer::after{content:none}
     let lazyIO = [];
     let ensureAligned = async () => {
     };
+    let flying = false, afterFlight = () => {
+    };
     async function alignHeights(list, tick) {
       var _a, _b;
       unalign();
@@ -3609,6 +3611,8 @@ tr.sgc-spacer::after{content:none}
       for (const io of lazyIO) io.disconnect();
       lazyIO = [];
       ensureAligned = async () => {
+      };
+      afterFlight = () => {
       };
       if (!opt.page) return alignBatch(list, tick);
       const groups = /* @__PURE__ */ new Map();
@@ -3649,6 +3653,15 @@ tr.sgc-spacer::after{content:none}
           draining = false;
         }
       };
+      const passed = /* @__PURE__ */ new Map();
+      afterFlight = () => {
+        for (const [key, pg] of passed) {
+          const r = pg.getBoundingClientRect(), vh = pg.ownerDocument.defaultView.innerHeight;
+          if (r.bottom > -vh * 1.5 && r.top < vh * 2.5) queue.add(key);
+        }
+        passed.clear();
+        drain();
+      };
       ensureAligned = async (keys) => {
         for (const k of keys) if (groups.has(k)) queue.add(k);
         while (draining) await yieldToBrowser();
@@ -3664,6 +3677,10 @@ tr.sgc-spacer::after{content:none}
         const idx = new Map(pages.map((p, i) => [p, i]));
         const ioRoot = scEl && scEl.nodeType === 1 && scEl.ownerDocument === r.ownerDocument ? scEl : null;
         const io = new win.IntersectionObserver((entries) => {
+          if (flying) {
+            for (const e of entries) if (e.isIntersecting) passed.set(side + ":" + idx.get(e.target), e.target);
+            return;
+          }
           for (const e of entries) if (e.isIntersecting) queue.add(side + ":" + idx.get(e.target));
           drain();
         }, { root: ioRoot, rootMargin: "150% 0px 150% 0px" });
@@ -4097,8 +4114,93 @@ tr.sgc-spacer::after{content:none}
           el = w.frameElement;
         }
       }
+      let glide = null;
       try {
-        if (opt.page) {
+        if (soft) {
+          const clampTo = (sc, v) => Math.max(0, Math.min(v, sc.max()));
+          const items = sides.map(({ side }) => {
+            var _a2, _b2, _c2;
+            const sc = scrollers[side];
+            const b0 = targetOf(side);
+            return { side, sc, from: sc.top, dest: null, seen: 0, pg: opt.page ? (_c2 = (_b2 = (_a2 = hostEl(b0, side)) == null ? void 0 : _a2.closest) == null ? void 0 : _b2.call(_a2, opt.page)) != null ? _c2 : null : null };
+          });
+          const aim = (it) => {
+            const sc = it.sc, vh = sc.height();
+            const block = targetOf(it.side);
+            if (!(block == null ? void 0 : block.isConnected)) return it.dest;
+            if (it.pg) {
+              const top = topIn(it.pg, sc.doc) - sc.viewTop();
+              const ph = it.pg.getBoundingClientRect().height;
+              const inView = top < vh && top + ph > 0;
+              it.seen = inView ? it.seen + 1 : 0;
+              if (it.seen >= 2) {
+                const bt = topIn(block, sc.doc) - sc.viewTop();
+                if (bt >= top - 2 && bt <= top + ph + 2) return sc.top + offBy(sc, block);
+              }
+              return clampTo(sc, sc.top + top - vh * 0.15);
+            }
+            return sc.top + offBy(sc, block);
+          };
+          const easeInOut = (t) => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+          const easeOut = (t) => 1 - Math.pow(1 - t, 3);
+          const begin = (it, d, now2, main) => {
+            const from = it.sc.top, dist = Math.abs(d - from), vh = Math.max(1, it.sc.height());
+            it.seg = main ? { from, t0: now2, T: Math.min(700, 380 + 110 * Math.log2(1 + dist / vh)), fn: easeInOut } : { from, t0: now2, T: Math.min(480, 220 + dist * 0.3), fn: easeOut };
+            if (main && dist > vh * 4) {
+              it.seg.warp = vh * 1.5;
+              it.seg.dir = Math.sign(d - from);
+            }
+            it.dest = d;
+            it.done = false;
+          };
+          glide = async (main) => {
+            let moved = false, asked = false;
+            flying = true;
+            try {
+              for (let n = 0; n < 600; n++) {
+                const now2 = await new Promise((r) => requestAnimationFrame(r));
+                if (token !== goToken || userMoved) return moved;
+                let busy = false;
+                for (const it of items) {
+                  const d = aim(it);
+                  if (d === null) continue;
+                  if (!asked && it.seen >= 1 && keys.length) {
+                    asked = true;
+                    ensureAligned(keys);
+                  }
+                  if (!it.seg || it.done) {
+                    if (Math.abs(d - it.sc.top) > 2) begin(it, d, now2, main && !it.seg);
+                    else {
+                      it.done = true;
+                      continue;
+                    }
+                  } else if (Math.abs(d - it.dest) > 1) begin(it, d, now2, false);
+                  const g = it.seg, t = Math.min(1, (now2 - g.t0) / g.T);
+                  let v;
+                  if (g.warp) {
+                    const vp = g.warp * 2 * g.fn(t);
+                    v = vp <= g.warp ? g.from + g.dir * vp : it.dest - g.dir * (g.warp * 2 - vp);
+                  } else v = g.from + (it.dest - g.from) * g.fn(t);
+                  v = clampTo(it.sc, v);
+                  const tg = it.sc.target;
+                  if (tg.scrollTo) tg.scrollTo({ top: v, behavior: "instant" });
+                  else it.sc.top = v;
+                  moved = true;
+                  if (t >= 1) it.done = true;
+                  else busy = true;
+                }
+                if (!busy) break;
+              }
+            } finally {
+              flying = false;
+              afterFlight();
+            }
+            return moved;
+          };
+          link == null ? void 0 : link.pause(2500);
+          await glide(true);
+          if (token !== goToken) return;
+        } else if (opt.page) {
           let movedToPage = false;
           for (const { side, block } of sides) {
             const pg = (_e = (_d = hostEl(block, side)) == null ? void 0 : _d.closest) == null ? void 0 : _e.call(_d, opt.page);
@@ -4106,7 +4208,7 @@ tr.sgc-spacer::after{content:none}
             const sc = scrollers[side];
             const d = topIn(pg, sc.doc) - sc.viewTop();
             if (d > sc.height() * 1.5 || d + pg.getBoundingClientRect().height < -sc.height() * 0.5) {
-              const v = Math.max(0, Math.min(sc.top + d - sc.height() * 0.15 - (soft ? Math.sign(d) * sc.height() * 0.8 : 0), sc.max()));
+              const v = Math.max(0, Math.min(sc.top + d - sc.height() * 0.15, sc.max()));
               const t = sc.target;
               if (t.scrollTo) t.scrollTo({ top: v, behavior: "instant" });
               else sc.top = v;
@@ -4124,29 +4226,16 @@ tr.sgc-spacer::after{content:none}
         for (let round = 0; round < 7 && !userMoved; round++) {
           if (keys.length) await ensureAligned(keys);
           if (token !== goToken) return;
-          let moving = false;
           sides = sides.map(({ side }) => ({ side, block: targetOf(side) })).filter((x) => x.block);
-          for (const { side, block } of sides) {
-            if (!block.isConnected) continue;
-            const sc = scrollers[side];
-            const off = offBy(sc, block);
-            if (Math.abs(off) > 2) {
-              if (soft && Math.abs(off) > sc.height() * 2) {
-                const t = sc.target, v = sc.top + off - Math.sign(off) * sc.height() * 0.8;
-                if (t.scrollTo) t.scrollTo({ top: v, behavior: "instant" });
-                else sc.top = v;
-                await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-                if (token !== goToken) return;
-                if (keys.length) await ensureAligned(keys);
-                if (!block.isConnected) continue;
-              }
-              scrollIntoScroller(sc, block, 0.3, soft);
-              moving = true;
-            }
-          }
-          if (!moving) break;
+          const off = sides.filter(({ block }) => block.isConnected).map(({ side, block }) => [scrollers[side], block, offBy(scrollers[side], block)]).filter((x) => Math.abs(x[2]) > 2);
+          if (!off.length) break;
           link == null ? void 0 : link.pause(2e3);
-          await Promise.all(sides.map(({ side }) => settle(scrollers[side])));
+          if (glide) {
+            if (!await glide(false)) break;
+          } else {
+            for (const [sc, block] of off) scrollIntoScroller(sc, block, 0.3, false);
+            await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+          }
           if (token !== goToken) return;
         }
       } finally {
