@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // SilverBio Compare 직접 해 보기 (/compare, /ko/compare). 비밀번호로 잠근 페이지 (CompareGate).
-// 홈에서 가는 버튼은 숨겼고(COMPARE_PUBLIC), 검색엔진에도 나오지 않게 함(noindex, sitemap 에서 뺌)
+// 검색엔진에는 나오지 않게 함(noindex, sitemap 에서 뺌). 홈의 버튼(COMPARE_PUBLIC)을 누르면 비밀번호 화면
 const { t } = useI18n();
 const { pathTo } = useSiteNav();
 
