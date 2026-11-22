@@ -40,7 +40,7 @@
 
 ## mountViewer(host, options)
 
-`left`/`right` 에 `{ url, label }` 또는 `{ html, label }`. 나머지는 createCompare 옵션 + `height`, `layout`(`'shared'` 기본 / `'split'`).
+`left`/`right` 에 `{ url, label }` 또는 `{ html, label }`. `scripts: false` 면 화면 안의 스크립트를 실행하지 않습니다 (받은 파일·붙여 넣은 HTML 을 열 때). 나머지는 createCompare 옵션 + `height`, `layout`(`'shared'` 기본 / `'split'`).
 반환 `{ ready: Promise<controller>, controller, setMode('side'|'redline'), destroy() }`.
 
 - `shared`: 두 iframe 을 내용 높이만큼 늘려 한 스크롤 영역에 → 가장 자연스러움
@@ -63,6 +63,16 @@ lay.attach(ctrl);   // 도구 막대·변경 목록·한 장 보기 연결
 
 기본 도구 막대(개수·이전/다음·종류 거르기)와 변경 목록. `{ locale, labels, nonce }`.
 단축키 F7 / Shift+F7 = 다음 / 이전 변경 (한 화면에 비교 창이 여러 개면 초점이 든 창만).
+
+## exportReport(ctrl, options) · downloadReport(ctrl, options)
+
+비교 결과를 그 자체로 열리는 HTML 보고서 한 장으로 만듭니다 (변경관리 첨부·인쇄·PDF 저장).
+번호·종류·쪽·이전·이후, 변경 합계, 작성/검토/승인 서명칸이 들어갑니다. 문서 내용은 글자로만 넣습니다.
+
+```js
+const html = SgCompare.exportReport(ctrl, { leftLabel: 'v1.0', rightLabel: 'v1.1', locale: 'ko', author: '홍길동' });
+SgCompare.downloadReport(ctrl, { leftLabel: 'v1.0', rightLabel: 'v1.1' });   // 파일로 바로 내려받기
+```
 
 ## 색 바꾸기 (CSS 변수)
 

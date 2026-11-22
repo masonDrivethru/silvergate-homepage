@@ -119,7 +119,9 @@ export function mountChangeList(el: HTMLElement, ctrl: CompareController, o?: Ui
 export interface ViewerSource { url?: string; html?: string; label?: string }
 export function mountViewer(host: HTMLElement, o: Omit<CompareOptions, 'left' | 'right'> & UiOptions & { left: ViewerSource; right: ViewerSource; height?: string;
   /** 'shared'(기본): 두 iframe 을 한 스크롤 영역에 나란히 / 'split': 따로 스크롤 + 스크롤 맞춤 */
-  layout?: 'shared' | 'split' }): {
+  layout?: 'shared' | 'split';
+  /** false = 화면 안의 스크립트를 실행하지 않음 (저장해 둔 화면·받은 파일을 열 때). 기본 true */
+  scripts?: boolean }): {
   ready: Promise<CompareController>;
   readonly controller: CompareController | null;
   setMode(m: 'side' | 'redline'): void;
@@ -143,3 +145,9 @@ export function getMessages(locale?: string, overrides?: Record<string, unknown>
 
 /** SDK 버전 */
 export const version: string;
+
+export interface ReportOptions { title?: string; leftLabel?: string; rightLabel?: string; locale?: 'ko' | 'en' | string; author?: string; version?: string }
+/** 비교 결과를 그 자체로 열리는 HTML 보고서 한 장으로 (변경관리 첨부·인쇄·PDF 저장용) */
+export function exportReport(ctrl: CompareController, o?: ReportOptions): string;
+/** 보고서를 파일로 내려받게. 돌려주는 값 = 파일 이름 */
+export function downloadReport(ctrl: CompareController, o?: ReportOptions & { fileName?: string; document?: Document }): string;

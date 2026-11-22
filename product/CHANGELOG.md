@@ -9,7 +9,10 @@
 - **속도**: 긴 문서 비교 계산 1.0초 → 0.4초(3,000쪽), 멀리 있는 변경으로 이동 2.3초 → 0.8초. 글자 표시를 고정형으로 바꿔 변경이 수천 건이어도 화면 고치기가 느려지지 않음
 - **안정성**: 새 비교가 시작되면 앞 비교 취소, 백그라운드 계산 시간 제한·오류 시 자동 전환. 지문 96비트로 강화. 정리(destroy) 후 원본이 글자 하나까지 그대로
 - **쓰기 쉽게**: 뼈대 함수 `mountLayout`, 쪽 건너뛰기 옵션 `virtualize`, 단축키 F7 은 초점이 든 비교 창만
-- **자동 테스트**: 브라우저 테스트 17종(검사 130개) `npm run test:browser -w @silvergate/compare-dom`
+- **바로 쓰는 비교 화면** `SilverBio-Compare.html`: 설치 없이 HTML 두 개를 붙여 넣어 비교 (화면에서 복사한 것·코드 모두, 원래 사이트 주소로 CSS·그림 살리기)
+- **변경 보고서** `exportReport` · `downloadReport`: 비교 결과를 인쇄·PDF 가능한 보고서로
+- **검증 보고서** `검증보고서.html`: 브라우저 자동 테스트 결과를 시험 항목·기대 결과·실제 값·판정 표로 (`node product/scripts/validation-report.mjs`)
+- **자동 테스트**: 브라우저 테스트 18종(검사 134개) `npm run test:browser -w @silvergate/compare-dom`
 
 
 첫 납품 버전.

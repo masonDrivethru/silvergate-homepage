@@ -4,5 +4,6 @@ export { mountToolbar, mountChangeList, mountViewer, mountLayout, safeUrl, ensur
 export { snapshot } from './snapshot.js';
 export { diffTrees, DOM_RULES } from './engine.js';
 export { messages, getMessages } from './messages.js';
+export { exportReport, downloadReport } from './report.js';
 /** SDK 버전 */
 export const version = '1.0.0';

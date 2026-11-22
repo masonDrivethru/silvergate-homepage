@@ -5,7 +5,7 @@
  *  - mountViewer: 주소(URL)나 HTML 두 개만 주면 좌우 비교 화면 전체 (JSP 등 서버 화면용)
  */
 import { createCompare } from './controller.js';
-import { getMessages } from './messages.js';
+import { getMessages, attrLabel } from './messages.js';
 import { styleConfig, applyNonce } from './marks.js';
 
 const TYPES = ['added', 'modified', 'deleted', 'moved'];
@@ -123,11 +123,11 @@ export function mountChangeList(el, ctrl, o = {}) {
       body.push(h(doc, 'span', { class: 'sgc-li-diff' }, c.text.diffs.map(([op, t]) =>
         op === 0 ? t : h(doc, op < 0 ? 'del' : 'ins', {}, t))));
       if (c.text.span) {
-        const an = String(c.text.span.attr ?? '').split(', ').map((a) => m.attrNames?.[a] ?? a).join(', ');
+        const an = attrLabel(m, c.text.span.attr, c.right ?? c.left);
         body.push(h(doc, 'span', { class: 'sgc-li-attr' }, `${an}: `, h(doc, 'del', {}, String(c.text.span.before ?? '')), ' → ', h(doc, 'ins', {}, String(c.text.span.after ?? ''))));
       }
     } else if (c.what === 'attr') {
-      const an = String(c.text.attr ?? '').split(', ').map((a) => m.attrNames?.[a] ?? a).join(', ');
+      const an = attrLabel(m, c.text.attr, c.right ?? c.left);
       body.push(h(doc, 'span', { class: 'sgc-li-ctx' }, c.text.context || ''));
       body.push(h(doc, 'span', { class: 'sgc-li-attr' }, `${an}: `, h(doc, 'del', {}, String(c.text.before ?? '')), ' → ', h(doc, 'ins', {}, String(c.text.after ?? ''))));
     } else if (c.what === 'column') {
@@ -258,6 +258,8 @@ export function mountViewer(host, o) {
   const m = getMessages(o.locale, o.labels);
   const frame = (src) => {
     const f = h(doc, 'iframe', { class: 'sgc-frame', title: src.label ?? '' });
+    // scripts: false → 화면 안의 스크립트를 실행하지 않음 (저장해 둔 화면·받은 파일을 열 때 안전하게). 읽기는 그대로 됨
+    if (o.scripts === false) f.setAttribute('sandbox', 'allow-same-origin');
     if (src.url) f.src = safeUrl(doc, src.url);
     else f.srcdoc = src.html ?? '';
     return f;

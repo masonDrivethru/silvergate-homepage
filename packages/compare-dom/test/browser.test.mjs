@@ -40,9 +40,14 @@ const BASE = `http://localhost:${PORT}`;
 // 다른 도메인 흉내 (같은 서버, 다른 호스트 이름)
 const OTHER = `http://127.0.0.1:${PORT}`;
 
-const only = process.argv.slice(2);
+// --json 파일: 결과를 JSON 으로 (검증 보고서용).  나머지 인자: 이름에 이 글자가 든 테스트만
+const argv = process.argv.slice(2);
+const jsonAt = argv.indexOf('--json');
+const jsonOut = jsonAt >= 0 ? argv.splice(jsonAt, 2)[1] : null;
+const only = argv;
 const results = [];
 const browser = await chromium.launch();
+const browserVersion = browser.version();
 
 async function test(name, fn, pageOpt = {}) {
   if (only.length && !only.some((o) => name.includes(o))) return;
@@ -58,7 +63,7 @@ async function test(name, fn, pageOpt = {}) {
   } catch (e) { check('실행', false, String(e?.message ?? e).split('\n')[0]); }
   await page.close();
   const bad = checks.filter((c) => !c.ok);
-  results.push({ name, ok: !bad.length });
+  results.push({ name, ok: !bad.length, ms: Date.now() - t0, checks });
   console.log(`${bad.length ? '✘' : '✔'} ${name}  (${checks.length - bad.length}/${checks.length}, ${Date.now() - t0}ms)`);
   for (const c of bad) console.log(`    ✘ ${c.what}${c.detail ? ' — ' + c.detail : ''}`);
 }
@@ -455,8 +460,35 @@ await test('화면 배율 125% + 문서 축소(zoom): 멀리 여러 번 오가�
   check('도착한 변경의 좌우 짝이 같은 높이', worstPair <= 1, `최대 ${worstPair.toFixed(1)}px`);
 }, { viewport: { width: 1536, height: 730 }, deviceScaleFactor: 1.25 });
 
+await test('변경 보고서: 개수·내용이 화면과 같고, 문서 속 태그는 글자로만', async (page, check) => {
+  await page.goto(`${BASE}/t/blank`);
+  const r = await page.evaluate(async () => {
+    const L = document.createElement('div'), R = document.createElement('div');
+    L.innerHTML = '<p>혼합 시간은 10분</p><p>값 &lt;img src=x onerror="window.__x=1"&gt;</p><p>지워질 문단</p><img src="a.png" alt="a">';
+    R.innerHTML = '<p>혼합 시간은 15분</p><p>값 &lt;img src=x onerror="window.__x=1"&gt; 끝</p><img src="b.png" alt="a"><p>새 문단</p>';
+    document.body.append(L, R);
+    const c = SgCompare.createCompare({ left: L, right: R, align: false });
+    for (let i = 0; i < 200 && !c.timing; i++) await new Promise((r) => setTimeout(r, 20));
+    const html = SgCompare.exportReport(c, { leftLabel: 'v<1>', rightLabel: 'v2', locale: 'ko', version: SgCompare.version });
+    const f = document.createElement('iframe'); document.body.appendChild(f); f.srcdoc = html;
+    await new Promise((r) => f.onload = r);
+    const d = f.contentDocument;
+    return { n: c.changes.length, rows: d.querySelectorAll('tbody tr').length, imgs: d.querySelectorAll('img').length, ran: window.__x ?? 0, label: d.querySelector('.meta dd')?.textContent,
+      ins: [...d.querySelectorAll('ins')].map((x) => x.textContent).join('|'), del: [...d.querySelectorAll('del')].map((x) => x.textContent).join('|'), text: d.body.textContent };
+  });
+  check('보고서 줄 수 = 변경 수', r.n > 0 && r.rows === r.n, `${r.rows} / ${r.n}`);
+  check('바뀐 글자만 표시 (10분 → 15분: 지운 글자 0, 넣은 글자 5)', r.del.split('|')[0] === '0' && r.ins.split('|')[0] === '5', r.del + ' / ' + r.ins);
+  check('그림 주소 바뀜은 "그림: a.png → b.png"', /그림/.test(r.text) && /a\.png/.test(r.del + r.text) && /b\.png/.test(r.ins + r.text), r.text.slice(0, 300));
+  check('문서 속 태그·이름은 글자로만 (실행 안 됨)', r.imgs === 0 && r.ran === 0 && r.label === 'v<1>', JSON.stringify({ imgs: r.imgs, ran: r.ran, label: r.label }));
+});
+
 await browser.close();
 server.close();
 const bad = results.filter((r) => !r.ok);
 console.log(`\n${results.length - bad.length} / ${results.length} 통과`);
+if (jsonOut) {
+  const { writeFileSync } = await import('node:fs');
+  const pkg = JSON.parse(await readFile(path.join(pkgRoot, 'package.json'), 'utf8'));
+  writeFileSync(jsonOut, JSON.stringify({ sdk: pkg.version, browser: `Chromium ${browserVersion}`, node: process.version, platform: `${process.platform} ${process.arch}`, date: new Date().toISOString(), results }, null, 2));
+}
 process.exit(bad.length ? 1 : 0);

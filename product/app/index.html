@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SilverBio Compare</title>
+<style>
+  :root { --bg:#f4f5f7; --panel:#fff; --line:#e3e6eb; --fg:#14171c; --mut:#667085; --acc:#2563eb; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.5 "Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",system-ui,sans-serif; display: flex; flex-direction: column; }
+  header { display: flex; align-items: center; gap: 10px; padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  header b { font-size: 15px; }
+  header .sp { flex: 1; }
+  .mut { color: var(--mut); font-size: 12px; }
+  button { font: inherit; border: 1px solid var(--line); background: var(--panel); color: var(--fg); border-radius: 8px; padding: 6px 14px; cursor: pointer; }
+  button.primary { background: var(--acc); border-color: var(--acc); color: #fff; font-weight: 600; }
+  button:disabled { opacity: .45; cursor: default; }
+  main { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 12px 16px 16px; gap: 10px; }
+  .row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+  .row input[type=text], .row input[type=url] { font: inherit; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
+  #base { width: min(420px, 100%); }
+  .two { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .pane { min-height: 0; display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .pane-head { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+  .badge { font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 999px; }
+  .old { background: #fee2e2; color: #b91c1c; } .new { background: #dcfce7; color: #15803d; }
+  .pane-head input { flex: 1; min-width: 0; font: inherit; font-weight: 600; border: 0; padding: 2px 4px; background: transparent; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; padding: 3px 10px; font-size: 12px; }
+  .seg button[aria-pressed="true"] { background: #eef2f7; font-weight: 700; }
+  .pane-body { flex: 1; min-height: 0; position: relative; background: #e6e8ec; }
+  .pane-body textarea { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; resize: none; padding: 12px; font: 12px/1.5 Consolas,"D2Coding",monospace; background: #fff; }
+  .pane-body iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #fff; }
+  .empty { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: var(--mut); text-align: center; padding: 20px; pointer-events: none; }
+  .empty b { color: var(--fg); font-size: 15px; }
+  #viewer { flex: 1; min-height: 0; display: flex; }
+  #viewer > .sgc-viewer { flex: 1; }
+  .err { color: #b91c1c; margin: 0; }
+  [hidden] { display: none !important; }
+  @media (max-width: 800px) { .two { grid-template-columns: 1fr; grid-auto-rows: minmax(320px, 1fr); overflow: auto; } }
+</style>
+</head>
+<body>
+<header>
+  <b>SilverBio Compare</b><span class="mut" id="ver"></span>
+  <span class="sp"></span>
+  <button type="button" id="back" hidden data-t="back">← 다시 붙여 넣기</button>
+  <button type="button" id="report" hidden data-t="report">보고서 저장</button>
+  <button type="button" id="go" class="primary" disabled data-t="go">비교하기</button>
+  <button type="button" id="lang" title="Language">EN</button>
+</header>
+
+<main>
+  <section id="input" style="display:contents">
+    <div class="row">
+      <span class="mut" data-t="how">왼쪽에 이전 버전, 오른쪽에 새 버전을 붙여 넣으세요 (Ctrl+V). 화면에서 복사한 내용도, HTML 코드도 됩니다.</span>
+    </div>
+    <div class="row">
+      <label class="mut" for="base" data-t="baseLabel">원래 사이트 주소 (있으면 그 사이트의 CSS·그림까지 그대로)</label>
+      <input type="url" id="base" placeholder="https://example.com/doc/view">
+      <label class="mut"><input type="checkbox" id="scripts"> <span data-t="scripts">화면 안의 스크립트 실행</span></label>
+    </div>
+    <div class="two">
+      <div class="pane" data-side="L">
+        <div class="pane-head"><span class="badge old" data-t="old">이전</span><input type="text" class="name" value="v1" aria-label="name"><span class="seg"><button type="button" class="v-doc" aria-pressed="true" data-t="doc">문서</button><button type="button" class="v-code" aria-pressed="false" data-t="code">코드</button></span><button type="button" class="clear" data-t="clear">지우기</button></div>
+        <div class="pane-body"><iframe title="preview" sandbox="allow-same-origin"></iframe><textarea spellcheck="false" hidden></textarea><div class="empty"><b data-t="pasteHere">여기를 누르고 Ctrl+V</b><span data-t="pasteHint">화면에서 복사한 내용 또는 HTML 코드</span></div></div>
+      </div>
+      <div class="pane" data-side="R">
+        <div class="pane-head"><span class="badge new" data-t="new">새 버전</span><input type="text" class="name" value="v2" aria-label="name"><span class="seg"><button type="button" class="v-doc" aria-pressed="true" data-t="doc">문서</button><button type="button" class="v-code" aria-pressed="false" data-t="code">코드</button></span><button type="button" class="clear" data-t="clear">지우기</button></div>
+        <div class="pane-body"><iframe title="preview" sandbox="allow-same-origin"></iframe><textarea spellcheck="false" hidden></textarea><div class="empty"><b data-t="pasteHere">여기를 누르고 Ctrl+V</b><span data-t="pasteHint">화면에서 복사한 내용 또는 HTML 코드</span></div></div>
+      </div>
+    </div>
+  </section>
+  <div id="viewer" hidden></div>
+  <p id="error" class="err" hidden></p>
+</main>
+
+<!--SGC-->
+<script>
+(function () {
+  'use strict';
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+  var T = {
+    ko: { back: '← 다시 붙여 넣기', report: '보고서 저장', go: '비교하기', how: '왼쪽에 이전 버전, 오른쪽에 새 버전을 붙여 넣으세요 (Ctrl+V). 화면에서 복사한 내용도, HTML 코드도 됩니다.',
+      baseLabel: '원래 사이트 주소 (있으면 그 사이트의 CSS·그림까지 그대로)', scripts: '화면 안의 스크립트 실행', old: '이전', new: '새 버전', doc: '문서', code: '코드', clear: '지우기',
+      pasteHere: '여기를 누르고 Ctrl+V', pasteHint: '화면에서 복사한 내용 또는 HTML 코드' },
+    en: { back: '← Paste again', report: 'Save report', go: 'Compare', how: 'Paste the previous version on the left and the new version on the right (Ctrl+V). Content copied from a screen or HTML code both work.',
+      baseLabel: 'Original site address (optional — loads that site\'s CSS and images)', scripts: 'Run scripts inside the documents', old: 'Before', new: 'After', doc: 'Document', code: 'Code', clear: 'Clear',
+      pasteHere: 'Click here and press Ctrl+V', pasteHint: 'Content copied from a screen, or HTML code' },
+  };
+  var lang = 'ko';
+  try { if ((localStorage.getItem('sgc-app-lang') || navigator.language || '').slice(0, 2) === 'en') lang = 'en'; } catch (e) {}
+  function applyLang() {
+    document.documentElement.lang = lang;
+    document.querySelectorAll('[data-t]').forEach(function (el) { el.textContent = T[lang][el.getAttribute('data-t')]; });
+    $('#lang').textContent = lang === 'ko' ? 'EN' : '한국어';
+  }
+  $('#lang').onclick = function () { lang = lang === 'ko' ? 'en' : 'ko'; try { localStorage.setItem('sgc-app-lang', lang); } catch (e) {} applyLang(); if (viewer) start(); };
+  $('#ver').textContent = 'v' + SgCompare.version;
+
+  // ---------- 붙여 넣기 → 문서로 보기 ----------
+  var html = { L: '', R: '' };
+  /** 붙여 넣은 것을 완전한 문서로: 조각이면 html/body 로 감싸고, 원래 사이트 주소가 있으면 <base> 로 CSS·그림 주소를 살림 */
+  function asDocument(src) {
+    var base = $('#base').value.trim();
+    var baseTag = base ? '<base href="' + base.replace(/"/g, '&quot;') + '">' : '';
+    var meta = '<meta charset="utf-8">';
+    if (/<html[\s>]/i.test(src)) {
+      if (!baseTag) return src;
+      return /<head[^>]*>/i.test(src) ? src.replace(/<head([^>]*)>/i, '<head$1>' + baseTag) : src.replace(/<html([^>]*)>/i, '<html$1><head>' + baseTag + '</head>');
+    }
+    return '<!doctype html><html><head>' + meta + baseTag + '<style>body{margin:16px;font:14px/1.6 "Malgun Gothic",sans-serif}</style></head><body>' + src + '</body></html>';
+  }
+  function show(side) {
+    var pane = $('.pane[data-side="' + side + '"]');
+    var frame = $('iframe', pane), ta = $('textarea', pane), empty = $('.empty', pane);
+    var code = $('.v-code', pane).getAttribute('aria-pressed') === 'true';
+    empty.hidden = !!html[side] || code;
+    ta.hidden = !code; frame.hidden = code;
+    if (!code) frame.srcdoc = html[side] ? asDocument(html[side]) : '';
+    if (ta.value !== html[side]) ta.value = html[side];
+    $('#go').disabled = !(html.L.trim() && html.R.trim());
+  }
+  /** 붙여 넣기: 화면에서 복사한 것이면 그 HTML(모양 포함), 코드를 복사한 것이면 그 글자 */
+  function fromClipboard(e) {
+    var cd = e.clipboardData; if (!cd) return null;
+    var h = cd.getData('text/html'), t = cd.getData('text/plain');
+    if (t && /^\s*</.test(t) && /<\/?[a-z][\s\S]*>/i.test(t)) return t;          // HTML 코드를 복사한 경우
+    if (h) return h.replace(/^[\s\S]*?<!--StartFragment-->/, '').replace(/<!--EndFragment-->[\s\S]*$/, '');   // 화면에서 복사 (Windows 클립보드 표시 제거)
+    return t ? t.replace(/[&<>]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; }).replace(/\n/g, '<br>') : null;
+  }
+  document.querySelectorAll('.pane').forEach(function (pane) {
+    var side = pane.getAttribute('data-side'), body = $('.pane-body', pane), ta = $('textarea', pane);
+    body.tabIndex = 0;
+    var onPaste = function (e) {
+      var got = fromClipboard(e); if (got == null) return;
+      e.preventDefault(); html[side] = got; show(side);
+    };
+    body.addEventListener('paste', onPaste);
+    ta.addEventListener('input', function () { html[side] = ta.value; $('#go').disabled = !(html.L.trim() && html.R.trim()); });
+    $('.v-doc', pane).onclick = function () { $('.v-doc', pane).setAttribute('aria-pressed', 'true'); $('.v-code', pane).setAttribute('aria-pressed', 'false'); show(side); };
+    $('.v-code', pane).onclick = function () { $('.v-doc', pane).setAttribute('aria-pressed', 'false'); $('.v-code', pane).setAttribute('aria-pressed', 'true'); show(side); ta.focus(); };
+    $('.clear', pane).onclick = function () { html[side] = ''; show(side); body.focus(); };
+    // 파일을 끌어다 놓아도 됨 (.html)
+    body.addEventListener('dragover', function (e) { e.preventDefault(); });
+    body.addEventListener('drop', function (e) {
+      e.preventDefault(); var f = e.dataTransfer.files[0]; if (!f) return;
+      var r = new FileReader(); r.onload = function () { html[side] = String(r.result); $('.name', pane).value = f.name.replace(/\.[^.]+$/, ''); show(side); }; r.readAsText(f);
+    });
+  });
+  $('#base').addEventListener('change', function () { show('L'); show('R'); });
+
+  // ---------- 비교 ----------
+  var viewer = null;
+  function start() {
+    if (viewer) viewer.destroy();
+    $('#input').hidden = true; $('#viewer').hidden = false; $('#back').hidden = false; $('#report').hidden = false; $('#report').disabled = true; $('#go').hidden = true;
+    $('#error').hidden = true;
+    viewer = SgCompare.mountViewer($('#viewer'), {
+      left: { html: asDocument(html.L), label: $('.pane[data-side="L"] .name').value },
+      right: { html: asDocument(html.R), label: $('.pane[data-side="R"] .name').value },
+      scripts: $('#scripts').checked, locale: lang, height: '100%',
+    });
+    viewer.ready.then(function () { $('#report').disabled = false; }, function (e) { $('#error').textContent = String(e && e.message || e); $('#error').hidden = false; });
+  }
+  $('#go').onclick = start;
+  $('#back').onclick = function () {
+    if (viewer) viewer.destroy(); viewer = null;
+    $('#input').hidden = false; $('#viewer').hidden = true; $('#back').hidden = true; $('#report').hidden = true; $('#go').hidden = false;
+    show('L'); show('R');
+  };
+  $('#report').onclick = function () {
+    if (!viewer || !viewer.controller) return;
+    SgCompare.downloadReport(viewer.controller, { leftLabel: $('.pane[data-side="L"] .name').value, rightLabel: $('.pane[data-side="R"] .name').value, locale: lang, version: SgCompare.version });
+  };
+  applyLang(); show('L'); show('R');
+})();
+</script>
+</body>
+</html>

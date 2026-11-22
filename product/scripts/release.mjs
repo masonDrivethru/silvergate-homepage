@@ -75,6 +75,21 @@ for (const f of DIST_FILES) copyFileSync(path.join(pk('compare-dom'), 'dist', f)
 for (const x of ['README.md', 'LICENSE', 'THIRD_PARTY_NOTICES.md', 'CHANGELOG.md']) copyFileSync(path.join(prod, x), path.join(out, x));
 cpSync(path.join(prod, 'docs'), path.join(out, 'docs'), { recursive: true });
 cpSync(path.join(prod, 'examples'), path.join(out, 'examples'), { recursive: true });
+// 바로 쓰는 비교 화면: 파일 하나 (모듈을 안에 넣음). 더블클릭으로 열고 HTML 두 개를 붙여 넣으면 비교
+{
+  const app = readFileSync(path.join(prod, 'app/index.html'), 'utf8');
+  const js = readFileSync(path.join(pk('compare-dom'), 'dist/sg-compare.min.js'), 'utf8').replace(/<\/script/gi, '<\\/script');
+  const [a, b] = app.split('<!--SGC-->');
+  if (b === undefined) throw new Error('product/app/index.html 에 <!--SGC--> 자리가 없습니다');
+  writeFileSync(path.join(out, 'SilverBio-Compare.html'), `${a}<script>${js}</script>${b}`);
+}
+// 검증 보고서 (브라우저 자동 테스트 결과). playwright 가 없으면 건너뜀
+try {
+  execSync(`node "${path.join(here, 'validation-report.mjs')}" "${path.join(out, '검증보고서.html')}"`, { cwd: root, stdio: 'inherit' });
+} catch (e) {
+  if (e.status === 2) console.warn('⚠ playwright 가 없어 검증 보고서를 건너뜁니다 (npm i -D playwright)');
+  else throw new Error('브라우저 자동 테스트 실패 — 납품 묶음을 만들지 않습니다');
+}
 rmSync(stage, { recursive: true, force: true });
 
 // 소스맵·풀어 쓴 소스가 섞이지 않았는지 확인

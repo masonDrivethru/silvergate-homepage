@@ -1501,7 +1501,9 @@ var SgCompare = (() => {
     DOM_RULES: () => DOM_RULES,
     createCompare: () => createCompare,
     diffTrees: () => diffTrees,
+    downloadReport: () => downloadReport,
     ensureUiStyle: () => ensureUiStyle,
+    exportReport: () => exportReport,
     getMessages: () => getMessages,
     messages: () => messages,
     mountChangeList: () => mountChangeList,
@@ -1963,9 +1965,9 @@ var SgCompare = (() => {
       return n === 1 ? base : `${base}#${n}`;
     });
   }
-  function matchKeyed(L, R, keyOf, detectMoves = true) {
+  function matchKeyed(L, R2, keyOf, detectMoves = true) {
     const lid = uniqueIds(L, keyOf);
-    const rid = uniqueIds(R, keyOf);
+    const rid = uniqueIds(R2, keyOf);
     const lpos = new Map(lid.map((id, i) => [id, i]));
     const rset = new Set(rid);
     const moved = /* @__PURE__ */ new Set();
@@ -1989,9 +1991,9 @@ var SgCompare = (() => {
       if (lpos.has(id)) {
         if (!moved.has(id)) flushLeftOnly(id);
         const i = lpos.get(id);
-        out.push({ id, hasL: true, hasR: true, l: L[i], r: R[ri], li: i, ri, moved: moved.has(id) });
+        out.push({ id, hasL: true, hasR: true, l: L[i], r: R2[ri], li: i, ri, moved: moved.has(id) });
       } else {
-        out.push({ id, hasL: false, hasR: true, l: void 0, r: R[ri], li: -1, ri, moved: false });
+        out.push({ id, hasL: false, hasR: true, l: void 0, r: R2[ri], li: -1, ri, moved: false });
       }
     });
     flushLeftOnly(void 0);
@@ -2016,14 +2018,14 @@ var SgCompare = (() => {
     return keep;
   }
   var LCS_LIMIT = 4e6;
-  function matchKeyless(L, R, hashOf, similar = null) {
+  function matchKeyless(L, R2, hashOf, similar = null) {
     const hl = L.map((x, i) => hashOf(x, "l", i));
-    const hr = R.map((x, i) => hashOf(x, "r", i));
+    const hr = R2.map((x, i) => hashOf(x, "r", i));
     let pre = 0;
-    while (pre < L.length && pre < R.length && hl[pre] === hr[pre]) pre++;
+    while (pre < L.length && pre < R2.length && hl[pre] === hr[pre]) pre++;
     let suf = 0;
-    while (suf < L.length - pre && suf < R.length - pre && hl[L.length - 1 - suf] === hr[R.length - 1 - suf]) suf++;
-    const n = L.length - pre - suf, m = R.length - pre - suf;
+    while (suf < L.length - pre && suf < R2.length - pre && hl[L.length - 1 - suf] === hr[R2.length - 1 - suf]) suf++;
+    const n = L.length - pre - suf, m = R2.length - pre - suf;
     const anchors = [];
     for (let i = 0; i < pre; i++) anchors.push([i, i]);
     const big = n > 0 && m > 0 && (n + 1) * (m + 1) > LCS_LIMIT ? anchorsByMyers(hl, hr, pre, n, m) : null;
@@ -2044,15 +2046,15 @@ var SgCompare = (() => {
         else j++;
       }
     }
-    for (let k = suf; k > 0; k--) anchors.push([L.length - k, R.length - k]);
-    anchors.push([L.length, R.length]);
+    for (let k = suf; k > 0; k--) anchors.push([L.length - k, R2.length - k]);
+    anchors.push([L.length, R2.length]);
     const out = [];
     const add = (li, ri) => out.push({
       id: ri >= 0 ? `#${ri}` : `#~${li}`,
       hasL: li >= 0,
       hasR: ri >= 0,
       l: li >= 0 ? L[li] : void 0,
-      r: ri >= 0 ? R[ri] : void 0,
+      r: ri >= 0 ? R2[ri] : void 0,
       li,
       ri,
       moved: false
@@ -2061,7 +2063,7 @@ var SgCompare = (() => {
     for (const [al, ar] of anchors) {
       const gl = al - pl, gr = ar - pr;
       if (similar && gl > 0 && gr > 0 && gl * gr <= GAP_LIMIT) {
-        for (const [a, b] of alignGap(L, R, pl, gl, pr, gr, similar)) add(a, b);
+        for (const [a, b] of alignGap(L, R2, pl, gl, pr, gr, similar)) add(a, b);
       } else {
         const both = Math.min(gl, gr);
         for (let k = 0; k < both; k++) add(pl + k, pr + k);
@@ -2076,11 +2078,11 @@ var SgCompare = (() => {
   }
   var GAP_LIMIT = 25e4;
   var SIM_MIN = 0.5;
-  function alignGap(L, R, pl, gl, pr, gr, similar) {
+  function alignGap(L, R2, pl, gl, pr, gr, similar) {
     const W = gr + 1;
     const sim = new Float64Array(gl * gr);
     for (let i2 = 0; i2 < gl; i2++) for (let j2 = 0; j2 < gr; j2++) {
-      const s = Number(similar(L[pl + i2], R[pr + j2])) || 0;
+      const s = Number(similar(L[pl + i2], R2[pr + j2])) || 0;
       sim[i2 * gr + j2] = s >= SIM_MIN ? s : -1;
     }
     const dp = new Float64Array((gl + 1) * W);
@@ -2149,11 +2151,11 @@ var SgCompare = (() => {
       const cur = nodes.get(path);
       if (!cur || RANK[status] > RANK[cur.status] || own && !cur.own && RANK[status] >= RANK[cur.status]) nodes.set(path, { status, own });
     };
-    function keyRule(pat, L, R) {
+    function keyRule(pat, L, R2) {
       const rule = find.keys(pat);
       if (rule === false) return null;
       if (typeof rule === "function") {
-        const ok = [L, R].every((arr) => arr.every((x, i) => {
+        const ok = [L, R2].every((arr) => arr.every((x, i) => {
           const k = rule(x, i);
           return k !== null && k !== void 0;
         }));
@@ -2167,10 +2169,10 @@ var SgCompare = (() => {
           return `#${idx}`;
         };
       }
-      const all = [...L, ...R];
+      const all = [...L, ...R2];
       if (!all.length || !all.every(isObj)) return null;
       for (const f of AUTO_KEYS) {
-        const ok = [L, R].every((arr) => {
+        const ok = [L, R2].every((arr) => {
           const seen = /* @__PURE__ */ new Set();
           return arr.every((x) => x[f] !== void 0 && x[f] !== null && !seen.has(x[f]) && seen.add(x[f]));
         });
@@ -2897,6 +2899,7 @@ tr.sgc-spacer::after{content:none}
       gapDeleted: "\uC0C8 \uBC84\uC804\uC5D0\uC11C \uC0AD\uC81C\uB428",
       column: (n) => `\uD45C \uC5F4 ${n}\uCE78`,
       attrNames: { colspan: "\uAC00\uB85C \uBCD1\uD569(colspan)", rowspan: "\uC138\uB85C \uBCD1\uD569(rowspan)", value: "\uC785\uB825\uAC12", src: "\uADF8\uB9BC", href: "\uB9C1\uD06C" },
+      srcOther: "\uC8FC\uC18C",
       nodes: "\uC77D\uC740 \uC694\uC18C",
       took: (s) => `\uBE44\uAD50 ${s}\uCD08`,
       page: (p) => `${p}\uCABD`,
@@ -2923,6 +2926,7 @@ tr.sgc-spacer::after{content:none}
       gapDeleted: "Removed in the new version",
       column: (n) => `Table column (${n} cells)`,
       attrNames: { colspan: "Merge (colspan)", rowspan: "Merge (rowspan)", value: "Input value", src: "Image", href: "Link" },
+      srcOther: "Address",
       nodes: "Nodes",
       took: (s) => `${s}s`,
       page: (p) => `p.${p}`,
@@ -2933,6 +2937,13 @@ tr.sgc-spacer::after{content:none}
     var _a, _b;
     const base = (_b = (_a = messages[locale]) != null ? _a : messages[String(locale != null ? locale : "").slice(0, 2)]) != null ? _b : messages.ko;
     return overrides ? { ...base, ...overrides } : base;
+  }
+  function attrLabel(m, names, node) {
+    const el = node ? node.nodeType === 1 ? node : node.parentElement : null;
+    return String(names != null ? names : "").split(", ").map((a) => {
+      var _a, _b;
+      return (_b = a === "src" && el && el.localName !== "img" ? m.srcOther : (_a = m.attrNames) == null ? void 0 : _a[a]) != null ? _b : a;
+    }).join(", ");
   }
 
   // src/controller.js
@@ -3199,17 +3210,17 @@ tr.sgc-spacer::after{content:none}
       state.error = null;
       emit("start");
       try {
-        const L = root("left"), R = root("right");
+        const L = root("left"), R2 = root("right");
         await virtualize();
         if (id !== runId || destroyed) return;
         ensureMarkStyle(L.ownerDocument, name + "l");
-        ensureMarkStyle(R.ownerDocument, name + "r");
+        ensureMarkStyle(R2.ownerDocument, name + "r");
         const t0 = performance.now();
         const sopt = { attrs: opt.attrs, ignore: opt.ignore, anchors: opt.anchors, keyAttrs: opt.keyAttrs, flatten: (_a = opt.flatten) != null ? _a : opt.page, frames: opt.frames, visibleOnly: opt.visibleOnly };
-        const big = L.getElementsByTagName("*").length + R.getElementsByTagName("*").length > 6e3;
+        const big = L.getElementsByTagName("*").length + R2.getElementsByTagName("*").length > 6e3;
         const sl = big ? await snapshotAsync(L, sopt) : snapshot(L, sopt);
         if (id !== runId || destroyed) return;
-        const sr = big ? await snapshotAsync(R, sopt) : snapshot(R, sopt);
+        const sr = big ? await snapshotAsync(R2, sopt) : snapshot(R2, sopt);
         if (id !== runId || destroyed) return;
         const t1 = performance.now();
         const size = sl.nodes.length + sr.nodes.length;
@@ -3840,7 +3851,7 @@ tr.sgc-spacer::after{content:none}
       }
       applyFixes(fixes);
       const seen = /* @__PURE__ */ new Set(), tops = [];
-      const esc2 = (v) => {
+      const esc3 = (v) => {
         var _a2;
         return ((_a2 = globalThis.CSS) == null ? void 0 : _a2.escape) ? CSS.escape(v) : String(v).replace(/["\\]/g, "\\$&");
       };
@@ -3854,11 +3865,11 @@ tr.sgc-spacer::after{content:none}
           const u = topUnit(ch[side], side);
           const key = (_m = u == null ? void 0 : u.getAttribute) == null ? void 0 : _m.call(u, "data-sgc-key");
           if (!u || !key || u === (side === "right" ? ch.right : ch.left)) continue;
-          const v = root(other).querySelector(`[data-sgc-key="${esc2(key)}"]`);
+          const v = root(other).querySelector(`[data-sgc-key="${esc3(key)}"]`);
           if (!v) continue;
           const inner = (_n = ch[side].nodeType === 1 ? ch[side] : ch[side].parentElement) == null ? void 0 : _n.closest("[data-sgc-key]");
           if (inner && inner !== u && u.contains(inner)) {
-            const iv = v.querySelector(`[data-sgc-key="${esc2(inner.getAttribute("data-sgc-key"))}"]`);
+            const iv = v.querySelector(`[data-sgc-key="${esc3(inner.getAttribute("data-sgc-key"))}"]`);
             if (iv && !seen.has(side === "right" ? iv : inner)) {
               seen.add(side === "right" ? iv : inner);
               tops.push(side === "right" ? [iv, inner] : [inner, iv]);
@@ -3941,26 +3952,26 @@ tr.sgc-spacer::after{content:none}
       const pgL = pageIndex("left"), pgR = pageIndex("right");
       for (const c of out.changes) {
         if (!await tick()) return;
-        const L = nodeOf("left", (_a = c.at) == null ? void 0 : _a.left), R = nodeOf("right", (_b = c.at) == null ? void 0 : _b.right);
-        if ((c.type === "added" || c.type === "deleted") && (((_c = L.obj) == null ? void 0 : _c.virt) && !L.rest.length || ((_d = R.obj) == null ? void 0 : _d.virt) && !R.rest.length)) continue;
+        const L = nodeOf("left", (_a = c.at) == null ? void 0 : _a.left), R2 = nodeOf("right", (_b = c.at) == null ? void 0 : _b.right);
+        if ((c.type === "added" || c.type === "deleted") && (((_c = L.obj) == null ? void 0 : _c.virt) && !L.rest.length || ((_d = R2.obj) == null ? void 0 : _d.virt) && !R2.rest.length)) continue;
         const ch = {
           index: list.length,
           type: c.type,
           path: c.path,
           diffs: c.diffs,
           left: L.node,
-          right: R.node,
+          right: R2.node,
           what: "node",
           gap: null,
           before: c.left,
           after: c.right
         };
-        const field = (L.node ? L.rest : R.rest)[0];
+        const field = (L.node ? L.rest : R2.rest)[0];
         if (c.type === "moved") ch.what = "moved";
         else if (field === "v") ch.what = "text";
         else if (field === "a" || field === "n" || field === "k") {
           ch.what = "attr";
-          ch.attr = (L.node ? L.rest : R.rest).slice(1).join(".") || field;
+          ch.attr = (L.node ? L.rest : R2.rest).slice(1).join(".") || field;
         } else ch.what = "node";
         if (((_e = c.at) == null ? void 0 : _e.gap) && (c.type === "added" || c.type === "deleted")) {
           const gside = c.at.gap.side;
@@ -3975,9 +3986,9 @@ tr.sgc-spacer::after{content:none}
         }
         if (ch.what === "attr" || ch.what === "moved") {
           ch.left = L.node;
-          ch.right = R.node;
+          ch.right = R2.node;
         }
-        if (ch.what === "node") ch.h = (_g = L.node ? L.obj : R.obj) == null ? void 0 : _g.h;
+        if (ch.what === "node") ch.h = (_g = L.node ? L.obj : R2.obj) == null ? void 0 : _g.h;
         ch.page = {
           left: pgL && ch.left ? pgL(ch.left) : pgL && ((_h = ch.gap) == null ? void 0 : _h.side) === "left" ? pgL(ch.gap.node) : null,
           right: pgR && ch.right ? pgR(ch.right) : pgR && ((_i = ch.gap) == null ? void 0 : _i.side) === "right" ? pgR(ch.gap.node) : null
@@ -4443,10 +4454,10 @@ tr.sgc-spacer::after{content:none}
     function renderRedline(target) {
       var _a;
       if (!snaps) throw new Error("[sg-compare] run() \uC774 \uB05D\uB09C \uB4A4\uC5D0 \uBD80\uB974\uC138\uC694");
-      const R = root("right");
+      const R2 = root("right");
       const doc = target.ownerDocument;
       ensureMarkStyle(doc, name + "x");
-      const clone = doc.importNode(R, true);
+      const clone = doc.importNode(R2, true);
       const cloneOf = /* @__PURE__ */ new Map();
       const pairUp = (x, y) => {
         const st = [[x, y]];
@@ -4457,7 +4468,7 @@ tr.sgc-spacer::after{content:none}
           for (let i = 0; i < pc.length && i < qc.length; i++) st.push([pc[i], qc[i]]);
         }
       };
-      pairUp(R, clone);
+      pairUp(R2, clone);
       const fillFrames = (srcRoot) => {
         if (opt.frames === false) return;
         for (const f of srcRoot.querySelectorAll("iframe,frame")) {
@@ -4476,7 +4487,7 @@ tr.sgc-spacer::after{content:none}
           fillFrames(body);
         }
       };
-      fillFrames(R);
+      fillFrames(R2);
       for (const [el, prop, old] of padded) {
         const c = cloneOf.get(el);
         if (c == null ? void 0 : c.style) c.style[prop] = old;
@@ -4813,17 +4824,11 @@ tr.sgc-spacer::after{content:none}
       if (c.text.diffs) {
         body.push(h(doc, "span", { class: "sgc-li-diff" }, c.text.diffs.map(([op, t]) => op === 0 ? t : h(doc, op < 0 ? "del" : "ins", {}, t))));
         if (c.text.span) {
-          const an = String((_b = c.text.span.attr) != null ? _b : "").split(", ").map((a) => {
-            var _a3, _b2;
-            return (_b2 = (_a3 = m.attrNames) == null ? void 0 : _a3[a]) != null ? _b2 : a;
-          }).join(", ");
+          const an = attrLabel(m, c.text.span.attr, (_b = c.right) != null ? _b : c.left);
           body.push(h(doc, "span", { class: "sgc-li-attr" }, `${an}: `, h(doc, "del", {}, String((_c = c.text.span.before) != null ? _c : "")), " \u2192 ", h(doc, "ins", {}, String((_d = c.text.span.after) != null ? _d : ""))));
         }
       } else if (c.what === "attr") {
-        const an = String((_e = c.text.attr) != null ? _e : "").split(", ").map((a) => {
-          var _a3, _b2;
-          return (_b2 = (_a3 = m.attrNames) == null ? void 0 : _a3[a]) != null ? _b2 : a;
-        }).join(", ");
+        const an = attrLabel(m, c.text.attr, (_e = c.right) != null ? _e : c.left);
         body.push(h(doc, "span", { class: "sgc-li-ctx" }, c.text.context || ""));
         body.push(h(doc, "span", { class: "sgc-li-attr" }, `${an}: `, h(doc, "del", {}, String((_f = c.text.before) != null ? _f : "")), " \u2192 ", h(doc, "ins", {}, String((_g = c.text.after) != null ? _g : ""))));
       } else if (c.what === "column") {
@@ -5010,6 +5015,7 @@ tr.sgc-spacer::after{content:none}
     const frame = (src) => {
       var _a2, _b2;
       const f = h(doc, "iframe", { class: "sgc-frame", title: (_a2 = src.label) != null ? _a2 : "" });
+      if (o.scripts === false) f.setAttribute("sandbox", "allow-same-origin");
       if (src.url) f.src = safeUrl(doc, src.url);
       else f.srcdoc = (_b2 = src.html) != null ? _b2 : "";
       return f;
@@ -5249,6 +5255,150 @@ tr.sgc-spacer::after{content:none}
 @media (max-width:640px){.sgc-panes{grid-template-columns:1fr;grid-template-rows:1fr 1fr}.sgc-viewer[data-mode="redline"] .sgc-panes{grid-template-rows:1fr}}
 @media (max-width:560px){.sgc-chip{height:28px;padding:0 9px}.sgc-pane-head{padding:6px 10px}}
 `;
+
+  // src/report.js
+  var esc2 = (s) => String(s != null ? s : "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  var R = {
+    ko: {
+      title: "\uBB38\uC11C \uBE44\uAD50 \uBCF4\uACE0\uC11C",
+      before: "\uC774\uC804 \uBC84\uC804",
+      after: "\uC0C8 \uBC84\uC804",
+      made: "\uC791\uC131 \uC77C\uC2DC",
+      tool: "\uBE44\uAD50 \uB3C4\uAD6C",
+      total: "\uBCC0\uACBD \uD569\uACC4",
+      no: "\uBC88\uD638",
+      type: "\uC885\uB958",
+      where: "\uC704\uCE58",
+      content: "\uB0B4\uC6A9",
+      was: "\uC774\uC804",
+      now: "\uC774\uD6C4",
+      none: "\uB450 \uBC84\uC804 \uC0AC\uC774\uC5D0 \uBC14\uB010 \uACF3\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
+      page: (p) => `${p}\uCABD`,
+      column: (n) => `\uD45C \uC5F4 ${n}\uCE78`,
+      note: "\uC774 \uBCF4\uACE0\uC11C\uB294 \uD654\uBA74\uC5D0 \uADF8\uB824\uC9C4 \uB450 \uBB38\uC11C\uB97C \uC790\uB3D9\uC73C\uB85C \uBE44\uAD50\uD55C \uACB0\uACFC\uC785\uB2C8\uB2E4. \uCD5C\uC885 \uD310\uB2E8\uC740 \uB2F4\uB2F9\uC790\uAC00 \uC6D0\uBB38\uACFC \uB300\uC870\uD574 \uD655\uC778\uD558\uC2ED\uC2DC\uC624.",
+      sign: ["\uC791\uC131", "\uAC80\uD1A0", "\uC2B9\uC778"],
+      printHint: "\uC778\uC1C4\uD558\uAC70\uB098 PDF \uB85C \uC800\uC7A5\uD558\uB824\uBA74 Ctrl+P"
+    },
+    en: {
+      title: "Document Comparison Report",
+      before: "Previous version",
+      after: "New version",
+      made: "Generated",
+      tool: "Tool",
+      total: "Total changes",
+      no: "No.",
+      type: "Type",
+      where: "Location",
+      content: "Content",
+      was: "Before",
+      now: "After",
+      none: "No differences between the two versions.",
+      page: (p) => `p.${p}`,
+      column: (n) => `Table column (${n} cells)`,
+      note: "This report was produced by automatically comparing the two rendered documents. Reviewers must confirm against the source documents.",
+      sign: ["Prepared by", "Reviewed by", "Approved by"],
+      printHint: "Press Ctrl+P to print or save as PDF"
+    }
+  };
+  function diffSides(diffs) {
+    let was = "", now2 = "";
+    for (const [op, t] of diffs) {
+      if (op === 0) {
+        was += esc2(t);
+        now2 += esc2(t);
+      } else if (op < 0) was += `<del>${esc2(t)}</del>`;
+      else now2 += `<ins>${esc2(t)}</ins>`;
+    }
+    return [was, now2];
+  }
+  function exportReport(ctrl, o = {}) {
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k;
+    const lang = ((_a = o.locale) != null ? _a : "ko").startsWith("ko") ? "ko" : "en";
+    const t = R[lang], m = getMessages(lang);
+    const changes = (_b = ctrl.changes) != null ? _b : [];
+    const s = (_c = ctrl.stats) != null ? _c : {};
+    const when = /* @__PURE__ */ new Date();
+    const stamp = when.toLocaleString(lang === "ko" ? "ko-KR" : "en-US", { hour12: false });
+    const rows = changes.map((c, i) => {
+      var _a2, _b2, _c2, _d2, _e2, _f2, _g2, _h2, _i2, _j2;
+      const page = (_c2 = (_a2 = c.page) == null ? void 0 : _a2.right) != null ? _c2 : (_b2 = c.page) == null ? void 0 : _b2.left;
+      const where = page ? t.page(page) : "";
+      let content = "", was = "", now2 = "";
+      const tx = (_d2 = c.text) != null ? _d2 : {};
+      if (c.what === "text" && c.diffs) {
+        [was, now2] = diffSides(c.diffs);
+        if (tx.span) {
+          const an = esc2(attrLabel(m, tx.span.attr, (_e2 = c.right) != null ? _e2 : c.left));
+          was += `<div class="sub">${an}: ${esc2(tx.span.before)}</div>`;
+          now2 += `<div class="sub">${an}: ${esc2(tx.span.after)}</div>`;
+        }
+      } else if (c.what === "attr") {
+        const an = esc2(attrLabel(m, tx.attr, (_f2 = c.right) != null ? _f2 : c.left));
+        const ctx = tx.context ? `<div class="sub">${esc2(tx.context)}</div>` : "";
+        was = `${an}: <del>${esc2(tx.before)}</del>${ctx}`;
+        now2 = `${an}: <ins>${esc2(tx.after)}</ins>${ctx}`;
+      } else if (c.what === "column") {
+        content = `${esc2(t.column(tx.column))} \xB7 ${esc2((_g2 = tx.context) != null ? _g2 : "")}`;
+        if (c.type === "deleted") was = content;
+        else now2 = content;
+        content = "";
+      } else if (c.type === "deleted") was = `<del>${esc2((_h2 = tx.context) != null ? _h2 : "")}</del>`;
+      else if (c.type === "added") now2 = `<ins>${esc2((_i2 = tx.context) != null ? _i2 : "")}</ins>`;
+      else content = esc2((_j2 = tx.context) != null ? _j2 : "");
+      return `<tr class="t-${c.type}"><td class="n">${i + 1}</td><td><span class="tag">${esc2(m[c.type])}</span></td><td class="w">${esc2(where)}</td>` + (content ? `<td colspan="2">${content}</td>` : `<td>${was}</td><td>${now2}</td>`) + "</tr>";
+    }).join("");
+    const title = (_d = o.title) != null ? _d : t.title;
+    return `<!doctype html>
+<html lang="${lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${esc2(title)}</title>
+<style>
+body{margin:0;background:#f4f5f7;color:#1b2130;font:13px/1.55 "Noto Sans KR","Malgun Gothic",system-ui,sans-serif}
+.page{max-width:1080px;margin:24px auto;background:#fff;padding:36px 40px;box-shadow:0 1px 3px rgba(0,0,0,.12)}
+h1{margin:0 0 4px;font-size:20px}.hint{margin:0 0 18px;color:#667085;font-size:12px}
+.meta{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid #d3d8df;margin-bottom:14px}
+.meta div{padding:8px 12px;border-left:1px solid #d3d8df}.meta div:first-child{border-left:0}
+.meta dt{font-size:11px;color:#5b6474}.meta dd{margin:0;font-weight:600;overflow-wrap:anywhere}
+.stats{display:flex;gap:16px;margin:0 0 14px;font-weight:600}.stats .a{color:#15803d}.stats .m{color:#1d4ed8}.stats .d{color:#b91c1c}.stats .v{color:#6d28d9}
+table{width:100%;border-collapse:collapse}th,td{border:1px solid #d3d8df;padding:6px 8px;text-align:left;vertical-align:top;overflow-wrap:anywhere}
+th{background:#eff1f4;font-size:12px;color:#5b6474}td.n,td.w{white-space:nowrap;color:#5b6474}
+.tag{display:inline-block;padding:0 6px;border-radius:4px;font-size:11px;font-weight:700}
+.t-added .tag{background:#dcfce7;color:#15803d}.t-modified .tag{background:#dbeafe;color:#1d4ed8}.t-deleted .tag{background:#fee2e2;color:#b91c1c}.t-moved .tag{background:#ede9fe;color:#6d28d9}
+ins{background:#dcfce7;color:#15803d;text-decoration:none}del{background:#fee2e2;color:#b91c1c}
+.sub{margin-top:4px;font-size:11px;color:#5b6474}.empty{padding:20px;color:#5b6474}
+.note{margin:16px 0 0;font-size:11px;color:#5b6474}
+.sign{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:28px}.sign div{border-top:1px solid #1b2130;padding-top:6px;font-size:11px;color:#5b6474;height:48px}
+@media print{body{background:#fff}.page{box-shadow:none;margin:0;max-width:none;padding:0}.hint{display:none}tr{break-inside:avoid}}
+</style></head><body><div class="page">
+<h1>${esc2(title)}</h1><p class="hint">${esc2(t.printHint)}</p>
+<dl class="meta">
+<div><dt>${esc2(t.before)}</dt><dd>${esc2((_e = o.leftLabel) != null ? _e : "")}</dd></div>
+<div><dt>${esc2(t.after)}</dt><dd>${esc2((_f = o.rightLabel) != null ? _f : "")}</dd></div>
+<div><dt>${esc2(t.made)}</dt><dd>${esc2(stamp)}${o.author ? ` \xB7 ${esc2(o.author)}` : ""}</dd></div>
+<div><dt>${esc2(t.tool)}</dt><dd>SilverBio Compare ${esc2((_g = o.version) != null ? _g : "")}</dd></div>
+</dl>
+<p class="stats"><span>${esc2(t.total)} ${changes.length}</span><span class="a">${esc2(m.added)} ${(_h = s.added) != null ? _h : 0}</span><span class="m">${esc2(m.modified)} ${(_i = s.modified) != null ? _i : 0}</span><span class="d">${esc2(m.deleted)} ${(_j = s.deleted) != null ? _j : 0}</span><span class="v">${esc2(m.moved)} ${(_k = s.moved) != null ? _k : 0}</span></p>
+${changes.length ? `<table><thead><tr><th>${esc2(t.no)}</th><th>${esc2(t.type)}</th><th>${esc2(t.where)}</th><th style="width:40%">${esc2(t.was)}</th><th style="width:40%">${esc2(t.now)}</th></tr></thead><tbody>${rows}</tbody></table>` : `<p class="empty">${esc2(t.none)}</p>`}
+<p class="note">${esc2(t.note)}</p>
+<div class="sign">${t.sign.map((x) => `<div>${esc2(x)}</div>`).join("")}</div>
+</div></body></html>`;
+  }
+  function downloadReport(ctrl, o = {}) {
+    var _a, _b;
+    const html = exportReport(ctrl, o);
+    const d = /* @__PURE__ */ new Date(), p = (n) => String(n).padStart(2, "0");
+    const name = (_a = o.fileName) != null ? _a : `compare-report-${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}.html`;
+    const doc = (_b = o.document) != null ? _b : document;
+    const a = doc.createElement("a");
+    a.href = URL.createObjectURL(new Blob([html], { type: "text/html;charset=utf-8" }));
+    a.download = name;
+    doc.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      URL.revokeObjectURL(a.href);
+      a.remove();
+    }, 1e3);
+    return name;
+  }
 
   // src/index.js
   var version = "1.0.0";
