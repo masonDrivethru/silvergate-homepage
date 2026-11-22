@@ -157,7 +157,7 @@ const { pathTo } = useSiteNav();
         </div>
         <p class="diffx__sample">{{ $t('diff.hint') }}</p>
         <!-- 직접 해 보기 페이지(/compare)로 가는 탭 모양 버튼 -->
-        <a class="cmp-entry" :href="pathTo(COMPARE_PATH)">
+        <a v-if="COMPARE_PUBLIC" class="cmp-entry" :href="pathTo(COMPARE_PATH)">
           <span class="cmp-entry__dot" aria-hidden="true"></span>{{ $t('cdemo.entry') }}<span aria-hidden="true">→</span>
         </a>
       </div>

@@ -3602,6 +3602,7 @@ tr.sgc-spacer::after{content:none}
       return el && el !== r ? el : null;
     }
     let lazyIO = [];
+    const seenPages = /* @__PURE__ */ new Set();
     let ensureAligned = async () => {
     };
     let flying = false, afterFlight = () => {
@@ -3644,23 +3645,65 @@ tr.sgc-spacer::after{content:none}
         try {
           while (queue.size) {
             const batch = [];
-            for (const key of queue) for (const ch of (_a2 = groups.get(key)) != null ? _a2 : []) if (!done.has(ch)) {
-              done.add(ch);
-              batch.push(ch);
+            for (const key of queue) {
+              seenPages.add(key);
+              for (const ch of (_a2 = groups.get(key)) != null ? _a2 : []) if (!done.has(ch)) {
+                done.add(ch);
+                batch.push(ch);
+              }
             }
             queue.clear();
-            if (batch.length) await alignBatch(batch, async () => !destroyed);
+            if (!batch.length) continue;
+            const shown = forceRender(batch);
+            try {
+              await alignBatch(batch, async () => !destroyed);
+            } finally {
+              releaseRender(shown);
+            }
           }
         } finally {
           draining = false;
         }
       };
+      const forceRender = (batch) => {
+        var _a2, _b2;
+        const pages = /* @__PURE__ */ new Set();
+        const add2 = (n, side) => {
+          var _a3, _b3;
+          const pg = (_b3 = (_a3 = hostEl(n, side)) == null ? void 0 : _a3.closest) == null ? void 0 : _b3.call(_a3, opt.page);
+          if (pg) pages.add(pg);
+        };
+        for (const ch of batch) {
+          add2(ch.left, "left");
+          add2(ch.right, "right");
+          if (ch.gap) {
+            add2(ch.gap.node, ch.gap.side);
+            add2(ch.gap.prev, ch.gap.side);
+          }
+          for (const x of (_a2 = ch.extra) != null ? _a2 : []) add2(x.node, ch.type === "added" ? "right" : "left");
+          for (const n of (_b2 = ch.alsoLeft) != null ? _b2 : []) add2(n, "left");
+        }
+        const out = [];
+        for (const pg of pages) {
+          if (pg.ownerDocument.defaultView.getComputedStyle(pg).contentVisibility !== "auto") continue;
+          out.push([pg, pg.style.contentVisibility, pg.hasAttribute("style")]);
+          pg.style.contentVisibility = "visible";
+        }
+        return out;
+      };
+      const releaseRender = (list2) => {
+        if (!list2.length) return;
+        const win = list2[0][0].ownerDocument.defaultView;
+        win.requestAnimationFrame(() => win.requestAnimationFrame(() => {
+          for (const [pg, old, had] of list2) {
+            pg.style.contentVisibility = old;
+            if (!had && pg.getAttribute("style") === "") pg.removeAttribute("style");
+          }
+        }));
+      };
       const passed = /* @__PURE__ */ new Map();
       afterFlight = () => {
-        for (const [key, pg] of passed) {
-          const r = pg.getBoundingClientRect(), vh = pg.ownerDocument.defaultView.innerHeight;
-          if (r.bottom > -vh * 1.5 && r.top < vh * 2.5) queue.add(key);
-        }
+        for (const key of passed.keys()) queue.add(key);
         passed.clear();
         drain();
       };
@@ -3688,7 +3731,25 @@ tr.sgc-spacer::after{content:none}
         }, { root: ioRoot, rootMargin: "150% 0px 150% 0px" });
         for (const p of pages) if (groups.has(side + ":" + idx.get(p))) io.observe(p);
         lazyIO.push(io);
+        const onState = (e) => {
+          if (e.skipped) return;
+          const key = side + ":" + idx.get(e.target);
+          if (!groups.has(key)) return;
+          if (flying) {
+            passed.set(key, e.target);
+            return;
+          }
+          queue.add(key);
+          drain();
+        };
+        const watched = pages.filter((p) => groups.has(side + ":" + idx.get(p)));
+        for (const p of watched) p.addEventListener("contentvisibilityautostatechange", onState);
+        lazyIO.push({ disconnect: () => {
+          for (const p of watched) p.removeEventListener("contentvisibilityautostatechange", onState);
+        } });
       }
+      for (const k of seenPages) if (groups.has(k)) queue.add(k);
+      if (queue.size) drain();
     }
     async function alignBatch(list, tick) {
       var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;

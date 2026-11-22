@@ -1330,3 +1330,13 @@ html[data-motion="calm"] main .section__title { background-position: 0 0; }
   .cmp-bar .cmp-seg::-webkit-scrollbar { display: none; }
   .cmp-bar .cmp-seg button { flex: 0 0 auto; white-space: nowrap; }
 }
+
+/* ===== /compare 비밀번호 화면 (app/components/compare/Gate.vue) ===== */
+.cmp-gate { padding-top: var(--s4); min-height: 60vh; }
+.cmp-gate__box { max-width: 560px; }
+.cmp-gate__form { margin-top: var(--s3); display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.cmp-gate__form input { flex: 1 1 220px; min-height: 44px; padding: 0 16px; border-radius: var(--r-pill); border: 1px solid var(--glass-line-soft); background: rgb(var(--ink) / .05); color: var(--text); font: inherit; }
+.cmp-gate__form input:focus-visible { outline: 2px solid var(--silver-hi); outline-offset: 2px; }
+.cmp-gate__form .cmp-entry { margin-top: 0; cursor: pointer; font: inherit; }
+.cmp-gate__form .cmp-entry:disabled { opacity: .6; cursor: progress; }
+.cmp-gate__msg { margin: var(--s2) 0 0; font-size: var(--fs-small); color: var(--del, #f87171); }

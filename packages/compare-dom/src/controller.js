@@ -601,6 +601,9 @@ export function createCompare(options) {
    * (재고-넣고를 번갈아 하면 넣을 때마다 문서 전체 배치를 다시 계산해 수천 쪽에서 수십 초가 걸림)
    */
   let lazyIO = [];
+  /** 한 번이라도 화면에 그려진(높이를 맞춘) 쪽들 'left:3'. 다시 맞출 때(글꼴·폭 바뀜) 이 쪽들은 바로 맞춘다:
+   *  브라우저는 그려진 적 있는 쪽의 높이를 기억해 두고 화면 밖에서도 그 높이를 쓰므로, 맞추지 않은 채 두면 그 아래가 전부 어긋난다 */
+  const seenPages = new Set();
   /** 이동하기 전에 그 쪽들의 높이 맞추기를 먼저 끝낸다 (쪽 문서). 키: 'left:3' */
   let ensureAligned = async () => {};
   /** 변경점으로 흘러가는 중 (그동안 스쳐 가는 쪽의 높이 맞추기는 미룸) */
@@ -640,18 +643,47 @@ export function createCompare(options) {
       try {
         while (queue.size) {
           const batch = [];
-          for (const key of queue) for (const ch of groups.get(key) ?? []) if (!done.has(ch)) { done.add(ch); batch.push(ch); }
+          for (const key of queue) { seenPages.add(key); for (const ch of groups.get(key) ?? []) if (!done.has(ch)) { done.add(ch); batch.push(ch); } }
           queue.clear();
-          if (batch.length) await alignBatch(batch, async () => !destroyed);
+          if (!batch.length) continue;
+          // 높이를 재기 전에 그 쪽들을 실제로 그리게 한다: 화면에서 먼 쪽은 브라우저가 그리지 않고 건너뛰어(content-visibility)
+          // 안쪽 높이를 물으면 0 이 나온다 → "맞출 필요 없음"으로 잘못 끝나 좌우 쪽 높이가 어긋났다 (화면 배율·타이밍에 따라)
+          const shown = forceRender(batch);
+          try { await alignBatch(batch, async () => !destroyed); }
+          finally { releaseRender(shown); }
         }
       } finally { draining = false; }
     };
-    const passed = new Map();
-    afterFlight = () => {
-      for (const [key, pg] of passed) {
-        const r = pg.getBoundingClientRect(), vh = pg.ownerDocument.defaultView.innerHeight;
-        if (r.bottom > -vh * 1.5 && r.top < vh * 2.5) queue.add(key);
+    /** 변경들이 걸친 쪽 중 브라우저가 건너뛰는(content-visibility) 쪽을 잠깐 그리게. 되돌릴 목록을 돌려줌 */
+    const forceRender = (batch) => {
+      const pages = new Set();
+      const add = (n, side) => { const pg = hostEl(n, side)?.closest?.(opt.page); if (pg) pages.add(pg); };
+      for (const ch of batch) {
+        add(ch.left, 'left'); add(ch.right, 'right');
+        if (ch.gap) { add(ch.gap.node, ch.gap.side); add(ch.gap.prev, ch.gap.side); }
+        for (const x of ch.extra ?? []) add(x.node, ch.type === 'added' ? 'right' : 'left');
+        for (const n of ch.alsoLeft ?? []) add(n, 'left');
       }
+      const out = [];
+      for (const pg of pages) {
+        if (pg.ownerDocument.defaultView.getComputedStyle(pg).contentVisibility !== 'auto') continue;
+        out.push([pg, pg.style.contentVisibility, pg.hasAttribute('style')]);
+        pg.style.contentVisibility = 'visible';
+      }
+      return out;
+    };
+    /** 다음 그리기가 끝난 뒤 되돌린다 (그 사이 브라우저가 "맞춘 뒤의 높이"를 기억해 두므로, 다시 건너뛰어도 높이가 그대로) */
+    const releaseRender = (list) => {
+      if (!list.length) return;
+      const win = list[0][0].ownerDocument.defaultView;
+      win.requestAnimationFrame(() => win.requestAnimationFrame(() => {
+        for (const [pg, old, had] of list) { pg.style.contentVisibility = old; if (!had && pg.getAttribute('style') === '') pg.removeAttribute('style'); }
+      }));
+    };
+    const passed = new Map();
+    // 흘러가는 동안 스쳐 간 쪽은 모두 그려졌던 쪽이므로 도착한 뒤 전부 맞춘다 (건너뛰기 덕분에 몇 장뿐)
+    afterFlight = () => {
+      for (const key of passed.keys()) queue.add(key);
       passed.clear();
       drain();
     };
@@ -678,7 +710,23 @@ export function createCompare(options) {
       }, { root: ioRoot, rootMargin: '150% 0px 150% 0px' });
       for (const p of pages) if (groups.has(side + ':' + idx.get(p))) io.observe(p);
       lazyIO.push(io);
+      // 브라우저가 화면 밖 쪽을 "그리기 시작했다"는 신호도 받는다. 브라우저가 미리 그리는 범위는 화면 배율·확대에 따라
+      // 위의 "화면 근처"보다 넓을 수 있다 → 그려졌는데 맞추지 않은 쪽이 생기면 그 아래가 전부 어긋난다 (배율 125% 에서 확인)
+      const onState = (e) => {
+        if (e.skipped) return;
+        const key = side + ':' + idx.get(e.target);
+        if (!groups.has(key)) return;
+        if (flying) { passed.set(key, e.target); return; }
+        queue.add(key);
+        drain();
+      };
+      const watched = pages.filter((p) => groups.has(side + ':' + idx.get(p)));
+      for (const p of watched) p.addEventListener('contentvisibilityautostatechange', onState);
+      lazyIO.push({ disconnect: () => { for (const p of watched) p.removeEventListener('contentvisibilityautostatechange', onState); } });
     }
+    // 전에 그려졌던 쪽은 화면 근처가 아니어도 바로 다시 맞춘다
+    for (const k of seenPages) if (groups.has(k)) queue.add(k);
+    if (queue.size) drain();
   }
 
   async function alignBatch(list, tick) {

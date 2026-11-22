@@ -44,9 +44,9 @@ const only = process.argv.slice(2);
 const results = [];
 const browser = await chromium.launch();
 
-async function test(name, fn) {
+async function test(name, fn, pageOpt = {}) {
   if (only.length && !only.some((o) => name.includes(o))) return;
-  const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
+  const page = await browser.newPage({ viewport: { width: 1400, height: 900 }, ...pageOpt });
   const errs = [];
   page.on('pageerror', (e) => errs.push(e.message));
   const checks = [];
@@ -433,6 +433,27 @@ await test('똑같이 생긴 표가 반복될 때: 표마다 고유 ID(data-sgc-
   const n = await read();
   check('ID 가 없어도 오류 없이 비교되고 높이는 맞음', n.length > 0 && await page.evaluate(() => document.getElementById('left').offsetHeight === document.getElementById('right').offsetHeight), n.join(' | '));
 });
+
+await test('화면 배율 125% + 문서 축소(zoom): 멀리 여러 번 오가도 좌우 쪽 높이가 늘 같음', async (page, check) => {
+  // 브라우저가 화면 밖 쪽을 미리 그리는 범위는 배율·축소에 따라 넓어진다. 그려졌는데 높이를 맞추지 않은 쪽이 생기면 그 아래가 전부 어긋난다
+  await page.goto(`${BASE}/t/pages?n=400&cv=1&zoom=0.7&minh=330`);
+  await page.evaluate(() => window.start());
+  const r = await done(page);
+  check('오류 없음', !r.error, r.error);
+  const uneven = () => page.evaluate(() => { const L = [...document.querySelectorAll('#left .page')], R = [...document.querySelectorAll('#right .page')]; const bad = []; for (let i = 0; i < L.length; i++) { const d = R[i].getBoundingClientRect().height - L[i].getBoundingClientRect().height; if (Math.abs(d) > 0.5) bad.push(`${i + 1}쪽 ${d.toFixed(1)}`); } return bad; });
+  const order = [r.n - 1, 0, Math.floor(r.n / 2), r.n - 3, 5, Math.floor(r.n * 0.8), 2, Math.floor(r.n * 0.35), r.n - 2, Math.floor(r.n * 0.6)];
+  let worstPair = 0;
+  for (const k of order) {
+    await page.evaluate((k) => window.ctrl.goTo(k), k);
+    await page.waitForTimeout(250);
+    // 도착한 변경의 좌우 짝이 같은 높이에 있나 (한 스크롤 영역이라 같아야 함)
+    const d = await page.evaluate((k) => { const c = window.ctrl.changes[k]; const el = (n) => (n ? (n.nodeType === 1 ? n : n.parentElement) : null); const a = el(c.left) ?? el(c.gap?.side === 'left' ? c.gap.node : null), b = el(c.right) ?? el(c.gap?.side === 'right' ? c.gap.node : null); return a && b && c.type === 'modified' ? Math.abs(a.getBoundingClientRect().top - b.getBoundingClientRect().top) : 0; }, k);
+    worstPair = Math.max(worstPair, d);
+  }
+  const bad = await uneven();
+  check('10번 오간 뒤 좌우 쪽 높이가 모두 같음', bad.length === 0, bad.slice(0, 8).join(', '));
+  check('도착한 변경의 좌우 짝이 같은 높이', worstPair <= 1, `최대 ${worstPair.toFixed(1)}px`);
+}, { viewport: { width: 1536, height: 730 }, deviceScaleFactor: 1.25 });
 
 await browser.close();
 server.close();

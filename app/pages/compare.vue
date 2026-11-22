@@ -1,6 +1,6 @@
 <script setup lang="ts">
-// SilverBio Compare 직접 해 보기 (/compare, /ko/compare). 홈 Compare 연출의 탭 버튼에서 들어온다.
-// 홈만 공개 중에도 이 페이지는 공개 (nuxt.config.ts PAGES, public/sitemap.xml 에 들어 있음)
+// SilverBio Compare 직접 해 보기 (/compare, /ko/compare). 비밀번호로 잠근 페이지 (CompareGate).
+// 홈에서 가는 버튼은 숨겼고(COMPARE_PUBLIC), 검색엔진에도 나오지 않게 함(noindex, sitemap 에서 뺌)
 const { t } = useI18n();
 const { pathTo } = useSiteNav();
 
@@ -10,12 +10,19 @@ usePageSeo({
   description: () => t('cdemo.lead'),
   ogImage: () => '/assets/og-image.png',
 });
+useHead({ meta: [{ name: 'robots', content: 'noindex, nofollow, noarchive' }] });
 useReveal();
+const unlocked = ref(false);
 </script>
 
 <template>
   <div class="container cmp-back">
-    <a :href="pathTo('/#solutions')"><span aria-hidden="true">←</span> {{ $t('cdemo.back') }}</a>
+    <a :href="pathTo('/')"><span aria-hidden="true">←</span> {{ $t('cdemo.back') }}</a>
   </div>
-  <SectionCompareLive page />
+  <ClientOnly>
+    <!-- 비교 화면 코드는 잠금이 풀린 뒤에야 받는다 -->
+    <LazySectionCompareLive v-if="unlocked" page />
+    <CompareGate v-else @unlocked="unlocked = true" />
+    <template #fallback><CompareGate /></template>
+  </ClientOnly>
 </template>

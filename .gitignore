@@ -21,3 +21,7 @@ packages/compare-dom/demo/adapters.bundle.js
 !packages/compare-dom/dist/
 /release
 /undefined
+
+# 비밀 값 (비교 화면 비밀번호 지문 등): GitHub 에 올리지 않음
+.env
+.env.*

@@ -89,9 +89,9 @@ const pages = (q) => {
   const doc = (v) => Array.from({ length: n }, (_, i) => page(i + 1, v)).join('');
   const css = collapse
     ? '.page{background:#fff;min-height:500px}.page h3{margin:30px 0 10px}table{border-collapse:collapse}td,th{border:1px solid #bbb;padding:2px 6px}'
-    : `.page{box-sizing:border-box;background:#fff;min-height:560px;margin:10px;padding:24px;${cv ? 'content-visibility:auto;contain-intrinsic-size:auto 500px auto 512px;' : ''}}.page h3{margin:0 0 8px}p{margin:0 0 8px}table{border-collapse:collapse}td,th{border:1px solid #bbb;padding:2px 6px}`;
+    : `.page{box-sizing:border-box;background:#fff;min-height:${q.get('minh') ?? 560}px;margin:10px;padding:24px;${cv ? `content-visibility:auto;contain-intrinsic-size:auto 500px auto ${(q.get('minh') ?? 560) - 48}px;` : ''}}.page h3{margin:0 0 8px}p{margin:0 0 8px}table{border-collapse:collapse}td,th{border:1px solid #bbb;padding:2px 6px}`;
   return `${head('쪽 문서', '#desk{height:800px;overflow:auto;display:grid;grid-template-columns:1fr 1fr;align-items:start;background:#e6e8ec}' + css)}<body>
-<div id="desk"><div id="left">${doc(1)}</div><div id="right">${doc(2)}</div></div>${SDK}
+<div id="desk"><div id="left"${q.get('zoom') ? ` style="zoom:${q.get('zoom')}"` : ''}>${doc(1)}</div><div id="right"${q.get('zoom') ? ` style="zoom:${q.get('zoom')}"` : ''}>${doc(2)}</div></div>${SDK}
 <script>window.start = () => { window.ctrl = SgCompare.createCompare({ left, right, leftScroller: desk, rightScroller: desk, page: '.page'${q.get('virt') === '1' ? ', virtualize: true' : ''} }); };</script></body></html>`;
 };
 

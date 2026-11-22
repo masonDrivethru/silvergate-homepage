@@ -210,6 +210,16 @@
       "bg": "background",
       "empty": "Pick a page count and press \"Draw and compare\".",
       "speedNote": "\"Draw document\" is the browser drawing the document and is not part of the module. Module total = read + compare + paint. Results depend on the device."
+    },
+    "gate": {
+      "title": "This page is private.",
+      "lead": "The SilverBio Compare demo is open to invited guests only. Enter the password you were given.",
+      "label": "Password",
+      "open": "Open",
+      "checking": "Checking…",
+      "wrong": "That password is not correct.",
+      "wait": "Too many attempts. Try again in {s} seconds.",
+      "closed": "This page is not public right now. Contact us if you would like a demo."
     }
   },
   "dtab": {

@@ -220,6 +220,13 @@ compare-demo-spec.md      Compare 데모 사양서
 
 ---
 
+### Compare 비밀번호 (`/compare` 는 비공개)
+- `/compare`, `/ko/compare` 는 비밀번호를 넣어야 열림 (`app/components/compare/Gate.vue`). 홈의 "직접 비교해 보기" 버튼은 숨김(`COMPARE_PUBLIC = false`), 검색엔진 노출 차단(noindex), 사이트맵에서 뺌
+- **비밀번호 정하기/바꾸기**: `node scripts/set-compare-password.mjs` → `.env` 에 지문만 저장 (비밀번호 자체는 어디에도 없음, `.env` 는 GitHub 에 안 올라감) → `./deploy.sh`
+- **닫기**: `node scripts/set-compare-password.mjs --off` → 배포하면 아무도 못 여는 "비공개" 화면
+- `.env` 가 없는 PC 에서 배포하면 자동으로 "비공개" 화면이 됨 (안전한 쪽)
+- 한계: 정적 사이트라 화면을 가리는 수준의 잠금. 비밀번호를 모르면 화면과 비교 모듈 파일을 받지 않지만, 사이트 파일을 뒤지면 모듈 파일 주소를 찾아낼 수는 있음. 완전히 막으려면 서버 쪽 로그인(Firebase 인증 또는 Cloudflare Access)이 필요
+
 ## 8. 개발 · 배포 방법
 
 ```bash
@@ -238,7 +245,7 @@ npm run typecheck    # 타입 검사
 ### 작업할 때 주의할 점
 - 문구는 `ko.json`, `en.json` 둘 다 같은 키로 고친다. `{ } @ | $` 문자는 `{'@'}` 처럼 감싼다
 - 스크롤 연출 클래스가 붙는 요소(`.reveal`, `.form` 등)에는 `:class` 바인딩을 쓰지 않는다
-- `public/` 안 파일(아이콘 등)을 바꾸면 `public/sw.js` 의 `CACHE` 버전을 올린다 (지금 `sg-v45`)
+- `public/` 안 파일(아이콘 등)을 바꾸면 `public/sw.js` 의 `CACHE` 버전을 올린다 (지금 `sg-v46`)
 - `firebase.json` 은 모든 주소를 `no-cache` 로 보낸다 (`/`, `/ko` 같은 확장자 없는 주소가 1시간 캐시돼 휴대폰에 옛 화면이 보이던 문제 수정). `_nuxt/`·이미지는 따로 오래 캐시
 - Compare 데모 샘플에는 실제 고객사 제품명·파라미터를 쓰지 않는다 (전부 가상 데이터)
 

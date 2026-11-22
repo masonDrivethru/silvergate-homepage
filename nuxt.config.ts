@@ -23,6 +23,8 @@ export default defineNuxtConfig({
       appsScriptUrl: 'https://script.google.com/macros/s/AKfycbzQc8NsvP7o6lRXvOTyZ5GKrL8MZaRfhF0fzz6Kc39EPLR4OvNgijxH2YiZkn5H9Ld4/exec',
       // Cloudflare Turnstile 사이트 키 (비우면 Turnstile 없이 동작)
       turnstileSiteKey: '',
+      // /compare 비밀번호 지문 (scripts/set-compare-password.mjs 가 .env 에 씀). 비우면 /compare 는 비공개 화면
+      compareLock: '',
     },
   },
 
