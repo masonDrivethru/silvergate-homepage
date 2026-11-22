@@ -186,7 +186,31 @@
     },
     "entry": "Try it yourself",
     "back": "Back to home",
-    "metaTitle": "Try SilverBio Compare | SilverGate"
+    "metaTitle": "Try SilverBio Compare | SilverGate",
+    "sampleTables": "Complex tables",
+    "sampleSpeed": "Speed test",
+    "lab": {
+      "tablesLead": "Cases where the table structure changes: merged cells (colspan, rowspan), an added column, reordered rows, and a structure replaced entirely. The first one is a results table with two header rows and cells grouped by equipment.",
+      "changed": "What changed:",
+      "speedLead": "Pick a page count. Both versions of a document that long are actually drawn, then compared and timed. The comparison runs in the background (Web Worker), so the page stays responsive. When it finishes, click the last item in the change list.",
+      "pages": "Pages",
+      "pagesN": "{n} pages",
+      "run": "Draw and compare",
+      "running": "Drawing and comparing…",
+      "small": "Up to 1,000 pages on this device (open on a computer for larger documents).",
+      "results": "Results",
+      "colPages": "Pages (each side)",
+      "colNodes": "Nodes read",
+      "colDraw": "Draw document",
+      "colRead": "Read screen",
+      "colCompare": "Compare",
+      "colPaint": "Paint marks",
+      "colTotal": "Module total",
+      "colChanges": "Changes",
+      "bg": "background",
+      "empty": "Pick a page count and press \"Draw and compare\".",
+      "speedNote": "\"Draw document\" is the browser drawing the document and is not part of the module. Module total = read + compare + paint. Results depend on the device."
+    }
   },
   "dtab": {
     "1": "Batch record",

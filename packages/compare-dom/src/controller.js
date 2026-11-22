@@ -735,6 +735,27 @@ export function createCompare(options) {
     }
     // 3) 재기 → 쓰기: 양쪽 다 있는 변경을 줄 단위로 같은 높이
     const pairs = [];
+    // 표 칸이 한쪽에만 생기거나 없어지면(열 추가·삭제) 그 줄의 칸 폭이 바뀌어 글자가 줄바꿈될 수 있다
+    // → 그 줄과 반대쪽 같은 자리의 줄을 같은 높이로. 머리글 줄도 마찬가지 (같은 표의 머리글 줄끼리 순서대로)
+    const trOf = (n) => { const e = el(n); return e ? (e.localName === 'tr' ? e : e.closest('tr')) : null; };
+    const headPaired = new Set();
+    for (const ch of list) {
+      if (ch.type !== 'added' && ch.type !== 'deleted') continue;
+      const side = ch.type === 'added' ? 'right' : 'left';
+      for (const c of ch.extra ? [ch, ...ch.extra.map((x) => ({ [side]: x.node, gap: x.gap }))] : [ch]) {
+        const n = c[side];
+        if (n?.nodeType !== 1 || !/^(td|th)$/.test(n.localName)) continue;
+        const mine = trOf(n), other = trOf(c.gap?.node) ?? trOf(c.gap?.prev);
+        if (mine && other) pairs.push(side === 'right' ? [other, mine] : [mine, other]);
+        // 같은 표 머리글(thead) 줄들: 열이 늘면 머리글 칸도 좁아진다
+        const tm = n.closest('table'), to = other?.closest('table');
+        if (tm && to && !headPaired.has(tm)) {
+          headPaired.add(tm);
+          const hm = Array.from(tm.tHead?.rows ?? []), ho = Array.from(to.tHead?.rows ?? []);
+          if (hm.length === ho.length) hm.forEach((r, i) => pairs.push(side === 'right' ? [ho[i], r] : [r, ho[i]]));
+        }
+      }
+    }
     for (const ch of list) {
       if (ch.type === 'added' || ch.type === 'deleted' || !ch.left || !ch.right) continue;
       pairs.push([unitOf(ch.left), unitOf(ch.right)]);

@@ -3691,7 +3691,7 @@ tr.sgc-spacer::after{content:none}
       }
     }
     async function alignBatch(list, tick) {
-      var _a, _b, _c, _d, _e, _f, _g;
+      var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
       const msg = getMessages(opt.locale);
       const el = (x) => x ? x.nodeType === 1 ? x : x.parentElement : null;
       const plans = [];
@@ -3745,10 +3745,31 @@ tr.sgc-spacer::after{content:none}
         } else c.spacer = makeSpacer(ref, end, h2, label, null, pl.gap);
       }
       const pairs = [];
+      const trOf = (n) => {
+        const e = el(n);
+        return e ? e.localName === "tr" ? e : e.closest("tr") : null;
+      };
+      const headPaired = /* @__PURE__ */ new Set();
+      for (const ch of list) {
+        if (ch.type !== "added" && ch.type !== "deleted") continue;
+        const side = ch.type === "added" ? "right" : "left";
+        for (const c of ch.extra ? [ch, ...ch.extra.map((x) => ({ [side]: x.node, gap: x.gap }))] : [ch]) {
+          const n = c[side];
+          if ((n == null ? void 0 : n.nodeType) !== 1 || !/^(td|th)$/.test(n.localName)) continue;
+          const mine = trOf(n), other = (_g = trOf((_e = c.gap) == null ? void 0 : _e.node)) != null ? _g : trOf((_f = c.gap) == null ? void 0 : _f.prev);
+          if (mine && other) pairs.push(side === "right" ? [other, mine] : [mine, other]);
+          const tm = n.closest("table"), to = other == null ? void 0 : other.closest("table");
+          if (tm && to && !headPaired.has(tm)) {
+            headPaired.add(tm);
+            const hm = Array.from((_i = (_h = tm.tHead) == null ? void 0 : _h.rows) != null ? _i : []), ho = Array.from((_k = (_j = to.tHead) == null ? void 0 : _j.rows) != null ? _k : []);
+            if (hm.length === ho.length) hm.forEach((r, i) => pairs.push(side === "right" ? [ho[i], r] : [r, ho[i]]));
+          }
+        }
+      }
       for (const ch of list) {
         if (ch.type === "added" || ch.type === "deleted" || !ch.left || !ch.right) continue;
         pairs.push([unitOf(ch.left), unitOf(ch.right)]);
-        for (const n of (_e = ch.alsoLeft) != null ? _e : []) pairs.push([unitOf(n), unitOf(ch.right)]);
+        for (const n of (_l = ch.alsoLeft) != null ? _l : []) pairs.push([unitOf(n), unitOf(ch.right)]);
       }
       const fixes = [];
       for (const [a, b] of pairs) {
@@ -3770,11 +3791,11 @@ tr.sgc-spacer::after{content:none}
         } else {
           const side = ch.right ? "right" : "left", other = side === "right" ? "left" : "right";
           const u = topUnit(ch[side], side);
-          const key = (_f = u == null ? void 0 : u.getAttribute) == null ? void 0 : _f.call(u, "data-sgc-key");
+          const key = (_m = u == null ? void 0 : u.getAttribute) == null ? void 0 : _m.call(u, "data-sgc-key");
           if (!u || !key || u === (side === "right" ? ch.right : ch.left)) continue;
           const v = root(other).querySelector(`[data-sgc-key="${esc2(key)}"]`);
           if (!v) continue;
-          const inner = (_g = ch[side].nodeType === 1 ? ch[side] : ch[side].parentElement) == null ? void 0 : _g.closest("[data-sgc-key]");
+          const inner = (_n = ch[side].nodeType === 1 ? ch[side] : ch[side].parentElement) == null ? void 0 : _n.closest("[data-sgc-key]");
           if (inner && inner !== u && u.contains(inner)) {
             const iv = v.querySelector(`[data-sgc-key="${esc2(inner.getAttribute("data-sgc-key"))}"]`);
             if (iv && !seen.has(side === "right" ? iv : inner)) {

@@ -1291,3 +1291,42 @@ html[data-motion="calm"] main .section__title { background-position: 0 0; }
 .mbr-params--grid th, .mbr-params--grid td { text-align: center; }
 .mbr-phase { font-weight: 600; background: #fafbfc; }
 .mbr-foot { margin-top: auto; display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-2); border-top: 1px solid var(--rule); padding-top: 8px; }
+
+/* ===== Compare 직접 해 보기: 복잡한 표 · 속도 측정 탭 (app/components/compare/Lab.vue) ===== */
+.cmp-lab { margin-top: var(--s3); }
+.lab-lead { margin: 0 0 var(--s3); }
+.lab-cases { display: grid; gap: var(--s4); }
+.lab-case__title { margin: 0; font-size: var(--fs-h4, 18px); font-weight: 700; color: var(--text); }
+.lab-case__desc { margin: 6px 0 var(--s2); font-size: var(--fs-small); color: var(--text-2); }
+.lab-case__desc span { color: var(--text-3); }
+.cmp-lab .cmp-viewer { border-radius: var(--r-md); box-shadow: var(--glass-shadow); }
+.cmp-lab .lab-desk { background: #e6e8ec; padding: 14px 0; }
+:root:not([data-theme="light"]) .cmp-lab .lab-desk { background: #2a2c31; }
+.cmp-lab .sgc-col { padding: 0 8px; }
+.lab-paper { background: #fff; padding: 20px; box-shadow: 0 1px 3px rgba(16,24,40,.14), 0 0 0 1px rgba(16,24,40,.05); }
+.lab-list { margin: 0; padding-left: 1.2em; }
+.lab-speed__bar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px var(--s3); }
+.lab-run { margin-top: 0; }
+.lab-run:disabled { opacity: .6; cursor: progress; }
+.cmp-seg button:disabled { opacity: .5; cursor: progress; }
+.lab-table-wrap { margin-top: var(--s3); overflow-x: auto; border-radius: var(--r-md); border: 1px solid var(--glass-line-soft); background: var(--glass-fill); }
+.lab-table { width: 100%; border-collapse: collapse; font-size: var(--fs-small); font-variant-numeric: tabular-nums; }
+.lab-table th, .lab-table td { padding: 10px 14px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--glass-line-soft); color: var(--text-2); }
+.lab-table th { font-size: 12px; font-weight: 600; color: var(--text-3); }
+.lab-table th:first-child, .lab-table td:first-child { text-align: left; }
+.lab-table tbody tr:last-child td { border-bottom: 0; }
+.lab-table tbody tr:first-child td { color: var(--text); }
+.lab-table__total { font-weight: 700; color: var(--silver-hi) !important; }
+.lab-table td small { color: var(--text-3); font-size: 11px; }
+.lab-table__empty { text-align: left !important; color: var(--text-3) !important; }
+.lab-speed__stage { margin-top: var(--s3); }
+.lab-speed__stage .cmp-viewer { --sgc-height: min(80vh, 900px); }
+@media (max-width: 640px) {
+  .cmp-lab .sgc-shared { grid-template-columns: 1fr; }
+}
+/* 샘플 고르기 버튼이 4개라 좁은 화면에서는 가로로 밀어서 보기 */
+@media (max-width: 640px) {
+  .cmp-bar .cmp-seg { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+  .cmp-bar .cmp-seg::-webkit-scrollbar { display: none; }
+  .cmp-bar .cmp-seg button { flex: 0 0 auto; white-space: nowrap; }
+}

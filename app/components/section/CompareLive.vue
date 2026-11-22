@@ -9,7 +9,11 @@ import { planPages } from '~/compare/plan.js';
 defineProps<{ page?: boolean }>();
 const { locale } = useI18n();
 
-const sample = ref<'basic' | 'large'>('basic');
+const sample = ref<'basic' | 'large' | 'tables' | 'speed'>('basic');
+/** 복잡한 표 · 속도 측정 탭 (한 번 열면 그대로 둠) */
+const lab = computed(() => sample.value === 'tables' || sample.value === 'speed');
+const labUsed = ref(false);
+watch(lab, (v) => { if (v) labUsed.value = true; });
 const largeDocs = shallowRef<Record<string, MbrDocument> | null>(null);
 const loading = ref(false);
 async function loadLarge() {
@@ -84,8 +88,10 @@ onBeforeUnmount(() => cleanup?.());
         <div class="cmp-seg" role="group" :aria-label="$t('cdemo.sample')">
           <button type="button" :aria-pressed="sample === 'basic'" @click="sample = 'basic'">{{ $t('cdemo.sampleBasic') }}</button>
           <button type="button" :aria-pressed="sample === 'large'" @click="sample = 'large'">{{ $t('cdemo.sampleLarge') }}</button>
+          <button type="button" :aria-pressed="sample === 'tables'" @click="sample = 'tables'">{{ $t('cdemo.sampleTables') }}</button>
+          <button type="button" :aria-pressed="sample === 'speed'" @click="sample = 'speed'">{{ $t('cdemo.sampleSpeed') }}</button>
         </div>
-        <div class="cmp-vers">
+        <div v-show="!lab" class="cmp-vers">
           <label class="cmp-sel">
             <span class="sr-only">{{ $t('cdemo.from') }}</span>
             <select v-model="leftVer"><option v-for="v in versions" :key="v" :value="v">v{{ v }}</option></select>
@@ -99,7 +105,7 @@ onBeforeUnmount(() => cleanup?.());
         <p v-if="loading" class="cmp-perf" aria-live="polite">{{ $t('cdemo.loading') }}</p>
       </div>
 
-      <div class="sgc-viewer cmp-viewer" :data-mode="mode">
+      <div v-show="!lab" class="sgc-viewer cmp-viewer" :data-mode="mode">
         <div ref="bar" />
         <div class="sgc-body">
           <div class="sgc-panes">
@@ -124,7 +130,8 @@ onBeforeUnmount(() => cleanup?.());
           <aside ref="list" :aria-label="$t('cdemo.changes')" />
         </div>
       </div>
-      <p class="cmp__note">{{ $t('cdemo.note', { product: left.productName }) }}</p>
+      <p v-show="!lab" class="cmp__note">{{ $t('cdemo.note', { product: left.productName }) }}</p>
+      <ClientOnly><CompareLab v-if="labUsed" v-show="lab" :mode="sample === 'speed' ? 'speed' : 'tables'" /></ClientOnly>
     </div>
   </section>
 </template>
