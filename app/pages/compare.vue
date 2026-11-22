@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // SilverBio Compare 직접 해 보기 (/compare, /ko/compare). 비밀번호로 잠근 페이지 (CompareGate).
-// 검색엔진에는 나오지 않게 함(noindex, sitemap 에서 뺌). 홈의 버튼(COMPARE_PUBLIC)을 누르면 비밀번호 화면
+// 홈의 버튼(COMPARE_PUBLIC)을 누르면 비밀번호 화면. 검색엔진에는 제목·소개 문구만 나옴 (내용은 잠겨 있어 못 봄)
 const { t } = useI18n();
 const { pathTo } = useSiteNav();
 
@@ -10,7 +10,6 @@ usePageSeo({
   description: () => t('cdemo.lead'),
   ogImage: () => '/assets/og-image.png',
 });
-useHead({ meta: [{ name: 'robots', content: 'noindex, nofollow, noarchive' }] });
 useReveal();
 const unlocked = ref(false);
 </script>
