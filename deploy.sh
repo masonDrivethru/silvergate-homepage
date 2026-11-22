@@ -17,6 +17,8 @@ build() {
   echo "빌드 중 (nuxt generate)..."
   [ -d node_modules ] || npm ci
   npm run build > /dev/null
+  # 빌드하면 compare-dom/dist 파일이 다시 만들어져 경로 주석·줄바꿈만 바뀜 → 되돌려서 다음 git pull 이 막히지 않게
+  git checkout -- packages/compare-dom/dist 2>/dev/null || true
   [ -f .output/public/index.html ] || { echo "빌드 실패: .output/public/index.html 없음"; exit 1; }
 }
 
