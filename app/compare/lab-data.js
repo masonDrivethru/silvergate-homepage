@@ -80,7 +80,7 @@ export function tableCases(lang = 'en') {
 // ---------------- 속도 측정용 큰 문서 (운영 문서 양식 .mbr-page 그대로) ----------------
 const S = {
   en: {
-    company: 'DEMO BIOLOGICS', title: 'Equipment Cleaning Procedure', page: (n, t) => `Page ${n} of ${t}`,
+    company: 'SAMPLE PHARMA', title: 'Equipment Cleaning Procedure', page: (n, t) => `Page ${n} of ${t}`,
     equip: ['Cleaning tank T-201', 'Transfer pump P-104', 'Heat exchanger HX-3', 'Filling nozzle N-12', 'Filter housing F-07', 'Bioreactor BR-500', 'Buffer tank BT-30', 'Freeze dryer LY-2'],
     sec: (n, eq) => `${n}. Cleaning ${eq}`,
     steps: [
@@ -94,7 +94,7 @@ const S = {
     addStep: 'Record start time and operator signature.', addParam: 'Detergent concentration',
   },
   ko: {
-    company: 'DEMO BIOLOGICS', title: '설비 세척 절차서', page: (n, t) => `${n} / ${t}쪽`,
+    company: 'SAMPLE PHARMA', title: '설비 세척 절차서', page: (n, t) => `${n} / ${t}쪽`,
     equip: ['세척 탱크 T-201', '이송 펌프 P-104', '열교환기 HX-3', '충전 노즐 N-12', '여과 하우징 F-07', '배양기 BR-500', '버퍼 탱크 BT-30', '동결건조기 LY-2'],
     sec: (n, eq) => `${n}. ${eq} 세척`,
     steps: [

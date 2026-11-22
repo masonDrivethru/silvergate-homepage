@@ -121,7 +121,7 @@
     "loading": "Building the large sample…",
     "perf": "{steps} steps, {params} parameters compared in {ms} ms",
     "paper": {
-      "company": "DEMO BIOLOGICS",
+      "company": "SAMPLE PHARMA",
       "title": "Master Batch Record",
       "approved": "Approved",
       "review": "In review",

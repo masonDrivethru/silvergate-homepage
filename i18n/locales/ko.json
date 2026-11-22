@@ -84,7 +84,7 @@
     "loading": "대용량 샘플을 만드는 중…",
     "perf": "스텝 {steps}개, 파라미터 {params}개를 {ms}ms 만에 비교했습니다",
     "paper": {
-      "company": "DEMO BIOLOGICS",
+      "company": "SAMPLE PHARMA",
       "title": "마스터 배치 기록서",
       "approved": "승인됨",
       "review": "검토 중",

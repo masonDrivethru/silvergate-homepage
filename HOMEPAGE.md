@@ -224,7 +224,7 @@ compare-demo-spec.md      Compare 데모 사양서
 - `/compare`, `/ko/compare` 는 비밀번호를 넣어야 열림 (`app/components/compare/Gate.vue`). 홈의 "직접 비교해 보기" 버튼은 숨김(`COMPARE_PUBLIC = false`), 검색엔진 노출 차단(noindex), 사이트맵에서 뺌
 - **비밀번호 정하기/바꾸기**: `node scripts/set-compare-password.mjs` → `.env` 에 지문만 저장 (비밀번호 자체는 어디에도 없음, `.env` 는 GitHub 에 안 올라감) → `./deploy.sh`
 - **닫기**: `node scripts/set-compare-password.mjs --off` → 배포하면 아무도 못 여는 "비공개" 화면
-- `.env` 가 없는 PC 에서 배포하면 자동으로 "비공개" 화면이 됨 (안전한 쪽)
+- 기본 비밀번호 지문은 `nuxt.config.ts` 의 `compareLock` 에 들어 있음 (대표님이 정한 6자리 숫자). `.env` 가 있으면 그 값이 우선. 비우면 "비공개" 화면
 - 한계: 정적 사이트라 화면을 가리는 수준의 잠금. 비밀번호를 모르면 화면과 비교 모듈 파일을 받지 않지만, 사이트 파일을 뒤지면 모듈 파일 주소를 찾아낼 수는 있음. 완전히 막으려면 서버 쪽 로그인(Firebase 인증 또는 Cloudflare Access)이 필요
 
 ## 8. 개발 · 배포 방법

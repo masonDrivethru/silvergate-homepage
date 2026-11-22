@@ -19,10 +19,11 @@ if (off) {
   line = 'NUXT_PUBLIC_COMPARE_LOCK=';
   console.log('비밀번호를 지웁니다 → /compare 는 아무도 열 수 없는 "비공개" 화면이 됩니다.');
 } else {
-  const a = await ask('새 비밀번호 (10자 이상 권장): ');
+  const a = await ask('새 비밀번호 (6자 이상, 10자 이상 권장): ');
   const b = await ask('한 번 더: ');
   if (!a || a !== b) { console.error('두 번 입력한 비밀번호가 다릅니다.'); process.exit(1); }
-  if (a.length < 8) { console.error('8자 이상으로 정해 주세요.'); process.exit(1); }
+  if (a.length < 6) { console.error('6자 이상으로 정해 주세요.'); process.exit(1); }
+  if (a.length < 10 || /^\d+$/.test(a)) console.log('주의: 짧거나 숫자만인 비밀번호는 사이트 파일을 가져가 대입해 보면 풀릴 수 있습니다 (화면을 가리는 용도로만).');
   const salt = randomBytes(16);
   const hash = pbkdf2Sync(a.normalize('NFC'), salt, ITER, 32, 'sha256');
   line = `NUXT_PUBLIC_COMPARE_LOCK=v1:${ITER}:${salt.toString('base64')}:${hash.toString('base64')}`;
