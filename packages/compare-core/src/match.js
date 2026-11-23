@@ -258,10 +258,19 @@ function alignGap(L, R, pl, gl, pr, gr, similar) {
     dp[i * W + j] = Math.max(dp[(i + 1) * W + j], dp[i * W + j + 1], s >= 0 ? s + dp[(i + 1) * W + j + 1] : -1);
   }
   const out = [];
+  /** 왼쪽 i 가 오른쪽 j 보다 뒤의 항목과 짝지어져도 전체 점수가 최선인가 */
+  const pairsLater = (i, j) => {
+    for (let k = j + 1; k < gr; k++) { const t = sim[i * gr + k]; if (t >= 0 && t + dp[(i + 1) * W + k + 1] === dp[i * W + j]) return true; }
+    return false;
+  };
   let i = 0, j = 0;
   while (i < gl && j < gr) {
     const s = sim[i * gr + j];
     if (s >= 0 && dp[i * W + j] === s + dp[(i + 1) * W + j + 1]) { out.push([pl + i, pr + j]); i++; j++; }
+    // 여기서 짝지을 수 없고, 이 왼쪽 항목이 오른쪽 뒤의 항목과 짝지어져도 최선이면 오른쪽을 먼저 넘긴다
+    // (예: 표 줄에 열이 끼어들고 수량 세 칸이 한 칸으로 합쳐짐 → 합친 칸은 첫 칸과 짝, 나머지 두 칸이 삭제).
+    // 그 밖에는 삭제를 먼저 (Git 과 같은 순서)
+    else if (dp[i * W + j] === dp[i * W + j + 1] && pairsLater(i, j)) { out.push([-1, pr + j]); j++; }
     else if (dp[i * W + j] === dp[(i + 1) * W + j]) { out.push([pl + i, -1]); i++; }
     else { out.push([-1, pr + j]); j++; }
   }

@@ -182,7 +182,8 @@
       "wm_superseded": "SUPERSEDED",
       "wm_review": "DRAFT – IN REVIEW",
       "overlayTop": "Status: {status} · Effective date: {date}",
-      "overlayBottom": "UNCONTROLLED WHEN PRINTED · Verify the current version in the document management system"
+      "overlayBottom": "UNCONTROLLED WHEN PRINTED · Verify the current version in the document management system",
+      "colGrade": "Grade"
     },
     "entry": "Try it yourself",
     "back": "Back to home",

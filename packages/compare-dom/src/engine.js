@@ -32,11 +32,18 @@ export function similarity(a, b) {
   if (ta !== tb) return 0;
   if (!ta && a.n !== b.n) return 0;
   if (!ta && a.k && b.k) return a.k === b.k ? 1 : 0;
+  // 표 칸: 머리글로 본 열이 다르면 짝짓지 않는다 (열이 끼어들거나 칸이 합쳐진 줄). 같은 열이면 "수정"으로 짝지을 만큼 점수를 준다
+  let sameCol = false;
+  if (!ta && a.ck && b.ck) {
+    const A = a.ck.split('|'), B = b.ck.split('|');
+    if (!A.some((x) => B.includes(x))) return 0;
+    sameCol = true;
+  }
   // 첫 칸(제목 칸·번호 등)이 똑같은 표 줄·항목은 같은 줄로 본다
   const lead = !ta && a.c.length > 1 && b.c.length > 1 && a.c[0].h === b.c[0].h ? 0.75 : 0;
   const A = bigrams(a), B = bigrams(b);
   if (!A.size && !B.size) return ta ? (a.v === b.v ? 1 : 0.55) : 0.75;
-  if (!A.size || !B.size) return Math.max(lead, 0.55);   // 아주 짧은 글(한 글자 등)
+  if (!A.size || !B.size) return Math.max(lead, 0.55, sameCol ? 0.6 : 0);   // 아주 짧은 글(한 글자 등)
   let inter = 0, na = 0, nb = 0;
   for (const v of A.values()) na += v;
   for (const v of B.values()) nb += v;
@@ -45,12 +52,12 @@ export function similarity(a, b) {
   // 짧은 값(버전·날짜·숫자 등)은 글자가 많이 달라도 같은 자리의 "수정"으로 본다
   const short = textOf(a).length <= 24 && textOf(b).length <= 24 ? 0.55 : 0;
   if (ta) return Math.max(dice, short);
-  return Math.max(0.3 + 0.7 * dice, short, lead);      // 같은 태그면 기본 점수
+  return Math.max(0.3 + 0.7 * dice, short, lead, sameCol ? 0.6 : 0);      // 같은 태그면 기본 점수
 }
 
 export const DOM_RULES = {
   identity: { '**': (n) => (n && typeof n === 'object' && !Array.isArray(n) ? n.h : undefined) },
-  ignore: ['**.h', '**.i', '**.k', '**.virt'],
+  ignore: ['**.h', '**.i', '**.k', '**.virt', '**.ck'],
   keys: { '**.c': (n) => (n && n.k ? n.n + '#' + n.k : null) },
   similar: { '**.c.*': similarity },
   raw: true,

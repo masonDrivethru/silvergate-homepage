@@ -21,6 +21,7 @@
  * @property {string} [unit]
  * @property {Spec}   [spec]
  * @property {boolean} [cpp]    핵심 공정 변수 (v2.0 샘플의 CPP 열)
+ * @property {string} [note]     설정값·허용 범위 대신 한 칸 글자 (가로 병합)
  */
 
 /**
@@ -33,6 +34,8 @@
  * @property {string} [max]
  * @property {string} unit
  * @property {string} [supplier]
+ * @property {string} [grade]     등급 (v2.1 샘플의 등급 열)
+ * @property {string} [qtyNote]   수량 세 칸 대신 한 칸 글자 (가로 병합)
  */
 
 /**
@@ -60,6 +63,7 @@
  * @property {Material[]} [materials]                    원자재 표 (샘플)
  * @property {'simple' | 'detailed'} [materialsLayout]   표 모양: 단순(열 3개) / 상세(머리글 2단·단계별 묶음·공급사)
  * @property {boolean} [paramCpp]                        파라미터 표에 CPP 열 표시
+ * @property {boolean} [materialsGrade]                  상세 원자재 표에 등급 열 표시
  * @property {string[]} [signatures]  [작성자, 날짜, 검토자, 날짜, 승인자, 날짜] (샘플, 가상)
  * @property {string} [reason]        개정 사유 (샘플)
  * @property {'superseded' | 'effective' | 'review'} [status]  문서 관리 시스템 상태 (샘플)

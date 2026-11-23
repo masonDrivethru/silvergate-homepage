@@ -145,7 +145,8 @@
       "wm_superseded": "SUPERSEDED",
       "wm_review": "DRAFT – IN REVIEW",
       "overlayTop": "상태: {status} · 시행일: {date}",
-      "overlayBottom": "인쇄본은 관리되지 않음 · 최신 버전은 문서 관리 시스템에서 확인"
+      "overlayBottom": "인쇄본은 관리되지 않음 · 최신 버전은 문서 관리 시스템에서 확인",
+      "colGrade": "등급"
     },
     "entry": "직접 비교해 보기",
     "back": "홈으로",

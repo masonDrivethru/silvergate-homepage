@@ -33,6 +33,56 @@ export function hashStr(str, seed = 0) {
   return String.fromCharCode(h1 & 0xffff, h1 >>> 16, h2 & 0xffff, h2 >>> 16, h3 & 0xffff, h3 >>> 16);
 }
 
+/**
+ * 표 칸마다 "어느 열인지" 이름표 (머리글 글자로): 칸 → '수량>목표' 처럼. 가로 병합 칸은 'a|b|c'.
+ * 열이 끼어들거나 칸이 합쳐져도 같은 열의 칸끼리 짝짓게 한다 (자리 순서만 보면 엉뚱한 칸끼리 짝지어짐)
+ * 머리글이 없는 표는 null
+ */
+export function tableColKeys(table) {
+  const rows = Array.from(table.rows ?? []);
+  if (!rows.length) return null;
+  let head = table.tHead ? Array.from(table.tHead.rows) : [];
+  if (!head.length) { for (const r of rows) { if (r.cells.length && Array.from(r.cells).every((c) => c.tagName === 'TH')) head.push(r); else break; } }
+  if (!head.length) return null;
+  const label = (c) => normText(c.textContent ?? '').slice(0, 40);
+  // 머리글 격자: 열마다 위에서 아래로 이름
+  const names = [], taken = [];
+  head.forEach((tr, y) => {
+    taken[y] ??= [];
+    let x = 0;
+    for (const c of tr.cells) {
+      while (taken[y][x]) x++;
+      const cs = Math.max(1, c.colSpan || 1), rs = Math.max(1, c.rowSpan || 1), t = label(c);
+      for (let yy = y; yy < y + rs; yy++) { taken[yy] ??= []; for (let xx = x; xx < x + cs; xx++) { taken[yy][xx] = 1; (names[xx] ??= []); if (yy === y && t && names[xx].at(-1) !== t) names[xx].push(t); } }
+      x += cs;
+    }
+  });
+  const colName = names.map((n) => (n ?? []).join('>'));
+  if (!colName.some(Boolean)) return null;
+  const out = new Map();
+  const headSet = new Set(head);
+  // 본문: 묶음(tbody 등)마다 세로 병합을 따라 열 위치 계산
+  const groups = new Map();
+  for (const tr of rows) { if (headSet.has(tr)) continue; const g = tr.parentElement; if (!groups.has(g)) groups.set(g, []); groups.get(g).push(tr); }
+  for (const list of groups.values()) {
+    const tk = [];
+    list.forEach((tr, y) => {
+      tk[y] ??= [];
+      let x = 0;
+      for (const c of tr.cells) {
+        while (tk[y][x]) x++;
+        const cs = Math.max(1, c.colSpan || 1), rs = Math.max(1, c.rowSpan || 1);
+        for (let yy = y; yy < y + rs; yy++) { tk[yy] ??= []; for (let xx = x; xx < x + cs; xx++) tk[yy][xx] = 1; }
+        const ks = [];
+        for (let xx = x; xx < x + cs; xx++) if (colName[xx] && !ks.includes(colName[xx])) ks.push(colName[xx]);
+        if (ks.length) out.set(c, ks.join('|'));
+        x += cs;
+      }
+    });
+  }
+  return out;
+}
+
 /** 문서 안에 들어 있는 iframe 의 안쪽 문서 (같은 도메인이고 다 열렸을 때만). 다른 도메인이면 null → 주소(src)만 비교 */
 export function frameBody(el) {
   try {
@@ -101,6 +151,8 @@ function* walk(root, opt) {
   let count = 0;
   /** 표: 칸 요소 → 읽은 결과, 줄 묶음(tbody 등) → 위에서 내려오는(rowspan) 칸 */
   const cellOut = new Map();
+  /** 표 칸 → 열 이름표 (표를 열 때 한 번 계산) */
+  const colKey = new Map();
   const spans = new Map();
 
   /**
@@ -177,7 +229,12 @@ function* walk(root, opt) {
     } else if (e.hasAttribute('data-sgc-frame')) { isFrame = true; frameDepth++; }   // 한 장 보기용 복사본에서 iframe 자리
     // 열린 shadow DOM (웹 컴포넌트) 안쪽도 읽는다
     if (e.shadowRoot && e.shadowRoot.mode === 'open') kids = kids.concat(Array.from(e.shadowRoot.children));
-    if (tag === 'TD' || tag === 'TH') cellOut.set(e, out);
+    if (tag === 'TABLE') { const m = tableColKeys(e); if (m) for (const [c, k] of m) colKey.set(c, k); }
+    if (tag === 'TD' || tag === 'TH') {
+      cellOut.set(e, out);
+      const ck = colKey.get(e);
+      if (ck) { out.ck = ck; rec.ck = ck; }
+    }
     else if (tag === 'TR') kids = layoutRow(e, kids);
     return { out, sig, kids, x: 0, ai, rec, isFrame };
   }
@@ -200,8 +257,9 @@ function* walk(root, opt) {
         nodes.push(ch.virt);
         const vo = { n: o.n, c: o.c, h: o.h, i: vi, virt: 1 };
         if (o.a) vo.a = o.a;
+        if (o.ck) vo.ck = o.ck;
         f.out.c.push(vo);
-        flat[vi] = { ref: o.i, n: o.n, h: o.h, p: f.out.i, virt: 1, ...(o.a ? { a: o.a } : {}) };
+        flat[vi] = { ref: o.i, n: o.n, h: o.h, p: f.out.i, virt: 1, ...(o.a ? { a: o.a } : {}), ...(o.ck ? { ck: o.ck } : {}) };
         f.sig += '\u0003' + o.h;
         continue;
       }
@@ -246,6 +304,7 @@ export function unflatten(flat) {
       : r.v !== undefined ? { v: r.v, h: r.h, i } : { n: r.n, c: [], h: r.h, i };
     if (r.a) o.a = r.a;
     if (r.k) o.k = r.k;
+    if (r.ck) o.ck = r.ck;
     objs[i] = o;
     if (r.p >= 0) objs[r.p].c.push(o);
   }

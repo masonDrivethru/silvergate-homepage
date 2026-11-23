@@ -482,6 +482,25 @@ await test('변경 보고서: 개수·내용이 화면과 같고, 문서 속 태
   check('문서 속 태그·이름은 글자로만 (실행 안 됨)', r.imgs === 0 && r.ran === 0 && r.label === 'v<1>', JSON.stringify({ imgs: r.imgs, ran: r.ran, label: r.label }));
 });
 
+await test('열이 끼어들고 칸이 합쳐진 줄: 머리글로 같은 열 칸끼리 짝지음', async (page, check) => {
+  await page.goto(`${BASE}/t/blank`);
+  const r = await page.evaluate(async () => {
+    const L = document.createElement('div'), R = document.createElement('div');
+    const head2 = '<thead><tr><th rowspan="2">원자재</th>__G__<th colspan="3">수량</th><th rowspan="2">단위</th></tr><tr><th>목표</th><th>하한</th><th>상한</th></tr></thead>';
+    L.innerHTML = '<table>' + head2.replace('__G__', '') + '<tbody><tr><td>배지</td><td>450</td><td>440</td><td>480</td><td>L</td></tr><tr><td>수산화나트륨</td><td>20</td><td>18</td><td>22</td><td>L</td></tr></tbody></table>';
+    R.innerHTML = '<table>' + head2.replace('__G__', '<th rowspan="2">등급</th>') + '<tbody><tr><td>배지</td><td>세포 배양용</td><td>450</td><td>440</td><td>480</td><td>L</td></tr><tr><td>수산화나트륨</td><td>약전 등급</td><td colspan="3">필요량</td><td>L</td></tr></tbody></table>';
+    document.body.append(L, R);
+    const c = SgCompare.createCompare({ left: L, right: R, align: false });
+    for (let i = 0; i < 200 && !c.timing; i++) await new Promise((r) => setTimeout(r, 20));
+    return c.changes.map((x) => `${x.type}:${x.what}:${(x.text.diffs ?? []).map((d) => d[1]).join('') || x.text.context || ''}${x.span ? ':병합' : ''}${x.text.column ? ':' + x.text.column : ''}`);
+  });
+  const all = r.join(' | ');
+  check('등급 열은 머리글 + 두 줄을 묶어 "열 추가" 한 건 (3칸)', r.filter((x) => /^added:column:/.test(x)).length === 1 && r.some((x) => /^added:column:/.test(x) && x.endsWith(':3')), all);
+  check('합쳐진 칸은 첫 칸(목표 20)과 짝 → 수정', r.some((x) => /^modified:text:.*20.*필요량/.test(x)), all);
+  check('나머지 두 칸(18, 22)은 삭제', r.filter((x) => /^deleted:node:(18|22)$/.test(x)).length === 2, all);
+  check('엉뚱한 짝(숫자 → 등급) 없음', !r.some((x) => /(20|18|22).*등급/.test(x)), all);
+});
+
 await browser.close();
 server.close();
 const bad = results.filter((r) => !r.ok);

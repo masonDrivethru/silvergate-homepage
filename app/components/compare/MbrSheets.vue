@@ -75,6 +75,7 @@ const matKey = (m: Material) => 'm:' + m.name;
               <tr>
                 <th rowspan="2">{{ t('cdemo.paper.colPhase') }}</th>
                 <th rowspan="2">{{ t('cdemo.paper.colMaterial') }}</th>
+                <th v-if="doc.materialsGrade" rowspan="2">{{ t('cdemo.paper.colGrade') }}</th>
                 <th colspan="3">{{ t('cdemo.paper.colQty') }}</th>
                 <th rowspan="2">{{ t('cdemo.paper.colUnit') }}</th>
                 <th rowspan="2">{{ t('cdemo.paper.colSupplier') }}</th>
@@ -84,7 +85,11 @@ const matKey = (m: Material) => 'm:' + m.name;
             <tbody>
               <tr v-for="r in matRows" :key="matKey(r.m)" :data-sgc-key="matKey(r.m)">
                 <td v-if="r.first" :rowspan="r.span" class="mbr-phase">{{ r.m.phase }}</td>
-                <td>{{ r.m.name }}</td><td>{{ r.m.qty }}</td><td>{{ r.m.min }}</td><td>{{ r.m.max }}</td><td>{{ r.m.unit }}</td><td>{{ r.m.supplier }}</td>
+                <td>{{ r.m.name }}</td>
+                <td v-if="doc.materialsGrade">{{ r.m.grade }}</td>
+                <td v-if="r.m.qtyNote" colspan="3">{{ r.m.qtyNote }}</td>
+                <template v-else><td>{{ r.m.qty }}</td><td>{{ r.m.min }}</td><td>{{ r.m.max }}</td></template>
+                <td>{{ r.m.unit }}</td><td>{{ r.m.supplier }}</td>
               </tr>
             </tbody>
           </table>
@@ -113,7 +118,9 @@ const matKey = (m: Material) => 'm:' + m.name;
             </thead>
             <tbody>
               <tr v-for="p in it.step.params" :key="p.key" :data-sgc-key="'p:' + p.key">
-                <td>{{ p.label }}</td><td>{{ val(p) }}</td><td>{{ range(p) }}</td>
+                <td>{{ p.label }}</td>
+                <td v-if="p.note" colspan="2">{{ p.note }}</td>
+                <template v-else><td>{{ val(p) }}</td><td>{{ range(p) }}</td></template>
                 <td v-if="doc.paramCpp">{{ p.cpp ? t('cdemo.paper.yes') : '–' }}</td>
               </tr>
             </tbody>

@@ -12,7 +12,8 @@
 - **바로 쓰는 비교 화면** `SilverBio-Compare.html`: 설치 없이 HTML 두 개를 붙여 넣어 비교 (화면에서 복사한 것·코드 모두, 원래 사이트 주소로 CSS·그림 살리기)
 - **변경 보고서** `exportReport` · `downloadReport`: 비교 결과를 인쇄·PDF 가능한 보고서로
 - **검증 보고서** `검증보고서.html`: 브라우저 자동 테스트 결과를 시험 항목·기대 결과·실제 값·판정 표로 (`node product/scripts/validation-report.mjs`)
-- **자동 테스트**: 브라우저 테스트 18종(검사 134개) `npm run test:browser -w @silvergate/compare-dom`
+- **표 열 인식**: 표 머리글로 칸마다 어느 열인지 알아내, 열이 끼어들거나 칸이 합쳐진 줄에서도 같은 열 칸끼리 짝지음 (합친 칸은 첫 칸과 짝)
+- **자동 테스트**: 브라우저 테스트 19종(검사 139개) `npm run test:browser -w @silvergate/compare-dom`
 
 
 첫 납품 버전.

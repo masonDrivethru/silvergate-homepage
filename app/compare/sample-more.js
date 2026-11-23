@@ -9,6 +9,10 @@
  *   원자재 표: 열 3개 → 머리글 2단(수량: 목표/하한/상한) + 공정 단계별 묶음(rowspan) + 공급사 열, 한 줄 삭제
  *   파라미터 표: CPP(핵심 공정 변수) 열 추가
  *   구간: "정밀 여과" 구간 새로 생김 (2.2 가 이 구간으로 옮겨감), 3.3 삭제, 3.4 바이러스 여과 추가
+ * v2.0 → v2.1 (이미 복잡한 표가 또 바뀜)
+ *   원자재 표: "등급" 열 추가, "배지 조제" 단계를 새로 나눔(세로 묶음 다시 짬), 수산화나트륨 수량 세 칸 → "필요량" 한 칸(가로 병합),
+ *             정제 단계 두 줄 순서 바뀜, 소포제 수량 0.5 → 0.6, 레진 공급사 바뀜
+ *   파라미터 표: 1.2 에 "기록 주기" 줄 추가(설정값·허용 범위 칸 합침), 3.1 부하량 CPP 해제
  */
 import { getSamples } from './sample-data.js';
 
@@ -22,6 +26,8 @@ const TEXT = {
     vf: 'Virus filtration', vfIns: 'Pass the neutralized pool through the virus filter at constant pressure and check filter integrity after use.',
     pressure: 'Filter pressure', integrity: 'Integrity test', pass: 'Pass',
     supplierA: 'Fictional Supplier A', supplierB: 'Fictional Supplier B', supplierC: 'Fictional Supplier C',
+    prep: 'Media Preparation', asNeeded: 'As needed (pH adjustment)', interval: 'Recording interval', everyHour: 'Every hour (automatic log)',
+    gradeCompendial: 'Compendial', gradeCell: 'Cell culture', gradeChrom: 'Chromatography',
   },
   ko: {
     media: '기본 배지', glucose: '포도당 공급액', antifoam: '소포제 C', buffer: '인산 완충액', resin: 'Protein A 레진', naoh: '수산화나트륨 1 M',
@@ -30,6 +36,8 @@ const TEXT = {
     vf: '바이러스 여과', vfIns: '중화된 용액을 일정 압력으로 바이러스 필터에 통과시키고, 사용 후 필터 무결성을 확인한다.',
     pressure: '여과 압력', integrity: '무결성 시험', pass: '적합',
     supplierA: '가상 공급사 A', supplierB: '가상 공급사 B', supplierC: '가상 공급사 C',
+    prep: '배지 조제', asNeeded: '필요량 (pH 조정용)', interval: '기록 주기', everyHour: '1시간마다 (자동 기록)',
+    gradeCompendial: '약전 등급', gradeCell: '세포 배양용', gradeChrom: '크로마토그래피용',
   },
 };
 
@@ -44,7 +52,18 @@ function materials(t, ver) {
     { phase: t.purif, name: t.naoh, qty: '20', min: '18', max: '22', unit: 'L', supplier: t.supplierC },
   ];
   // v2.0: 인산 완충액 줄 삭제
-  return ver >= 2 ? rows.filter((r) => r.name !== t.buffer) : rows;
+  const out = ver >= 2 ? rows.filter((r) => r.name !== t.buffer) : rows;
+  if (ver < 2.1) return out;
+  // v2.1: 배지 조제 단계 분리 · 등급 열 · 수량 칸 병합 · 정제 두 줄 순서 · 값 수정
+  const by = (n) => out.find((r) => r.name === n);
+  by(t.media).phase = t.prep;
+  by(t.antifoam).qty = '0.6';
+  by(t.resin).supplier = t.supplierB;
+  const naoh = by(t.naoh);
+  naoh.qtyNote = t.asNeeded;
+  const grade = { [t.media]: t.gradeCell, [t.glucose]: t.gradeCompendial, [t.antifoam]: t.gradeCompendial, [t.resin]: t.gradeChrom, [t.naoh]: t.gradeCompendial };
+  for (const r of out) r.grade = grade[r.name];
+  return [by(t.media), by(t.glucose), by(t.antifoam), naoh, by(t.resin)];
 }
 
 /** 언어별 전체 샘플: 버전 → 문서 */
@@ -95,17 +114,28 @@ export function getAllSamples(locale) {
       { key: 'integrity', label: t.integrity, value: t.pass, cpp: false },
     ],
   });
+  // v2.1: 이미 복잡한 표가 또 바뀜
+  const v21 = clone(v20);
+  v21.version = '2.1';
+  v21.effectiveDate = '2027-04-01';
+  v21.materials = materials(t, 2.1);
+  v21.materialsGrade = true;
+  const s12 = st(v21, 'G1', '1.2');
+  if (s12?.params) s12.params.push({ key: 'interval', label: t.interval, note: t.everyHour, cpp: false });
+  for (const grp of v21.groups) for (const s of grp.steps ?? []) for (const p of s.params ?? []) if (p.key === 'load') p.cpp = false;
+
   // 서명표·개정 사유 (사람·날짜 모두 가상)
   const people = lang === 'ko' ? ['김지원', '이서연', '박도윤'] : ['J. Kim', 'S. Lee', 'D. Park'];
   const sign = (d1, d2, d3) => [people[0], d1, people[1], d2, people[2], d3];
   const reasons = lang === 'ko'
-    ? { '1.0': '최초 제정', '1.1': '배양 온도 변경, 중간 샘플링 추가', '1.2': '기준값 조정, 단계 순서 변경', '2.0': '원자재 표·파라미터 표 개편, 정밀 여과 구간 신설' }
-    : { '1.0': 'Initial issue', '1.1': 'Culture temperature change, in-process sampling added', '1.2': 'Limits adjusted, step order changed', '2.0': 'Material and parameter tables restructured, clarification section added' };
-  // 문서 관리 시스템의 상태 (가상): 1.0·1.1 대체됨, 1.2 시행, 2.0 검토 중
-  v10.status = 'superseded'; v11.status = 'superseded'; v12.status = 'effective'; v20.status = 'review';
+    ? { '1.0': '최초 제정', '1.1': '배양 온도 변경, 중간 샘플링 추가', '1.2': '기준값 조정, 단계 순서 변경', '2.0': '원자재 표·파라미터 표 개편, 정밀 여과 구간 신설', '2.1': '원자재 등급 열 추가, 배지 조제 단계 분리, 기록 주기 추가' }
+    : { '1.0': 'Initial issue', '1.1': 'Culture temperature change, in-process sampling added', '1.2': 'Limits adjusted, step order changed', '2.0': 'Material and parameter tables restructured, clarification section added', '2.1': 'Material grade column added, media preparation split out, recording interval added' };
+  // 문서 관리 시스템의 상태 (가상): 1.0·1.1·1.2 대체됨, 2.0 시행, 2.1 검토 중
+  v10.status = 'superseded'; v11.status = 'superseded'; v12.status = 'superseded'; v20.status = 'effective'; v21.status = 'review';
   v10.signatures = sign('2026-02-10', '2026-02-18', '2026-02-24'); v10.reason = reasons['1.0'];
   v11.signatures = sign('2026-05-20', '2026-06-02', '2026-06-09'); v11.reason = reasons['1.1'];
   v12.signatures = sign('2026-08-11', '2026-08-19', '2026-08-26'); v12.reason = reasons['1.2'];
   v20.signatures = sign('2026-12-14', '2026-12-22', '2027-01-08'); v20.reason = reasons['2.0'];
-  return { '1.0': v10, '1.1': v11, '1.2': v12, '2.0': v20 };
+  v21.signatures = sign('2027-03-08', '2027-03-16', '2027-03-24'); v21.reason = reasons['2.1'];
+  return { '1.0': v10, '1.1': v11, '1.2': v12, '2.0': v20, '2.1': v21 };
 }

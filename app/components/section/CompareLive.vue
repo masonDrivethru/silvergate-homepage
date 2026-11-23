@@ -27,9 +27,11 @@ watch([sample, locale], () => { if (sample.value === 'large') loadLarge(); });
 
 const docs = computed(() => (sample.value === 'large' && largeDocs.value) || getAllSamples(locale.value));
 const versions = computed(() => Object.keys(docs.value));
-const leftVer = ref('1.0');
-const rightVer = ref('1.1');
-watch(versions, (v) => { leftVer.value = v[0]!; rightVer.value = v[1] ?? v[0]!; });
+// 짧은 문서는 가장 최근 두 버전(v2.0 → v2.1: 복잡한 표 변경)이 처음 보이게. 대용량은 처음 두 버전
+const pickPair = (v: string[]) => (sample.value === 'basic' && v.length > 1 ? [v[v.length - 2]!, v[v.length - 1]!] : [v[0]!, v[1] ?? v[0]!]);
+const leftVer = ref(pickPair(Object.keys(getAllSamples(locale.value)))[0]!);
+const rightVer = ref(pickPair(Object.keys(getAllSamples(locale.value)))[1]!);
+watch(versions, (v) => { [leftVer.value, rightVer.value] = pickPair(v) as [string, string]; });
 const left = computed(() => docs.value[leftVer.value] ?? docs.value[versions.value[0]!]!);
 const right = computed(() => docs.value[rightVer.value] ?? docs.value[versions.value[1] ?? versions.value[0]!]!);
 /** 두 버전이 같은 쪽 나누기를 쓰게 (좌우 쪽마다 같은 항목 → 빈 칸과 함께 높이가 늘 맞음) */
