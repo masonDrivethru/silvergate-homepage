@@ -501,7 +501,9 @@ export function createCompare(options) {
     for (const sp of spacers) sp.remove();
     // 지운 빈 칸을 변경이 계속 가리키지 않게 (이동할 때 없어진 빈 칸을 목표로 잡는 문제)
     for (const ch of state.changes) ch.spacer = null;
-    for (const [el, prop, old, had] of padded) { el.style[prop] = old; if (!had && el.getAttribute('style') === '') el.removeAttribute('style'); }
+    // 거꾸로 되돌린다: 같은 요소를 두 번 고쳤으면(줄 단위 + 큰 덩어리 단위) 앞에서부터 되돌리면 중간값이 남고,
+    // 다시 맞출 때마다 여백이 두 배씩 불어났다 (휴대폰에서 보는 쪽을 바꿀 때 문서가 끝없이 길어짐)
+    for (const [el, prop, old, had] of padded.reverse()) { el.style[prop] = old; if (!had && el.getAttribute('style') === '') el.removeAttribute('style'); }
     spacers = []; padded = [];
   }
   const zoomOf = (el) => {
@@ -530,7 +532,7 @@ export function createCompare(options) {
     if (cs.display === 'table-row') return ch;
     return cs.boxSizing === 'border-box' ? ch : ch + px(cs.paddingTop) + px(cs.paddingBottom) + px(cs.borderTopWidth) + px(cs.borderBottomWidth);
   }
-  function spaceOf(el) {
+  function spaceOf(el, solo = null) {
     const z = zoomOf(el) || 1;
     const r = el.getBoundingClientRect();
     const win = el.ownerDocument.defaultView;
@@ -544,6 +546,16 @@ export function createCompare(options) {
     let next = el.nextElementSibling;
     while (next && (next.classList.contains('sgc-spacer') || next.hasAttribute('data-sgc-ignore'))) next = next.nextElementSibling;
     if (next) { const nr = next.getBoundingClientRect(); if (nr.top >= r.bottom - 1 && nr.top - r.top < r.height * 3 + 200) return (nr.top - r.top) / z; }
+    // 맨 끝 항목: 위 여백은 앞 항목의 아래 여백과 겹친다(margin collapse) → 앞 항목 여백 끝에서부터 잰다
+    // (위 여백을 통째로 더하면 그만큼 빈 칸이 커져 다음 쪽부터 끝까지 좌우가 어긋났다)
+    let prev = el.previousElementSibling;
+    while (prev && (prev.classList.contains('sgc-spacer') || prev.hasAttribute('data-sgc-ignore'))) prev = prev.previousElementSibling;
+    if (prev) {
+      // 앞 항목도 이쪽에만 있는 것(함께 추가됨)이면 그 빈 칸이 이 항목 위 여백까지 이미 쟀다(다음 항목까지 거리)
+      if (solo?.has(prev)) return h + px(cs.marginBottom);
+      // 앞 항목이 양쪽에 다 있으면: 반대쪽엔 앞 항목 아래 여백만 있으므로, 그보다 큰 만큼만 더한다
+      return h + Math.max(0, px(cs.marginTop) - px(win.getComputedStyle(prev).marginBottom)) + px(cs.marginBottom);
+    }
     return h + px(cs.marginTop) + px(cs.marginBottom);
   }
   function parentGap(el) {
@@ -575,7 +587,14 @@ export function createCompare(options) {
     sp.setAttribute('data-sgc-ignore', '');
     sp.setAttribute('aria-hidden', 'true');
     // 그사이 화면이 다시 그려져 기준 요소가 없어졌으면 넣지 않는다 (다시 비교하면서 새로 넣음)
-    if (afterNode) { if (!afterNode.parentNode) return null; afterNode.parentNode.insertBefore(sp, afterNode.nextSibling); }
+    if (afterNode) {
+      if (!afterNode.parentNode) return null;
+      // 같은 항목 뒤에 빈 칸이 여러 개 들어가면(연달아 추가된 제목 + 단계 등) 앞서 넣은 빈 칸들 뒤에 → 순서가 반대쪽 원본과 같게
+      // (바로 뒤에 넣으면 나중 것이 앞에 끼어들어 순서가 뒤집히고, 클릭하면 엉뚱한 빈 칸이 반짝였다)
+      let at = afterNode.nextSibling;
+      while (at && at.nodeType === 1 && at.classList.contains('sgc-spacer')) at = at.nextSibling;
+      afterNode.parentNode.insertBefore(sp, at);
+    }
     else if (!parent || !(end || ref.parentNode)) return null;
     else if (end) parent.appendChild(sp); else parent.insertBefore(sp, ref);
     spacers.push(sp);
@@ -734,6 +753,9 @@ export function createCompare(options) {
     const el = (x) => (x ? (x.nodeType === 1 ? x : x.parentElement) : null);
     // 1) 재기: 한쪽에만 있는 덩어리의 높이와 넣을 자리
     const plans = [];
+    // 이쪽에만 있는 덩어리들 (빈 칸 높이를 잴 때 앞 항목이 함께 추가·삭제된 것인지 보려고)
+    const solo = new Set();
+    for (const ch of list) if (ch.type === 'added' || ch.type === 'deleted') { const s = ch.type === 'added' ? 'right' : 'left'; solo.add(el(ch[s])); for (const x of ch.extra ?? []) solo.add(el(x.node)); }
     for (const ch of list) {
       const exp = ch.extra ? [ch, ...ch.extra.map((x) => ({ ...ch, [ch.type === 'added' ? 'right' : 'left']: x.node, gap: x.gap }))] : [ch];
       for (const c of exp) {
@@ -761,7 +783,7 @@ export function createCompare(options) {
           }
         } else if (end && prev) after = prev;
         if (!ref && !after && !intoPage) continue;
-        const h = spaceOf(n);
+        const h = spaceOf(n, solo);
         if (h < 1) continue;
         if (intoPage) {
           // 쪽 안 첫 내용 앞 (비교에서 빠지는 머리말·표 머리 다음). 내용이 없으면 꼬리말 앞
@@ -845,6 +867,8 @@ export function createCompare(options) {
   /** 같은 높이로 만들 값 계산 (읽기만) */
   function measurePair(a, b) {
     if (!a || !b || a === b || !a.isConnected || !b.isConnected) return null;
+    // 한쪽이 숨어 있으면(휴대폰에서 안 보는 쪽) 높이가 0 이라 맞출 수 없다. 보이게 되면 폭이 바뀌어 다시 맞춘다
+    if (!a.getClientRects().length || !b.getClientRects().length) return null;
     const ha = layoutHeight(a), hb = layoutHeight(b);
     if (Math.abs(ha - hb) < 0.5) return null;
     const lo = ha < hb ? a : b, diff = Math.abs(ha - hb);
@@ -1049,6 +1073,14 @@ export function createCompare(options) {
   }
 
   function elOf(n) { return n ? (n.nodeType === 1 ? n : n.parentElement) : null; }
+  /** 화면에 상자가 있는지 (display:none 인 칸 = 휴대폰에서 숨긴 쪽 등은 false) */
+  function shown(el) { return !!el?.isConnected && el.getClientRects().length > 0; }
+  /** 변경의 실제 내용이 있는 쪽: 삭제·이전 버전에만 있는 것 → 'left', 그 밖 → 'right'. 한쪽만 보여 주는 화면(휴대폰)은 이쪽으로 바꿔 보여 주면 된다 */
+  function contentSide(ch) {
+    if (!ch) return 'right';
+    if (ch.type === 'deleted' || (!ch.right && ch.left)) return 'left';
+    return 'right';
+  }
 
   let focusTimer = 0;
   const focused = [];
@@ -1072,6 +1104,10 @@ export function createCompare(options) {
     for (const el of focused) el.removeAttribute('data-sgc-focus');
     focused.length = 0;
     emit('focus', ch);
+    // 'focus' 를 받은 화면이 보이는 쪽을 바꿀 수 있다(휴대폰에서 삭제를 누르면 이전 버전으로 등). Vue·React 는 다음 틈에 화면을 고치므로
+    // 그 뒤에 자리를 잰다 (먼저 재면 숨었던 쪽 기준이라 엉뚱한 곳으로 감)
+    await new Promise((r) => setTimeout(r, 0));
+    if (token !== goToken) return;
     const targetOf = (side) => {
       let el = elOf(ch[side]);
       if (!el && ch.gap?.side === side) el = (ch.spacer?.isConnected ? ch.spacer : null) ?? elOf(ch.gap.node);
@@ -1087,17 +1123,43 @@ export function createCompare(options) {
     }
     // ② 이동: 부드럽게 (움직임 줄이기 설정이면 바로): 부드럽게 (움직임 줄이기 설정이면 바로)
     let sides = ['left', 'right'].map((side) => ({ side, block: targetOf(side) })).filter((x) => x.block);
-    // 두 문서가 한 스크롤 영역에 있으면(좌우가 늘 함께 움직임) 한쪽 기준으로만 맞춘다 (새 버전 쪽 우선)
-    if (sides.length > 1 && scrollers.left.target === scrollers.right.target) sides = [sides.find((x) => x.side === 'right') ?? sides[0]];
+    // 두 문서가 한 스크롤 영역에 있으면(좌우가 늘 함께 움직임) 한쪽 기준으로만 맞춘다:
+    // 실제 내용이 있는 쪽 (삭제 → 이전 버전, 그 밖 → 새 버전). 빈 칸 쪽을 기준으로 맞추면 삭제된 내용이 빈 칸과 높이가 달라 화면 끝에 걸릴 수 있다
+    const shared = scrollers.left.target === scrollers.right.target;
+    const main = contentSide(ch);
+    if (sides.length > 1 && shared) {
+      const pick = sides.find((x) => x.side === main && shown(x.block)) ?? sides.find((x) => shown(x.block)) ?? sides.find((x) => x.side === main) ?? sides[0];
+      sides = [pick];
+    }
+    /** 한 스크롤 영역일 때 반대쪽 짝 (빈 칸 또는 짝 요소) → 둘 다 화면에 들어오게 맞춘다 */
+    const partnerOf = (side) => {
+      if (!shared) return null;
+      const p = targetOf(side === 'left' ? 'right' : 'left');
+      return p && p.isConnected && shown(p) ? p : null;
+    };
     const reduce = !!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
     const soft = smooth && !reduce;
     let userMoved = false;
     const stopper = () => { userMoved = true; };
     const docsSet = new Set(sides.map(({ side }) => root(side).ownerDocument));
     for (const d of docsSet) for (const ev of ['wheel', 'touchstart', 'keydown', 'mousedown']) d.addEventListener(ev, stopper, { passive: true, capture: true });
-    /** 목표까지 남은 거리 (px) */
-    const offBy = (sc, block) => {
-      const want = sc.top + (topIn(block, sc.doc) - sc.viewTop()) - sc.height() * 0.3;
+    /** 목표까지 남은 거리 (px). 목표를 화면 위에서 30% 자리에, 반대쪽 짝(partner)도 화면 안에 들어오게 */
+    const offBy = (sc, block, partner = null) => {
+      const vh = sc.height(), base = sc.viewTop();
+      const bTop = topIn(block, sc.doc) - base;
+      let want = sc.top + bTop - vh * 0.3;
+      if (partner?.isConnected) {
+        const z = block.getBoundingClientRect(), pz = partner.getBoundingClientRect();
+        const pTop = topIn(partner, sc.doc) - base;
+        const lo = Math.min(bTop, pTop), hi = Math.max(bTop + z.height, pTop + pz.height);
+        const pad = Math.min(48, vh * 0.08);
+        if (hi - lo <= vh - pad * 2) {
+          // 둘을 합친 범위가 화면 안에 다 들어가게 (목표 자리 30% 에서 가장 조금 움직여서)
+          const top = want - sc.top;   // 화면 맨 위가 문서 안에서 옮겨 갈 양
+          const minTop = hi - (vh - pad), maxTop = lo - pad;
+          want = sc.top + Math.max(minTop, Math.min(top, maxTop));
+        }
+      }
       return Math.max(0, Math.min(want, sc.max())) - sc.top;
     };
     /** 스크롤이 멈출 때까지 (scrollend 또는 몇 프레임 동안 그대로), 최대 1.5초 */
@@ -1157,11 +1219,11 @@ export function createCompare(options) {
             // 쪽이 화면에 들어온 다음 프레임부터 (그때는 안쪽이 그려져 있음), 줄 위치가 쪽 안에 있을 때만 정확한 자리로
             if (it.seen >= 2) {
               const bt = topIn(block, sc.doc) - sc.viewTop();
-              if (bt >= top - 2 && bt <= top + ph + 2) return sc.top + offBy(sc, block);
+              if (bt >= top - 2 && bt <= top + ph + 2) return sc.top + offBy(sc, block, partnerOf(it.side));
             }
             return clampTo(sc, sc.top + top - vh * 0.15);
           }
-          return sc.top + offBy(sc, block);
+          return sc.top + offBy(sc, block, partnerOf(it.side));
         };
         // 한 구간 = 지금 자리에서 목표까지. 가는 도중 목표가 바뀌면(쪽이 그려져 정확한 줄을 알게 됨, 빈 칸이 생김)
         // 멈추지 않고 그 자리에서 새 목표로 부드럽게 이어 간다 (위치가 끊기지 않음)
@@ -1248,12 +1310,12 @@ export function createCompare(options) {
         if (token !== goToken) return;
         // 높이 맞추기로 빈 칸이 새로 생겼을 수 있으니 목표를 다시 찾는다
         sides = sides.map(({ side }) => ({ side, block: targetOf(side) })).filter((x) => x.block);
-        const off = sides.filter(({ block }) => block.isConnected).map(({ side, block }) => [scrollers[side], block, offBy(scrollers[side], block)]).filter((x) => Math.abs(x[2]) > 2);
+        const off = sides.filter(({ block }) => block.isConnected).map(({ side, block }) => [scrollers[side], block, offBy(scrollers[side], block, partnerOf(side))]).filter((x) => Math.abs(x[2]) > 2);
         if (!off.length) break;
         link?.pause(2000);
         if (glide) { if (!(await glide(false))) break; }
         else {
-          for (const [sc, block] of off) scrollIntoScroller(sc, block, 0.3, false);
+          for (const [sc, , d] of off) { const v = sc.top + d; if (sc.target.scrollTo) sc.target.scrollTo({ top: v, behavior: 'instant' }); else sc.top = v; }
           await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
         }
         if (token !== goToken) return;
@@ -1445,7 +1507,7 @@ export function createCompare(options) {
     get sharedScroll() { if (!scrollers.left) setupScroll(); return scrollers.left.target === scrollers.right.target; },
     set syncScroll(v) { if (link) link.enabled = v; updateScrollbar(); emit('sync', !!v); },
     setFilter(type) { state.filter = type && state.filter !== type ? type : null; emit('filter', state.filter); },
-    run, goTo, next: () => step(1), prev: () => step(-1), renderRedline,
+    run, goTo, next: () => step(1), prev: () => step(-1), renderRedline, contentSide,
     on(ev, f) { if (!listeners.has(ev)) listeners.set(ev, []); listeners.get(ev).push(f); return () => api.off(ev, f); },
     off(ev, f) { const l = listeners.get(ev); if (l) l.splice(l.indexOf(f) >>> 0, 1); },
     clear() { unalign(); marks.left.clear(); marks.right.clear(); state.changes = []; emit('update', api); },

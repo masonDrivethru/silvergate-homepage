@@ -318,6 +318,11 @@ export function mountViewer(host, o) {
     if (shared) { fitFrame(fl); fitFrame(fr); }
     ctrl = createCompare({ ...o, left: fl, right: fr, auto: false, watch: o.watch ?? false,
       ...(shared ? { leftScroller: desk, rightScroller: desk } : {}) });
+    // 휴대폰(한쪽만 보임): 누른 변경의 내용이 안 보이는 쪽에만 있으면(삭제 등) 그쪽으로 바꿔 보여 준다
+    if (shared) ctrl.on('focus', (c) => {
+      const s = ctrl.contentSide(c), now = desk.dataset.phone;
+      if (s !== now && !c[now] && doc.defaultView.getComputedStyle(desk.querySelector(`.sgc-col--${s}`)).display === 'none') pick(s);
+    });
     tb = mountToolbar(bar, ctrl, { locale: o.locale, labels: o.labels, modes: true, onMode: setMode });
     cl = mountChangeList(list, ctrl, { locale: o.locale, labels: o.labels });
     ctrl.on('update', () => { redlineDirty = true; if (!paneX.hidden) drawRedline(); });

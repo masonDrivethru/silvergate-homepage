@@ -501,6 +501,40 @@ await test('열이 끼어들고 칸이 합쳐진 줄: 머리글로 같은 열 �
   check('엉뚱한 짝(숫자 → 등급) 없음', !r.some((x) => /(20|18|22).*등급/.test(x)), all);
 });
 
+await test('변경 클릭 → 포커스: 모든 변경이 화면 안에, 빈 칸 순서, 한쪽 숨김/보임 반복', async (page, check) => {
+  await page.goto(`${BASE}/t/navfocus`);
+  const r = await done(page);
+  check('오류 없음', !r.error, r.error);
+  // 쪽 끝에 연달아 추가된 제목(작음) + 단계(160px): 왼쪽 빈 칸도 같은 순서(작은 것 → 큰 것)
+  const order = await page.evaluate(() => [...document.querySelectorAll('#left .sgc-spacer')].map((s) => Math.round(s.getBoundingClientRect().height)));
+  const big = order.findIndex((h) => h > 140), small = order.findIndex((h) => h > 0 && h < 60);
+  check('연달아 추가된 항목의 빈 칸 순서가 원본과 같음', big > 0 && small >= 0 && small < big, order.join(','));
+  // 모든 변경을 눌러 보기: 목표(실제 내용)와 반대쪽 짝이 모두 화면 안
+  const miss = [];
+  for (let i = 0; i < r.n; i++) {
+    const j = await page.evaluate(async (i) => {
+      const c = window.ctrl, ch = c.changes[i];
+      await c.goTo(i);
+      const d = desk.getBoundingClientRect();
+      const els = [...document.querySelectorAll('[data-sgc-focus]')];
+      const out = els.map((el) => { const b = el.getBoundingClientRect(); return b.top >= d.top - 1 && b.bottom <= d.bottom + 1; });
+      return { type: ch.type, n: els.length, ok: els.length > 0 && out.every(Boolean), main: c.contentSide(ch), hasMain: els.some((el) => el.closest('#' + c.contentSide(ch))) };
+    }, i);
+    if (!j.ok || !j.hasMain) miss.push(`#${i} ${j.type} ${JSON.stringify(j)}`);
+  }
+  check(`변경 ${r.n}건 모두: 실제 내용과 반대쪽 짝이 화면 안에서 반짝`, miss.length === 0, miss.join(' / '));
+  // 한쪽을 숨겼다 보였다 (휴대폰에서 이전/새 버전 고르기) → 다시 맞출 때마다 여백이 불어나면 안 됨
+  const hs = [];
+  for (let k = 0; k < 4; k++) {
+    hs.push(await page.evaluate(async () => {
+      left.style.display = 'none'; await new Promise((r) => setTimeout(r, 300));
+      left.style.display = ''; await new Promise((r) => setTimeout(r, 300));
+      return [left.offsetHeight, right.offsetHeight];
+    }));
+  }
+  check('숨김/보임을 반복해도 문서 높이가 그대로이고 좌우가 같음', hs.every(([a, b]) => Math.abs(a - b) < 1 && Math.abs(a - hs[0][0]) < 1), JSON.stringify(hs));
+});
+
 await browser.close();
 server.close();
 const bad = results.filter((r) => !r.ok);

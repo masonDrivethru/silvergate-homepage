@@ -216,4 +216,12 @@ drawSheet(document.querySelector('#left .grid'), A, o); drawSheet(document.query
 window.ctrl = SgCompare.createCompare({ left, right, leftScroller: desk, rightScroller: desk });
 </script></body></html>`;
 
-export const PAGES = { brickkeys, bricks, jsontable, basic, viewer, legacy, portal, inner, widgets, blank, pages, hidden, tables };
+// ---------- 변경 클릭 → 포커스: 쪽 끝에 제목 + 단계가 연달아 추가, 줄바꿈으로 높이가 다른 제목, 삭제 ----------
+const navDoc = (v) => `<div class="pg"><h3>${v === 1 ? '1. 준비' : '1. 준비 — 작업 전 설비 점검과 청소 상태 확인, 원료 칭량 및 기록지 준비까지 모두 마친다'}</h3>
+<p>공통 문단 하나.</p><p>공통 문단 둘.</p>${v === 1 ? '<div class="step" style="height:90px">지워질 단계</div>' : ''}<p>공통 문단 셋.</p>
+${v === 2 ? '<h4 style="margin:4px 0">2. 새 절 제목</h4><div class="step" style="height:160px">새 단계 (높이 160)</div>' : ''}</div>
+<div class="pg"><p>다음 쪽 문단.</p>${'<p>채움 문단.</p>'.repeat(30)}</div>`;
+const navfocus = `${head('포커스', DESK + '.pg{background:#fff;margin:8px;padding:12px}.step{border:1px solid #99a;margin:6px 0}')}<body><div id="desk"><div id="left">${navDoc(1)}</div><div id="right">${navDoc(2)}</div></div>${SDK}
+<script>window.ctrl = SgCompare.createCompare({ left, right, leftScroller: desk, rightScroller: desk, page: '.pg' });</script></body></html>`;
+
+export const PAGES = { navfocus, brickkeys, bricks, jsontable, basic, viewer, legacy, portal, inner, widgets, blank, pages, hidden, tables };

@@ -59,6 +59,13 @@ onMounted(async () => {
   let dirty = true;
   const drawRedline = () => { if (xDoc.value) { ctrl.renderRedline(xDoc.value); dirty = false; } };
   ctrl.on('update', () => { dirty = true; if (mode.value === 'redline') drawRedline(); });
+  // 휴대폰(한쪽만 보임): 누른 변경의 내용이 안 보이는 쪽에만 있으면(삭제 등) 그쪽으로 바꿔 보여 준다
+  ctrl.on('focus', (c: any) => {
+    const s = ctrl.contentSide(c), el = desk.value;
+    if (!el || s === phoneSide.value || c[phoneSide.value]) return;
+    const col = el.querySelector<HTMLElement>(`.cmp-col--${s}`);
+    if (col && getComputedStyle(col).display === 'none') phoneSide.value = s;
+  });
   const tb = mountToolbar(bar.value!, ctrl, {
     locale: lang, modes: true,
     onMode: (m) => { mode.value = m; if (m === 'redline' && dirty) nextTick(drawRedline); },

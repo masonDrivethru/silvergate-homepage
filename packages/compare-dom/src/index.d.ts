@@ -99,6 +99,8 @@ export interface CompareController {
   readonly sharedScroll: boolean;
   run(): Promise<void>;
   goTo(index: number, opt?: { smooth?: boolean }): void;
+  /** 변경의 실제 내용이 있는 쪽 (삭제·이전 버전에만 있는 것 → 'left'). 한쪽만 보여 주는 화면은 'focus' 때 이쪽으로 바꿔 보여 주면 된다 */
+  contentSide(change: ChangeItem): 'left' | 'right';
   next(): void;
   prev(): void;
   setFilter(type: ChangeType | null): void;
