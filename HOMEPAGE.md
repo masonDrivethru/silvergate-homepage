@@ -62,6 +62,7 @@
 - **샘플 버전 4개** (`app/compare/sample-more.js`): v1.0 · v1.1 · v1.2(수정·순서 바뀜·원자재 추가) · v2.0(원자재 표 머리글 2단·단계별 묶음·공급사 열, 파라미터 표 CPP 열, 구간 신설·단계 삭제/추가). 두 버전은 `app/compare/plan.js` 로 같은 쪽 나누기 → 모듈이 빈 칸을 넣어 좌우 높이가 늘 맞음
 - **소스 보안**: `nuxt.config.ts` 에 `sourcemap: false` (운영 사이트에 원본 소스 안 나감). **GitHub 저장소는 반드시 비공개(private)로** — 공개면 소스 전체가 노출됨
 - **`/compare` 페이지는 이 모듈로 바뀜**: `app/pages/compare.vue` → `SectionCompareLive` (두 버전을 `CompareMbrSheets` 로 그냥 그리고, 모듈이 그려진 화면끼리 비교). 영어 기본, `/ko/compare` 한국어. 예전 화면(`SectionCompareDemo`, `components/compare/ComparePanel` 등, `app/compare/engine.js`)은 파일만 남겨 둠 — 되돌리려면 compare.vue 한 줄만 바꾸면 됨
+- **"내 페이지 비교" 탭** (`app/components/compare/Files.vue` + `app/compare/page-file.js`): 사용자가 저장한 웹페이지 파일 두 개(.mhtml 권장, .html + "_files" 폴더도 가능)를 끌어다 놓으면 `mountViewer({ html, scripts: false })` 로 비교. 파일은 브라우저 안에서만 읽음(서버 업로드 없음). MHTML 은 안의 그림·CSS 를 blob 주소로 바꿔 원래 모양 그대로, .html 은 `<!-- saved from url -->` 로 `<base>` 를 넣어 원래 사이트에서 그림·CSS 를 불러옴. 스크립트·noscript·refresh/CSP meta 는 뺌. 다른 도메인 페이지를 주소로 바로 비교하는 것은 브라우저 보안상 불가라 이 방식을 택함
 - `compare-core`: 어떤 JSON이든 비교하는 엔진 (키 기반 짝 맞춤, 비슷한 것끼리 짝, 해시로 같은 부분 건너뛰기). `node --test` 21개
 - `compare-dom`: **브라우저에 그려진 화면 두 개**를 원본 그대로 두고 바뀐 곳만 표시 (CSS Highlight API + 속성 하나). Worker 비교, 나눠 읽기, 쪽 단위 스크롤 맞춤, 한 장 보기, 변경 목록. `dist/sg-compare.min.js` 한 파일이면 JSP 에서 바로 사용. 자세한 것은 `packages/compare-dom/README.md`
 - `compare-vue` / `compare-react`: compare-dom 을 감싼 부품 (`<SgCompare>`, 문서 컴포넌트를 그대로 두 번 그림)

@@ -190,6 +190,21 @@
     "metaTitle": "Try SilverBio Compare | SilverGate",
     "sampleTables": "Complex tables",
     "sampleSpeed": "Speed test",
+    "sampleFiles": "Your pages",
+    "files": {
+      "lead": "Save any two web pages as files and drop them here. Changes are marked right on the original page. Compare an old and new copy of the same page, or two similar pages.",
+      "drop": "Drop a saved web page here",
+      "choose": "Choose file",
+      "change": "Change",
+      "remove": "Remove",
+      "reading": "Reading…",
+      "extras": "{n} extra files",
+      "bad": "Could not read \"{name}\". Try saving it again in Chrome or Edge as \"Webpage, Single File\".",
+      "none": "No web page file (.mhtml, .html) found.",
+      "howTitle": "How to use",
+      "how": "Open the page you want to compare in Chrome or Edge.\nPress Ctrl+S (Cmd+S on Mac) and save as \"Webpage, Single File (.mhtml)\".\nAfter the page changes, save it again the same way. Two different pages work too.\nDrop both files on the boxes above, or use \"Choose file\". If you drop both at once, the one saved first becomes the previous version.\nIf you saved as \"Webpage, Complete\", drop the \"_files\" folder together with the .html file so images and styles show up.\nClick the counts in the bar (added, modified, deleted) or press F7 / Shift+F7 to step through changes. \"Single view\" overlays both versions on one page.",
+      "privacy": "Files are opened only in this browser and never uploaded. Scripts on the page are not run, so pages drawn by scripts are compared as they looked when saved."
+    },
     "lab": {
       "tablesLead": "Cases where the table structure changes: merged cells (colspan, rowspan), an added column, reordered rows, and a structure replaced entirely. The first one is a results table with two header rows and cells grouped by equipment.",
       "changed": "What changed:",
